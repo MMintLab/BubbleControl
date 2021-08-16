@@ -120,7 +120,7 @@ def control_test(supervision=False):
     bc = BubbleController()
     target_pose = np.array([0.5, 0, .5, 0, -0.7071, 0.7071, 0])
     bc.control(target_pose, ref_frame='med_base', supervision=supervision)
-    tr.euler
+
 
 if __name__ == '__main__':
     supervision = False
