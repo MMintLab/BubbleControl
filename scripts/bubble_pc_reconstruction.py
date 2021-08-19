@@ -67,8 +67,8 @@ class BubblePCReconstructor(object):
         planes_pc = np.concatenate([plane_1, plane_2], axis=0)
         planes_pcd = pack_o3d_pcd(planes_pc)
 
-        # object model simplified by 2 planes
-        grid_y, grid_z = np.meshgrid(np.linspace(-0.003, 0.003, 30),
+        # PEN ---- object model simplified by 2 planes
+        grid_y, grid_z = np.meshgrid(np.linspace(-0.0025, 0.0025, 30),
                                      np.linspace(-self.height * 0.1, self.height * 0.1, 50))
         points_y = grid_y.flatten()
         points_z = grid_z.flatten()
@@ -81,7 +81,7 @@ class BubblePCReconstructor(object):
         pen_pc = np.concatenate([plane_1, plane_2], axis=0)
         pen_pcd = pack_o3d_pcd(pen_pc)
 
-        # spatula simplified by 2 planes
+        # SPATULA ---- spatula simplified by 2 planes
         grid_y, grid_z = np.meshgrid(np.linspace(-0.0025, 0.0025, 50),
                                      np.linspace(-0.01, 0.01, 50))
         points_y = grid_y.flatten()
@@ -95,11 +95,55 @@ class BubblePCReconstructor(object):
         spatula_pl_pc = np.concatenate([plane_1, plane_2], axis=0)
         spatula_pl_pcd = pack_o3d_pcd(spatula_pl_pc)
 
+        # MARKER ---- object model simplified by 2 planes
+        grid_y, grid_z = np.meshgrid(np.linspace(-0.0025, 0.0025, 30),
+                                     np.linspace(-self.height * 0.1, self.height * 0.1, 50))
+        points_y = grid_y.flatten()
+        points_z = grid_z.flatten()
+        plane_base = np.stack([np.zeros_like(points_y), points_y, points_z], axis=1)
+        plane_base = np.concatenate([plane_base, np.zeros_like(plane_base)], axis=1)
+        plane_1 = plane_base.copy()
+        plane_2 = plane_base.copy()
+        plane_1[:, 0] = 0.01
+        plane_2[:, 0] = -0.01
+        marker_pc = np.concatenate([plane_1, plane_2], axis=0)
+        marker_pcd = pack_o3d_pcd(marker_pc)
+
+        # ALLEN ---- object model simplified by 2 planes
+        grid_y, grid_z = np.meshgrid(np.linspace(-0.0025, 0.0025, 30),
+                                     np.linspace(-self.height * 0.1, self.height * 0.1, 50))
+        points_y = grid_y.flatten()
+        points_z = grid_z.flatten()
+        plane_base = np.stack([np.zeros_like(points_y), points_y, points_z], axis=1)
+        plane_base = np.concatenate([plane_base, np.zeros_like(plane_base)], axis=1)
+        plane_1 = plane_base.copy()
+        plane_2 = plane_base.copy()
+        plane_1[:, 0] = 0.003
+        plane_2[:, 0] = -0.003
+        allen_pc = np.concatenate([plane_1, plane_2], axis=0)
+        allen_pcd = pack_o3d_pcd(allen_pc)
+
+        # PINGPONG PADDLE ---- object model simplified by 2 planes
+        grid_y, grid_z = np.meshgrid(np.linspace(-0.01, 0.01, 30),
+                                     np.linspace(-self.height * 0.1, self.height * 0.1, 50))
+        points_y = grid_y.flatten()
+        points_z = grid_z.flatten()
+        plane_base = np.stack([np.zeros_like(points_y), points_y, points_z], axis=1)
+        plane_base = np.concatenate([plane_base, np.zeros_like(plane_base)], axis=1)
+        plane_1 = plane_base.copy()
+        plane_2 = plane_base.copy()
+        plane_1[:, 0] = 0.011
+        plane_2[:, 0] = -0.011
+        paddle_pc = np.concatenate([plane_1, plane_2], axis=0)
+        paddle_pcd = pack_o3d_pcd(paddle_pc)
+
         # object_model = cylinder_pcd
         # object_model = planes_pcd
         # object_model = pen_pcd
-        object_model = spatula_pl_pcd
-
+        # object_model = spatula_pl_pcd
+        # object_model = marker_pcd
+        # object_model = allen_pcd
+        object_model = paddle_pcd
 
         return object_model
 
@@ -292,10 +336,14 @@ class BubblePoseEstimator(object):
 if __name__ == '__main__':
 
     # Continuous  pose estimator:
-    view = False
-    # view = True
-    imprint_th = 0.006 # 0.0048 for pen
+    # view = False
+    view = True
+    # imprint_th = 0.0048 # for pen with gw 15
+    imprint_th = 0.0048 # for allen with gw 12
+    # imprint_th = 0.0053 # for marker with gw 20
+    # imprint_th = 0.006 # for spatula with gripper width of 15mm
     icp_th = 1. # consider all points
+    icp_th = 0.005 # for allen key
 
     bpe = BubblePoseEstimator(view=view, imprint_th=imprint_th, icp_th=icp_th, rate=5., verbose=view)
 
