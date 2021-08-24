@@ -141,9 +141,9 @@ class BubblePCReconstructor(object):
         # object_model = planes_pcd
         # object_model = pen_pcd
         # object_model = spatula_pl_pcd
-        # object_model = marker_pcd
+        object_model = marker_pcd
         # object_model = allen_pcd
-        object_model = paddle_pcd
+        # object_model = paddle_pcd
 
         return object_model
 
@@ -336,11 +336,11 @@ class BubblePoseEstimator(object):
 if __name__ == '__main__':
 
     # Continuous  pose estimator:
-    # view = False
-    view = True
+    view = False
+    # view = True
     # imprint_th = 0.0048 # for pen with gw 15
-    imprint_th = 0.0048 # for allen with gw 12
-    # imprint_th = 0.0053 # for marker with gw 20
+    # imprint_th = 0.0048 # for allen with gw 12
+    imprint_th = 0.0053 # for marker with gw 20
     # imprint_th = 0.006 # for spatula with gripper width of 15mm
     icp_th = 1. # consider all points
     icp_th = 0.005 # for allen key
