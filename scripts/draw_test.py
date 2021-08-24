@@ -84,17 +84,23 @@ class BubbleDrawer(object):
         }
         return marker_pose
 
+    def draw_points(self, xy_points, end_raise=True):
+        """
+        Draw lines between a series of xy points. The robot executes cartesian trajectories on impedance mode between all points on the list
+        Args:
+            xy_points: <np.ndarray> of size (N,2) containing the N points on the xy plane we want to be drawn
 
-    def draw_points(self, xy_points, ):
+        Returns: None
+        """
+        # Variables:
+        pre_height = 0.2
+        draw_height = 0.08  # set 0.1 for real
         draw_quat = np.array([-np.cos(np.pi/4), np.cos(np.pi/4), 0, 0])
 
         # first plan to the first corner
-        pre_height = 0.2
-        draw_height = 0.08  # set 0.1 for real
         pre_position = np.insert(xy_points[0], 2, pre_height)
         pre_pose = np.concatenate([pre_position, draw_quat], axis=0)
         self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(pre_pose), frame_id='med_base')
-        _ = input('press enter to continue')
         # self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.075)  # Low vel for safety
         self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF,
                                   vel=0.03)  # Low vel for safety
@@ -107,33 +113,39 @@ class BubbleDrawer(object):
         self.med.set_execute(True)
         self.med.follow_arms_joint_trajectory(plan_result.planning_result.plan.joint_trajectory,
                                               stop_condition=self._stop_signal)
+        # TODO: Read the z value after contact so we may modify the draw_height to not push to hard on the table
         # read force
         first_contact_wrench = self._get_wrench()
         print('contact wrench: ', first_contact_wrench.wrench)
-        self.force_threshold = 10
+        self.force_threshold = 10 # Increase the force threshold
         self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.1)
         for i, corner_i in enumerate(xy_points):
             position_i = np.insert(corner_i, 2, draw_height)
             pose_i = np.concatenate([pre_position, draw_quat], axis=0)
+            # TODO: Check plan_result to debug if the trajectory is not fulfilled
             # self.med.set_execute(False)
-            print('Position: ', position_i)
             plan_result = self.med.plan_to_position_cartesian(self.med.arm_group, 'grasp_frame',
                                                               target_position=list(position_i))
             # self.med.set_execute(True)
             # self.med.follow_arms_joint_trajectory(plan_result.planning_result.plan.joint_trajectory, stop_condition=self._stop_signal)
-            _ = input('press enter to continue')
-        self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(pre_pose), frame_id='med_base')
-        self.home_robot()
+        if end_raise:
+            # Raise the arm when we reach the last point
+            final_position = np.insert(xy_points[-1], 2, pre_height)
+            final_pose = np.concatenate([final_position, draw_quat], axis=0)
+            self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(final_pose), frame_id='med_base')
 
     def draw_square(self, side_size=0.2, center=(0.55, -0.1)):
         corners = np.asarray(center) + side_size * 0.5 * np.array([[1, 1],[1, -1], [-1, -1], [-1, 1], [1,1]])
         self.draw_points(corners)
 
-    def draw_regular_polygon(self, num_sides, inscribed_radius=0.2, center=(0.55, -0.1)):
+    def draw_regular_polygon(self, num_sides, circumscribed_radius=0.2, center=(0.55, -0.1)):
         angles = 2 * np.pi * np.arange(num_sides+1)/(num_sides)
         basic_vertices = np.stack([np.cos(angles), np.sin(angles)], axis=1)
-        corners = np.asarray(center) + inscribed_radius * 0.5 * basic_vertices
+        corners = np.asarray(center) + circumscribed_radius * 0.5 * basic_vertices
         self.draw_points(corners)
+
+    def draw_circle(self, radius=0.2, num_points=100, center=(0.55, -0.1)):
+        self.draw_regular_polygon(num_sides=num_points, circumscribed_radius=radius, center=center)
 
     def control(self, desired_pose, ref_frame):
         """
