@@ -12,6 +12,7 @@ from PIL import Image as imm
 import open3d as o3d
 from scipy.spatial import KDTree
 import copy
+import tf
 import tf.transformations as tr
 from functools import reduce
 from sklearn.cluster import DBSCAN
@@ -28,7 +29,8 @@ from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
 
 class BubblePCReconstructor(object):
 
-    def __init__(self, reconstruction_frame='grasp_frame', threshold=0.005):
+    def __init__(self, reconstruction_frame='grasp_frame', threshold=0.005, object_name='allen'):
+        self.object_name = object_name
         self.reconstruction_frame = reconstruction_frame
         self.threshold = threshold
         self.left_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_left')
@@ -144,6 +146,9 @@ class BubblePCReconstructor(object):
         object_model = marker_pcd
         # object_model = allen_pcd
         # object_model = paddle_pcd
+        # TODO: Add rest
+        models = {'allen': allen_pcd, 'marker': marker_pcd}
+        object_model = models[self.object_name]
 
         return object_model
 
@@ -278,14 +283,16 @@ class BubblePCReconstructor(object):
 
 class BubblePoseEstimator(object):
 
-    def __init__(self, imprint_th=0.005, icp_th=0.01, rate=1.0, view=False, verbose=False):
+    def __init__(self, imprint_th=0.005, icp_th=0.01, rate=1.0, view=False, verbose=False, object_name='allen'):
+        self.object_name = object_name
         self.imprint_th = imprint_th
         self.icp_th = icp_th
         self.rate = rate
         self.view = view
         self.verbose = verbose
-        self.reconstructor = BubblePCReconstructor(threshold=self.imprint_th)
+        self.reconstructor = BubblePCReconstructor(threshold=self.imprint_th, object_name=self.object_name)
         self.marker_publisher = rospy.Publisher('estimated_object', Marker, queue_size=100)
+        self.tf_broadcaster = tf.TransformBroadcaster()
         self.calibrate()
         self.estimate_pose(verbose=self.verbose)
         rospy.spin()
@@ -309,6 +316,8 @@ class BubblePoseEstimator(object):
         q = tr.quaternion_from_matrix(icp_tr)
         marker_i = self._create_marker(t, q)
         self.marker_publisher.publish(marker_i)
+        # add also the tf
+        # self.tf_broadcaster.sendTransform(list(t), list(q), rospy.Time.now(), self.reconstructor.reconstruction_frame, 'tool_obj_frame')
 
     def _create_marker(self, t, q):
         mk = Marker()

@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 import os
+import pdb
 import sys
 import numpy as np
 import threading
@@ -22,9 +23,10 @@ from visualization_msgs.msg import Marker
 
 class BubbleDrawer(object):
 
-    def __init__(self, object_topic='estimated_object', wrench_topic='/med/wrench', force_threshold=5.):
+    def __init__(self, object_topic='estimated_object', wrench_topic='/med/wrench', force_threshold=5., reactive=False):
         self.object_topic = object_topic
         self.wrench_topic = wrench_topic
+        self.reactive = reactive
         self.force_threshold = force_threshold
         rospy.init_node('drawing_test')
         self.tf_listener = tf.TransformListener()
@@ -47,7 +49,6 @@ class BubbleDrawer(object):
 
         # Set the robot to a favorable position so we can start the impedance mode
         self.home_robot()
-        _ =  input('ok')
         # self.med.plan_to_pose(self.med.arm_group, self.med.wrist, target_pose=[0.6, 0.0, 0.4, 0.0, np.pi - 0.2, 0.0], frame_id="world")
         # self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.075)  # Low vel for safety
         # self.med.set_control_mode(ControlMode.JOINT_POSITION, vel=0.05)  # Low vel for safety
@@ -65,7 +66,8 @@ class BubbleDrawer(object):
         measured_fz = wrench_stamped.wrench.force.z
         calibrated_fz = measured_fz-self.calibrated_wrench.wrench.force.z
         flag_force = np.abs(calibrated_fz) >= np.abs(self.force_threshold)
-        print('force z: {} (measured: {}) --- flag: {} ({} | {})'.format(calibrated_fz, measured_fz, flag_force, np.abs(calibrated_fz), np.abs(self.force_threshold)))
+        if flag_force:
+            print('force z: {} (measured: {}) --- flag: {} ({} | {})'.format(calibrated_fz, measured_fz, flag_force, np.abs(calibrated_fz), np.abs(self.force_threshold)))
         return flag_force
 
     def get_marker_pose(self):
@@ -94,7 +96,7 @@ class BubbleDrawer(object):
         """
         # Variables:
         pre_height = 0.2
-        draw_height = 0.08  # set 0.1 for real
+        draw_height = 0.075  # we could go as lower as 0.06
         draw_quat = np.array([-np.cos(np.pi/4), np.cos(np.pi/4), 0, 0])
 
         # first plan to the first corner
@@ -105,37 +107,63 @@ class BubbleDrawer(object):
         self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF,
                                   vel=0.03)  # Low vel for safety
         # lower down:
-        position_0 = np.insert(xy_points[0], 2, draw_height)
+        position_0 = np.insert(xy_points[0], 2, 0.065)
         pose_0 = np.concatenate([position_0, draw_quat], axis=0)
+        self.force_threshold = 5.
         self.med.set_execute(False)
         plan_result = self.med.plan_to_position_cartesian(self.med.arm_group, 'grasp_frame',
                                                           target_position=list(position_0))
         self.med.set_execute(True)
         self.med.follow_arms_joint_trajectory(plan_result.planning_result.plan.joint_trajectory,
                                               stop_condition=self._stop_signal)
+        rospy.sleep(.5)
         # TODO: Read the z value after contact so we may modify the draw_height to not push to hard on the table
         # read force
         first_contact_wrench = self._get_wrench()
         print('contact wrench: ', first_contact_wrench.wrench)
-        self.force_threshold = 10 # Increase the force threshold
+        self.force_threshold = 18 # Increase the force threshold
         self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.1)
         for i, corner_i in enumerate(xy_points):
+            if self.reactive:
+                # compensate for the orientation of the marker
+                T_desired = tr.quaternion_matrix(draw_quat)
+                T_desired[:3, 3] = None #desired_pose[:3]
+                current_marker_pose = self.get_marker_pose()
+                T_mf = tr.quaternion_matrix(current_marker_pose['pose'][3:])
+                T_mf[:3, 3] = current_marker_pose['pose'][:3]
+                T_mf_desired = T_desired @ np.linalg.inv(T_mf)  # maybe it is this
+
+                # Compute the target
+                target_pose = np.concatenate([T_mf_desired[:3, 3], tr.quaternion_from_matrix(T_mf_desired)])
+                plan_result = self.med.plan_to_pose(self.med.arm_group, current_marker_pose['frame'],
+                                                    target_pose=list(target_pose), frame_id='med_base')
+
             position_i = np.insert(corner_i, 2, draw_height)
             pose_i = np.concatenate([pre_position, draw_quat], axis=0)
             # TODO: Check plan_result to debug if the trajectory is not fulfilled
-            # self.med.set_execute(False)
+            self.med.set_execute(False)
             plan_result = self.med.plan_to_position_cartesian(self.med.arm_group, 'grasp_frame',
                                                               target_position=list(position_i))
-            # self.med.set_execute(True)
-            # self.med.follow_arms_joint_trajectory(plan_result.planning_result.plan.joint_trajectory, stop_condition=self._stop_signal)
+            self.med.set_execute(True)
+            execution_result = self.med.follow_arms_joint_trajectory(plan_result.planning_result.plan.joint_trajectory, stop_condition=self._stop_signal)
+            plan_success = plan_result.success
+            execution_success = execution_result.success
+            if not plan_success:
+                print('@' * 20 + '    Plan Failed    ' + '@' * 20)
+                import pdb; pdb.set_trace()
+            if not execution_success:
+                # It seams tha execution always fails (??)
+                print('-'*20+'    Execution Failed    '+'-'*20)
         if end_raise:
             # Raise the arm when we reach the last point
             final_position = np.insert(xy_points[-1], 2, pre_height)
             final_pose = np.concatenate([final_position, draw_quat], axis=0)
             self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(final_pose), frame_id='med_base')
 
-    def draw_square(self, side_size=0.2, center=(0.55, -0.1)):
+    def draw_square(self, side_size=0.2, center=(0.55, -0.1), step_size=None, spread_evenly=True):
         corners = np.asarray(center) + side_size * 0.5 * np.array([[1, 1],[1, -1], [-1, -1], [-1, 1], [1,1]])
+        if step_size is not None:
+            corners = self._discretize_points(corners, step_size=step_size, spread_evenly=spread_evenly)
         self.draw_points(corners)
 
     def draw_regular_polygon(self, num_sides, circumscribed_radius=0.2, center=(0.55, -0.1)):
@@ -146,6 +174,36 @@ class BubbleDrawer(object):
 
     def draw_circle(self, radius=0.2, num_points=100, center=(0.55, -0.1)):
         self.draw_regular_polygon(num_sides=num_points, circumscribed_radius=radius, center=center)
+
+    def _discretize_points(self, points_xy, step_size=0.05, spread_evenly=True):
+        """
+        Given a set of points on xy plane, create a new set of points where points at most are step_size from each other
+        Args:
+            points_xy:
+        Returns:
+        """
+        num_keypoints = points_xy.shape[0]
+        point_dim = points_xy.shape[-1]
+        discretized_points = []
+        for i, point_i in enumerate(points_xy[:-1]):
+            next_point = points_xy[i+1]
+            delta_v = next_point - point_i
+            point_dist = np.linalg.norm(delta_v)
+            unit_v = delta_v/point_dist
+            num_points = int(point_dist//step_size)
+            if spread_evenly:
+                # spread the points so they are all evenly distributed
+                step_i = point_dist/num_points
+            else:
+                # points dist a fixed distance, except last one that has a residual distance <= step_size
+                step_i = step_size
+            points_i = point_i + step_i * np.stack([np.arange(num_points)]*point_dim, axis=-1) * np.stack([unit_v]*num_points)
+            for new_point in points_i:
+                discretized_points.append(new_point)
+        discretized_points.append(points_xy[-1])
+        discretized_points = np.stack(discretized_points)
+        return discretized_points
+
 
     def control(self, desired_pose, ref_frame):
         """
@@ -180,12 +238,22 @@ class BubbleDrawer(object):
 
 def draw_test(supervision=False):
     bd = BubbleDrawer()
+    center = (0.55, -0.25)
     # bd.draw_square()
-    bd.draw_regular_polygon(3)
-    bd.draw_regular_polygon(4)
-    bd.draw_regular_polygon(5)
-    bd.draw_regular_polygon(6)
-    bd.draw_square()
+    # bd.draw_regular_polygon(3, center=center)
+    # bd.draw_regular_polygon(4, center=center)
+    # bd.draw_regular_polygon(5, center=center)
+    # bd.draw_regular_polygon(6, center=center)
+    bd.draw_square(center=center)
+    # bd.draw_square(center=center, step_size=0.04)
+
+    center_2 = (0.55, 0.2)
+    bd.draw_square(center=center_2)
+    bd.draw_square(center=center_2)
+    bd.draw_square(center=center_2)
+    # bd.draw_square(center=center_2, step_size=0.04)
+
+    # bd.draw_circle()
 
 if __name__ == '__main__':
     supervision = False
