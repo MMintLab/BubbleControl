@@ -290,6 +290,7 @@ class BubblePoseEstimator(object):
         self.rate = rate
         self.view = view
         self.verbose = verbose
+        rospy.init_node('bubble_pose_estimator')
         self.reconstructor = BubblePCReconstructor(threshold=self.imprint_th, object_name=self.object_name)
         self.marker_publisher = rospy.Publisher('estimated_object', Marker, queue_size=100)
         self.tf_broadcaster = tf.TransformBroadcaster()
@@ -345,8 +346,8 @@ class BubblePoseEstimator(object):
 if __name__ == '__main__':
 
     # Continuous  pose estimator:
-    view = False
-    # view = True
+    # view = False
+    view = True
     # imprint_th = 0.0048 # for pen with gw 15
     # imprint_th = 0.0048 # for allen with gw 12
     imprint_th = 0.0053 # for marker with gw 20

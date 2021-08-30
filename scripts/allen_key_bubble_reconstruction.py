@@ -39,7 +39,7 @@ if __name__ == '__main__':
     # imprint_th = 0.006 # for spatula with gripper width of 15mm
     icp_th = 1. # consider all points
     icp_th = 0.005 # for allen key
-
+    rospy.init_node('pc_reconstruction_test')
     bpe = BubblePoseEstimator(view=view, imprint_th=imprint_th, icp_th=icp_th, rate=5., verbose=view, object_name='allen')
 
 
