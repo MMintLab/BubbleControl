@@ -28,7 +28,11 @@ class BubbleDrawer(object):
         self.wrench_topic = wrench_topic
         self.reactive = reactive
         self.force_threshold = force_threshold
-        rospy.init_node('drawing_test')
+        try:
+            rospy.init_node('drawing_test')
+        except (rospy.exceptions.ROSInitException, rospy.exceptions.ROSException):
+            pass
+
         self.tf_listener = tf.TransformListener()
         self.med = Med(display_goals=False)
         self.marker_pose = None
@@ -96,16 +100,42 @@ class BubbleDrawer(object):
         """
         # Variables:
         pre_height = 0.2
-        draw_height = 0.075  # we could go as lower as 0.06
+        draw_height_limit = 0.075  # we could go as lower as 0.06
+        draw_height = draw_height_limit
         draw_quat = np.array([-np.cos(np.pi/4), np.cos(np.pi/4), 0, 0])
+        ref_frame = 'med_base'
 
         # first plan to the first corner
         pre_position = np.insert(xy_points[0], 2, pre_height)
         pre_pose = np.concatenate([pre_position, draw_quat], axis=0)
-        self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(pre_pose), frame_id='med_base')
-        # self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.075)  # Low vel for safety
-        self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF,
-                                  vel=0.03)  # Low vel for safety
+
+        if self.reactive:
+            desired_pose = pre_pose
+            T_desired = tr.quaternion_matrix(draw_quat) # in world frame
+            T_desired[:3,3] = pre_position
+            current_marker_pose = self.get_marker_pose()
+            # while True:
+            #     current_marker_pose = self.get_marker_pose()
+            #     self.tf_broadcaster.sendTransform(list(desired_pose[:3]), list(draw_quat), rospy.Time.now(),
+            #                                       'desired_obj_pose', ref_frame)
+            #     self.tf_broadcaster.sendTransform(list(current_marker_pose['pose'][:3]),
+            #                                       list(current_marker_pose['pose'][3:]), rospy.Time.now(),
+            #                                       'current_obj_pose', current_marker_pose['frame'])
+
+            T_mf = tr.quaternion_matrix(current_marker_pose['pose'][3:]) # marker frame in grasp frame
+            T_mf[:3, 3] = current_marker_pose['pose'][:3]
+            T_mf_desired = T_desired @ np.linalg.inv(T_mf)
+            target_pose = np.concatenate([T_mf_desired[:3, 3], tr.quaternion_from_matrix(T_mf_desired)])
+            self.tf_broadcaster.sendTransform(list(target_pose[:3]), list(target_pose[3:]), rospy.Time.now(),'{}_desired'.format(current_marker_pose['frame']), ref_frame)
+
+            self.tf_broadcaster.sendTransform(list(desired_pose[:3]), list(desired_pose[3:]), rospy.Time.now(),'desired_obj_pose', ref_frame)
+            self.tf_broadcaster.sendTransform(list(current_marker_pose['pose'][:3]),list(current_marker_pose['pose'][3:]), rospy.Time.now(),'current_obj_pose', current_marker_pose['frame'])
+            self.med.plan_to_pose(self.med.arm_group, current_marker_pose['frame'], target_pose=list(target_pose), frame_id='med_base')
+
+        else:
+            self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(pre_pose), frame_id='med_base')
+        # self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.075)  # Low val for safety
+        self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.03)  # Very Low val for precision
         # lower down:
         position_0 = np.insert(xy_points[0], 2, 0.065)
         pose_0 = np.concatenate([position_0, draw_quat], axis=0)
@@ -117,26 +147,31 @@ class BubbleDrawer(object):
         self.med.follow_arms_joint_trajectory(plan_result.planning_result.plan.joint_trajectory,
                                               stop_condition=self._stop_signal)
         rospy.sleep(.5)
+
         # TODO: Read the z value after contact so we may modify the draw_height to not push to hard on the table
+        # import pdb; pdb.set_trace()
+        contact_pose = self.tf2_listener.get_transform('med_base', 'grasp_frame')
+        draw_contact_gap = 0.005
+        draw_height = max(contact_pose[2,3]-draw_contact_gap, draw_height_limit)
         # read force
         first_contact_wrench = self._get_wrench()
         print('contact wrench: ', first_contact_wrench.wrench)
         self.force_threshold = 18 # Increase the force threshold
         self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.1)
         for i, corner_i in enumerate(xy_points):
-            if self.reactive:
-                # compensate for the orientation of the marker
-                T_desired = tr.quaternion_matrix(draw_quat)
-                T_desired[:3, 3] = None #desired_pose[:3]
-                current_marker_pose = self.get_marker_pose()
-                T_mf = tr.quaternion_matrix(current_marker_pose['pose'][3:])
-                T_mf[:3, 3] = current_marker_pose['pose'][:3]
-                T_mf_desired = T_desired @ np.linalg.inv(T_mf)  # maybe it is this
-
-                # Compute the target
-                target_pose = np.concatenate([T_mf_desired[:3, 3], tr.quaternion_from_matrix(T_mf_desired)])
-                plan_result = self.med.plan_to_pose(self.med.arm_group, current_marker_pose['frame'],
-                                                    target_pose=list(target_pose), frame_id='med_base')
+            # if self.reactive:
+            #     # compensate for the orientation of the marker
+            #     T_desired = tr.quaternion_matrix(draw_quat)
+            #     T_desired[:3, 3] = None #desired_pose[:3]
+            #     current_marker_pose = self.get_marker_pose()
+            #     T_mf = tr.quaternion_matrix(current_marker_pose['pose'][3:])
+            #     T_mf[:3, 3] = current_marker_pose['pose'][:3]
+            #     T_mf_desired = T_desired @ np.linalg.inv(T_mf)  # maybe it is this
+            #
+            #     # Compute the target
+            #     target_pose = np.concatenate([T_mf_desired[:3, 3], tr.quaternion_from_matrix(T_mf_desired)])
+            #     plan_result = self.med.plan_to_pose(self.med.arm_group, current_marker_pose['frame'],
+            #                                         target_pose=list(target_pose), frame_id='med_base')
 
             position_i = np.insert(corner_i, 2, draw_height)
             pose_i = np.concatenate([pre_position, draw_quat], axis=0)
@@ -236,25 +271,38 @@ class BubbleDrawer(object):
 
 # TEST THE CODE: ------------------------------------------------------------------------------------------------------
 
-def draw_test(supervision=False):
-    bd = BubbleDrawer()
+def draw_test(supervision=False, reactive=False):
+    bd = BubbleDrawer(reactive=reactive)
     center = (0.55, -0.25)
+    center_2 = (0.55, 0.2)
+
     # bd.draw_square()
     # bd.draw_regular_polygon(3, center=center)
     # bd.draw_regular_polygon(4, center=center)
     # bd.draw_regular_polygon(5, center=center)
     # bd.draw_regular_polygon(6, center=center)
-    bd.draw_square(center=center)
+    for i in range(2):
+        bd.draw_square(center=center_2)
     # bd.draw_square(center=center, step_size=0.04)
 
-    center_2 = (0.55, 0.2)
-    bd.draw_square(center=center_2)
-    bd.draw_square(center=center_2)
-    bd.draw_square(center=center_2)
+    # bd.draw_square(center=center_2)
+    # bd.draw_square(center=center_2)
+    # bd.draw_square(center=center_2)
     # bd.draw_square(center=center_2, step_size=0.04)
 
     # bd.draw_circle()
 
 if __name__ == '__main__':
     supervision = False
-    draw_test(supervision=supervision)
+    reactive = True
+    # reactive = False
+
+    from mmint_camera_utils.topic_recording import TopicRecorder, WrenchRecorder
+
+    # topic_recorder = TopicRecorder()
+    wrench_recorder = WrenchRecorder('/med/wrench', ref_frame='world')
+    wrench_recorder.record()
+    draw_test(supervision=supervision, reactive=reactive)
+    print('drawing done')
+    wrench_recorder.stop()
+    wrench_recorder.save('~/Desktop')

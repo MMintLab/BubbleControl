@@ -26,7 +26,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from mmint_camera_utils.point_cloud_utils import *
 from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
 
-from bubble_control.bubble_pc_reconstruction import BubblePoseEstimator
+from bubble_control.bubble_pose_estimation.bubble_pc_reconstruction import BubblePoseEstimator
 
 if __name__ == '__main__':
 

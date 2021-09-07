@@ -25,7 +25,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from mmint_camera_utils.point_cloud_utils import *
 from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
-from bubble_control.bubble_pose_estimation.bubble_pc_reconstruction import BubblePoseEstimator
+from bubble_control.bubble_pose_estimation.bubble_pose_estimation import BubblePoseEstimator
 
 
 if __name__ == '__main__':
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     # imprint_th = 0.006 # for spatula with gripper width of 15mm
     icp_th = 1. # consider all points
     icp_th = 0.005 # for allen key
-    bpe = BubblePoseEstimator(view=view, imprint_th=imprint_th, icp_th=icp_th, rate=5., verbose=view, object_name='marker')
+    bpe = BubblePoseEstimator(view=view, imprint_th=imprint_th, icp_th=icp_th, rate=5., verbose=view, object_name='marker', estimation_type='icp2d')
 
 
 

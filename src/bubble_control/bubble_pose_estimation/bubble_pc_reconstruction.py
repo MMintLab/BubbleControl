@@ -23,14 +23,16 @@ from sensor_msgs.msg import Image, CompressedImage, CameraInfo, PointCloud2
 from geometry_msgs.msg import TransformStamped, Pose
 from visualization_msgs.msg import Marker, MarkerArray
 
-from mmint_camera_utils.point_cloud_utils import *
+from mmint_camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud
 from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
+from bubble_control.bubble_pose_estimation.pose_estimators import ICP3DPoseEstimator, ICP2DPoseEstimator
 
 
 class BubblePCReconstructor(object):
 
-    def __init__(self, reconstruction_frame='grasp_frame', threshold=0.005, object_name='allen'):
+    def __init__(self, reconstruction_frame='grasp_frame', threshold=0.005, object_name='allen', estimation_type='icp3d'):
         self.object_name = object_name
+        self.estimation_type = estimation_type
         self.reconstruction_frame = reconstruction_frame
         self.threshold = threshold
         self.left_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_left')
@@ -48,6 +50,7 @@ class BubblePCReconstructor(object):
         self.radius = 0.005
         self.height = 0.12
         self.object_model = self._get_object_model()
+        self.pose_estimator = self._get_pose_estimator()
         self.last_tr = None
 
     def _get_object_model(self):
@@ -143,14 +146,26 @@ class BubblePCReconstructor(object):
         # object_model = planes_pcd
         # object_model = pen_pcd
         # object_model = spatula_pl_pcd
-        object_model = marker_pcd
+        # object_model = marker_pcd
         # object_model = allen_pcd
         # object_model = paddle_pcd
         # TODO: Add rest
-        models = {'allen': allen_pcd, 'marker': marker_pcd}
+        models = {'allen': allen_pcd, 'marker': marker_pcd, 'pen': pen_pcd}
         object_model = models[self.object_name]
 
         return object_model
+
+    def _get_pose_estimator(self):
+        pose_estimator = None
+        available_esttimation_types = ['icp3d', 'icp2d']
+        if self.estimation_type == 'icp3d':
+            pose_estimator = ICP3DPoseEstimator(obj_model=self.object_model)
+        elif self.estimation_type == 'icp2d':
+            pose_estimator = ICP2DPoseEstimator(obj_model=self.object_model, projection_axis=(1,0,0), max_num_iterations=20)
+        else:
+            raise NotImplementedError('pose estimation algorithm named "{}" not implemented yet. Available options: {}'.format(self.estimation_type, available_esttimation_types))
+        return pose_estimator
+
 
     def reference(self):
         pc_r, frame_r = self.right_parser.get_point_cloud(return_ref_frame=True)
@@ -212,53 +227,12 @@ class BubblePCReconstructor(object):
         filtered_pc = pc[good_indxs]
         return filtered_pc
 
-    def icp(self, threshold, view=False, verbose=False):
+    def estimate_pose(self, threshold, view=False, verbose=False):
         imprint = self.get_imprint(view=view)
-        # TODO: filter imprint to remove noise points
-        imprint_mean = np.mean(imprint[:, :3], axis=0)
-        dists = np.linalg.norm(imprint[:, :3] - imprint_mean, axis=1)
-        d_th = 0.015
-        imprint = imprint[np.where(dists<=d_th)]
-        imprint_pcd = pack_o3d_pcd(imprint)
-        imprint_mean = np.mean(imprint, axis=0)
-        if self.last_tr is None:
-            trans_init = np.eye(4)
-            # trans_init[:3, 3] = imprint_mean[:3]#+0.01*np.std(imprint[:,:3], axis=0)*np.random.randn(3)
-            _axis = np.random.uniform(-1, 1, 3)
-            axis = _axis/np.linalg.norm(_axis)
-            q_random = tr.quaternion_about_axis(np.random.uniform(-np.pi*0.1, np.pi*0.1), axis)
-            T_random = tr.quaternion_matrix(q_random)
-            # trans_init = T_random
-            trans_init[:3, 3] = imprint_mean[:3]#+0.01*np.std(imprint[:,:3], axis=0)*np.random.randn(3)
-        else:
-            trans_init = self.last_tr
-        if view:
-            # visualize the initial transformation
-            model_tr_pcd = copy.deepcopy(self.object_model)
-            model_tr_pcd.transform(trans_init)
-            mesh_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.01, origin=[0, 0, 0])
-            o3d.visualization.draw_geometries([imprint_pcd, model_tr_pcd, mesh_frame])
-        icp_tr = self._icp(source_pcd=self.object_model, target_pcd=imprint_pcd, threshold=threshold, trans_init=trans_init, verbose=verbose)
-        self.last_tr = icp_tr
-        if view:
-            # visualize the icp estimated transformation
-            model_tr_pcd = copy.deepcopy(self.object_model)
-            model_tr_pcd.transform(icp_tr)
-            mesh_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.01, origin=[0, 0, 0])
-            o3d.visualization.draw_geometries([imprint_pcd, model_tr_pcd, mesh_frame])
-        return icp_tr
-
-    def _icp(self, source_pcd, target_pcd, threshold, trans_init, verbose=False):
-        # Point-to-point:
-        reg_p2p = o3d.pipelines.registration.registration_icp(source_pcd, target_pcd, threshold, trans_init, o3d.pipelines.registration.TransformationEstimationPointToPoint(), o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=1000))
-        # point_to_plane:
-        # > compute normals (required for point-to-plane icp)
-        # imprint_pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.005, max_nn=30))
-        # reg_p2p = o3d.pipelines.registration.registration_icp(source_pcd, target_pcd, threshold, trans_init, o3d.pipelines.registration.TransformationEstimationPointToPlane(), o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=1000))
-        if verbose:
-            print(reg_p2p)
-        icp_transformation = reg_p2p.transformation
-        return icp_transformation
+        self.pose_estimator.threshold = threshold
+        self.pose_estimator.verbose = verbose
+        estimated_pose = self.pose_estimator.estimate_pose(imprint)
+        return estimated_pose
 
     def _get_far_points_indxs(self, query_pc, d_threshold, key):
         """
@@ -281,81 +255,7 @@ class BubblePCReconstructor(object):
         return far_qry_indxs
 
 
-class BubblePoseEstimator(object):
 
-    def __init__(self, imprint_th=0.005, icp_th=0.01, rate=1.0, view=False, verbose=False, object_name='allen'):
-        self.object_name = object_name
-        self.imprint_th = imprint_th
-        self.icp_th = icp_th
-        self.rate = rate
-        self.view = view
-        self.verbose = verbose
-        rospy.init_node('bubble_pose_estimator')
-        self.reconstructor = BubblePCReconstructor(threshold=self.imprint_th, object_name=self.object_name)
-        self.marker_publisher = rospy.Publisher('estimated_object', Marker, queue_size=100)
-        self.tf_broadcaster = tf.TransformBroadcaster()
-        self.calibrate()
-        self.estimate_pose(verbose=self.verbose)
-        rospy.spin()
-
-    def calibrate(self):
-        _ = input('press enter to calibrate')
-        self.reconstructor.reference()
-        _ = input('calibration done, press enter to continue')
-
-    def estimate_pose(self, verbose=False):
-        rate = rospy.Rate(self.rate)
-        while not rospy.is_shutdown():
-            try:
-                icp_tr = self.reconstructor.icp(threshold=self.icp_th, view=self.view, verbose=verbose)
-                self._broadcast_tr(icp_tr)
-            except rospy.ROSInterruptException:
-                break
-
-    def _broadcast_tr(self, icp_tr):
-        t = icp_tr[:3,3]
-        q = tr.quaternion_from_matrix(icp_tr)
-        marker_i = self._create_marker(t, q)
-        self.marker_publisher.publish(marker_i)
-        # add also the tf
-        # self.tf_broadcaster.sendTransform(list(t), list(q), rospy.Time.now(), self.reconstructor.reconstruction_frame, 'tool_obj_frame')
-
-    def _create_marker(self, t, q):
-        mk = Marker()
-        mk.header.frame_id = self.reconstructor.reconstruction_frame
-        mk.type = Marker.CYLINDER
-        mk.scale.x = 2*self.reconstructor.radius
-        mk.scale.y = 2*self.reconstructor.radius
-        mk.scale.z = 2*self.reconstructor.height # make it larger
-        # set color
-        mk.color.r = 158/255.
-        mk.color.g = 232/255.
-        mk.color.b = 217/255.
-        mk.color.a = 1.0
-        # set position
-        mk.pose.position.x = t[0]
-        mk.pose.position.y = t[1]
-        mk.pose.position.z = t[2]
-        mk.pose.orientation.x = q[0]
-        mk.pose.orientation.y = q[1]
-        mk.pose.orientation.z = q[2]
-        mk.pose.orientation.w = q[3]
-        return mk
-
-
-if __name__ == '__main__':
-
-    # Continuous  pose estimator:
-    # view = False
-    view = True
-    # imprint_th = 0.0048 # for pen with gw 15
-    # imprint_th = 0.0048 # for allen with gw 12
-    imprint_th = 0.0053 # for marker with gw 20
-    # imprint_th = 0.006 # for spatula with gripper width of 15mm
-    icp_th = 1. # consider all points
-    icp_th = 0.005 # for allen key
-
-    bpe = BubblePoseEstimator(view=view, imprint_th=imprint_th, icp_th=icp_th, rate=5., verbose=view)
 
 
 
