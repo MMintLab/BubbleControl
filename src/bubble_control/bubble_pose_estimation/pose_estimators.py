@@ -6,6 +6,7 @@ import copy
 import tf.transformations as tr
 from scipy.spatial import KDTree
 from tqdm import tqdm
+from mmint_utils.terminal_colors import term_colors
 
 
 class PCPoseEstimatorBase(abc.ABC):
@@ -178,7 +179,7 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
         source_points = self._project_pc(np.asarray(source_pcd.points))
         target_points = self._project_pc(np.asarray(target_pcd.points))
         if len(target_points) == 0:
-            print(f"{bcolors.WARNING}Warning: No scene points provided{bcolors.ENDC}")
+            print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
             if self.last_tr is not None:
                 return self.last_tr
             return init_tr
@@ -233,18 +234,6 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
             model_tr_pcd.transform(unprojected_icp_tr)
             view_pointcloud([target_pcd, model_tr_pcd], frame=True)
         return unprojected_icp_tr
-
-
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
 
 # Debug 2D version:

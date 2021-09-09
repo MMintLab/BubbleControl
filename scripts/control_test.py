@@ -16,6 +16,7 @@ from victor_hardware_interface_msgs.msg import ControlMode, MotionStatus
 from geometry_msgs.msg import Pose, PoseStamped, TransformStamped, Vector3
 from control_msgs.msg import FollowJointTrajectoryFeedback
 from visualization_msgs.msg import Marker
+from mmint_utils.terminal_colors import term_colors
 
 
 class BubbleController(object):
@@ -69,8 +70,19 @@ class BubbleController(object):
         try:
             while self.marker_pose is None:
                 rospy.sleep(0.1)
+
+            print(
+            f'''
+        *************************************************
+             
+             ---- Control: {term_colors.GREEN} ON {term_colors.ENDC} ----
+             
+             Stabilizing the tool pose
+             
+        *************************************************
+            '''
+            )
             while not rospy.is_shutdown():
-                print('Control')
 
                 # Read object position
                 self.lock.acquire()
@@ -80,15 +92,6 @@ class BubbleController(object):
                     self.lock.release()
                 T_mf = tr.quaternion_matrix(current_marker_pose['pose'][3:])
                 T_mf[:3,3] = current_marker_pose['pose'][:3]
-                # t_mf_rf, q_mf_rf = self.tf_listener.lookupTransform(ref_frame, current_marker_pose['frame'], rospy.Time(0))# transformation to get the marker on reference frame
-                # T_mf_rf = tr.quaternion_matrix(q_mf_rf)
-                # T_mf[:3, 3] = t_mf_rf
-                # T_rf = T_mf @ T_mf_rf
-                # current_pose = np.concatenate([T_rf[:3,3], tr.quaternion_from_matrix(T_rf)])
-                # Invert the position
-                # T_apply_rf = np.linalg.inv(T_rf)@T_desired
-
-                # T_mf_desired = np.linalg.inv(T_mf) @ T_desired  # maybe it is this
                 T_mf_desired = T_desired @ np.linalg.inv(T_mf)   # maybe it is this
 
                 # Compute the target
