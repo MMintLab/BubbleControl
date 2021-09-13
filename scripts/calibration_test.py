@@ -72,7 +72,7 @@ class BubbleDataCollection(object):
     def _sample_calibration_pose(self):
         # TODO: Make this random
         h_gap = 0.00
-        cal_position_i = [self.cfg['tool_center']['x'], self.cfg['tool_center']['y'], self.cfg['tool_size']['h']*.5+h_gap]
+        cal_position_i = [self.cfg['tool_center']['x'], self.cfg['tool_center']['y'], self.cfg['tool_size']['h']*.5 + h_gap]
         cal_quat_i = tr.quaternion_from_euler(-np.pi, 0, np.pi)
         cal_quat_i_base = np.array([0, 1, 0, 0])
         delta_angle = np.random.uniform(-90, 90)
