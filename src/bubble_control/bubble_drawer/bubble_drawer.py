@@ -28,11 +28,16 @@ class BubbleDrawer(object):
         self.wrench_topic = wrench_topic
         self.reactive = reactive
         self.force_threshold = force_threshold
+        # Parameters:
+        self.draw_contact_gap = 0.005  # TODO: Consider reducing this value to reduce the force
+        self.pre_height = 0.13
+        self.draw_height_limit = 0.075  # we could go as lower as 0.06
+        self.draw_quat = np.array([-np.cos(np.pi / 4), np.cos(np.pi / 4), 0, 0])
+        # Init ROS node
         try:
             rospy.init_node('drawing_test')
         except (rospy.exceptions.ROSInitException, rospy.exceptions.ROSException):
             pass
-
         self.tf_listener = tf.TransformListener()
         self.med = Med(display_goals=False)
         self.marker_pose = None
@@ -119,47 +124,51 @@ class BubbleDrawer(object):
                                                   stop_condition=self._stop_signal)
 
 
-    def draw_points(self, xy_points, end_raise=True):
-        """
-        Draw lines between a series of xy points. The robot executes cartesian trajectories on impedance mode between all points on the list
-        Args:
-            xy_points: <np.ndarray> of size (N,2) containing the N points on the xy plane we want to be drawn
 
-        Returns: None
-        """
+    def _init_drawing(self, init_point_xy, draw_quat=None, ref_frame=None):
+        # Plan to the point_xy and perform a guarded move to start drawing
+
         # Variables:
-        pre_height = 0.13
-        draw_height_limit = 0.075  # we could go as lower as 0.06
+        pre_height = self.pre_height
+        draw_height_limit = self.draw_height_limit
         draw_height = draw_height_limit
-        draw_quat = np.array([-np.cos(np.pi/4), np.cos(np.pi/4), 0, 0])
+        if draw_quat is None:
+            draw_quat = self.draw_quat
         ref_frame = 'med_base'
 
         # first plan to the first corner
-        pre_position = np.insert(xy_points[0], 2, pre_height)
+        pre_position = np.insert(init_point_xy, 2, pre_height)
         pre_pose = np.concatenate([pre_position, draw_quat], axis=0)
 
         if self.reactive:
             desired_pose = pre_pose
-            T_desired = tr.quaternion_matrix(draw_quat) # in world frame
-            T_desired[:3,3] = pre_position
+            T_desired = tr.quaternion_matrix(draw_quat)  # in world frame
+            T_desired[:3, 3] = pre_position
             current_marker_pose = self.get_marker_pose()
-            T_mf = tr.quaternion_matrix(current_marker_pose['pose'][3:]) # marker frame in grasp frame
+            T_mf = tr.quaternion_matrix(current_marker_pose['pose'][3:])  # marker frame in grasp frame
             T_mf[:3, 3] = current_marker_pose['pose'][:3]
             T_mf_desired = T_desired @ np.linalg.inv(T_mf)
             target_pose = np.concatenate([T_mf_desired[:3, 3], tr.quaternion_from_matrix(T_mf_desired)])
-            self.tf_broadcaster.sendTransform(list(target_pose[:3]), list(target_pose[3:]), rospy.Time.now(),'{}_desired'.format(current_marker_pose['frame']), ref_frame)
+            self.tf_broadcaster.sendTransform(list(target_pose[:3]), list(target_pose[3:]), rospy.Time.now(),
+                                              '{}_desired'.format(current_marker_pose['frame']), ref_frame)
 
-            self.tf_broadcaster.sendTransform(list(desired_pose[:3]), list(desired_pose[3:]), rospy.Time.now(),'desired_obj_pose', ref_frame)
-            self.tf_broadcaster.sendTransform(list(current_marker_pose['pose'][:3]),list(current_marker_pose['pose'][3:]), rospy.Time.now(),'current_obj_pose', current_marker_pose['frame'])
-            self.med.plan_to_pose(self.med.arm_group, current_marker_pose['frame'], target_pose=list(target_pose), frame_id='med_base')
+            self.tf_broadcaster.sendTransform(list(desired_pose[:3]), list(desired_pose[3:]), rospy.Time.now(),
+                                              'desired_obj_pose', ref_frame)
+            self.tf_broadcaster.sendTransform(list(current_marker_pose['pose'][:3]),
+                                              list(current_marker_pose['pose'][3:]), rospy.Time.now(),
+                                              'current_obj_pose', current_marker_pose['frame'])
+            self.med.plan_to_pose(self.med.arm_group, current_marker_pose['frame'], target_pose=list(target_pose),
+                                  frame_id='med_base')
 
         else:
             self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(pre_pose), frame_id='med_base')
         # self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.075)  # Low val for safety
         rospy.sleep(.5)
-        self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.03)  # Very Low val for precision
+        self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF,
+                                  vel=0.03)  # Very Low val for precision
+
         # lower down:
-        position_0 = np.insert(xy_points[0], 2, 0.065)
+        position_0 = np.insert(init_point_xy, 2, 0.065)
         pose_0 = np.concatenate([position_0, draw_quat], axis=0)
         self.force_threshold = 5.
         self.med.set_execute(False)
@@ -171,83 +180,113 @@ class BubbleDrawer(object):
         rospy.sleep(.5)
         # Read the value of z when we make contact to only set a slight force on the plane
         contact_pose = self.tf2_listener.get_transform('med_base', 'grasp_frame')
-        draw_contact_gap = 0.005 # TODO: Consider reducing this value to reduce the force
-        draw_height = max(contact_pose[2,3]-draw_contact_gap, draw_height_limit)
+        draw_contact_gap = 0.005  # TODO: Consider reducing this value to reduce the force
+        draw_height = max(contact_pose[2, 3] - draw_contact_gap, draw_height_limit)
         # read force
         first_contact_wrench = self._get_wrench()
         print('contact wrench: ', first_contact_wrench.wrench)
-        self.force_threshold = 18 # Increase the force threshold
-        self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.1)
-        rospy.sleep(.5)
-        for i, corner_i in enumerate(xy_points[1:]):
+        self.force_threshold = 18  # Increase the force threshold
 
-            position_i = np.insert(corner_i, 2, draw_height)
-            pose_i = np.concatenate([pre_position, draw_quat], axis=0)
-            # TODO: Check plan_result to debug if the trajectory is not fulfilled
-            self.med.set_execute(False)
-            plan_result = self.med.plan_to_position_cartesian(self.med.arm_group, 'grasp_frame',
-                                                              target_position=list(position_i))
-            self.med.set_execute(True)
-            execution_result = self.med.follow_arms_joint_trajectory(plan_result.planning_result.plan.joint_trajectory, stop_condition=self._stop_signal)
-            plan_success = plan_result.success
-            execution_success = execution_result.success
-            if not plan_success:
-                print('@' * 20 + '    Plan Failed    ' + '@' * 20)
-                import pdb; pdb.set_trace()
-            if not execution_success:
-                # It seams tha execution always fails (??)
-                print('-'*20+'    Execution Failed    '+'-'*20)
+        self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.1)  # change speed
+        return draw_height
 
-            if self.reactive and (i < len(xy_points)-2):
-                # Adjust the position when we reach the keypoint -------
-                # Lift:
-                lift_position = np.insert(corner_i, 2, pre_height)
-                self.med.plan_to_position_cartesian(self.med.arm_group, 'grasp_frame', target_position=list(lift_position))
-
-                # compensate for the orientation of the marker
-                T_desired = tr.quaternion_matrix(draw_quat)
-                T_desired[:3, 3] = lift_position
-                current_marker_pose = self.get_marker_pose()
-                T_mf = tr.quaternion_matrix(current_marker_pose['pose'][3:])
-                T_mf[:3, 3] = current_marker_pose['pose'][:3]
-                T_mf_desired = T_desired @ np.linalg.inv(T_mf)  # maybe it is this
-                # Compute the target and account for tool pose
-                target_pose = np.concatenate([T_mf_desired[:3, 3], tr.quaternion_from_matrix(T_mf_desired)])
-                plan_result = self.med.plan_to_pose(self.med.arm_group, current_marker_pose['frame'],
-                                                    target_pose=list(target_pose), frame_id='med_base')
-                # Go down again
-                rospy.sleep(.5)
-                self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF,
-                                          vel=0.05)  # Very Low val for precision
-                # lower down:
-                lower_position = np.insert(corner_i, 2, 0.065)
-                lower_pose = np.concatenate([lower_position, draw_quat], axis=0)
-                self.force_threshold = 5.
-                self.med.set_execute(False)
-                plan_result = self.med.plan_to_position_cartesian(self.med.arm_group, 'grasp_frame',
-                                                                  target_position=list(lower_position))
-                self.med.set_execute(True)
-                self.med.follow_arms_joint_trajectory(plan_result.planning_result.plan.joint_trajectory,
-                                                      stop_condition=self._stop_signal)
-                rospy.sleep(.5)
-                # Read the value of z when we make contact to only set a slight force on the plane
-                contact_pose = self.tf2_listener.get_transform('med_base', 'grasp_frame')
-                draw_height = max(contact_pose[2, 3] - draw_contact_gap, draw_height_limit)
-                # read force
-                first_contact_wrench = self._get_wrench()
-                print('contact wrench: ', first_contact_wrench.wrench)
-                self.force_threshold = 18  # Increase the force threshold
-                self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.1)
-                rospy.sleep(.5)
+    def _draw_to_point(self, point_xy, draw_height, end_raise=False):
+        position_i = np.insert(point_xy, 2, draw_height)
+        self.med.set_execute(False)
+        plan_result = self.med.plan_to_position_cartesian(self.med.arm_group, 'grasp_frame',
+                                                          target_position=list(position_i))
+        self.med.set_execute(True)
+        execution_result = self.med.follow_arms_joint_trajectory(plan_result.planning_result.plan.joint_trajectory,
+                                                                 stop_condition=self._stop_signal)
+        plan_success = plan_result.success
+        execution_success = execution_result.success
+        if not plan_success:
+            print('@' * 20 + '    Plan Failed    ' + '@' * 20)
+            import pdb; pdb.set_trace()
+        if not execution_success:
+            # It seams tha execution always fails (??)
+            print('-' * 20 + '    Execution Failed    ' + '-' * 20)
 
         if end_raise:
             # Raise the arm when we reach the last point
-            final_position = np.insert(xy_points[-1], 2, pre_height)
-            final_pose = np.concatenate([final_position, draw_quat], axis=0)
+            final_position = np.insert(point_xy, 2, self.pre_height)
+            final_pose = np.concatenate([final_position, self.draw_quat], axis=0)
+            self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(final_pose), frame_id='med_base')
+
+
+    def _adjust_tool_position(self, xy_point):
+        # Adjust the position when we reach the keypoint -------
+        # Lift:
+        draw_quat = self.draw_quat
+        lift_position = np.insert(xy_point, 2, self.pre_height)
+        self.med.plan_to_position_cartesian(self.med.arm_group, 'grasp_frame', target_position=list(lift_position))
+
+        # compensate for the orientation of the marker
+        T_desired = tr.quaternion_matrix(draw_quat)
+        T_desired[:3, 3] = lift_position
+        current_marker_pose = self.get_marker_pose()
+        T_mf = tr.quaternion_matrix(current_marker_pose['pose'][3:])
+        T_mf[:3, 3] = current_marker_pose['pose'][:3]
+        T_mf_desired = T_desired @ np.linalg.inv(T_mf)  # maybe it is this
+        # Compute the target and account for tool pose
+        target_pose = np.concatenate([T_mf_desired[:3, 3], tr.quaternion_from_matrix(T_mf_desired)])
+        plan_result = self.med.plan_to_pose(self.med.arm_group, current_marker_pose['frame'],
+                                            target_pose=list(target_pose), frame_id='med_base')
+        # Go down again
+        rospy.sleep(.5)
+        self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF,
+                                  vel=0.05)  # Very Low val for precision
+        # lower down:
+        lower_position = np.insert(xy_point, 2, 0.065)
+        lower_pose = np.concatenate([lower_position, draw_quat], axis=0)
+        self.force_threshold = 5.
+        self.med.set_execute(False)
+        plan_result = self.med.plan_to_position_cartesian(self.med.arm_group, 'grasp_frame',
+                                                          target_position=list(lower_position))
+        self.med.set_execute(True)
+        self.med.follow_arms_joint_trajectory(plan_result.planning_result.plan.joint_trajectory,
+                                              stop_condition=self._stop_signal)
+        rospy.sleep(.5)
+        # Read the value of z when we make contact to only set a slight force on the plane
+        contact_pose = self.tf2_listener.get_transform('med_base', 'grasp_frame')
+        draw_height = max(contact_pose[2, 3] - self.draw_contact_gap, self.draw_height_limit)
+        # read force
+        first_contact_wrench = self._get_wrench()
+        print('contact wrench: ', first_contact_wrench.wrench)
+        self.force_threshold = 18  # Increase the force threshold
+        self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.1)
+        rospy.sleep(.5)
+
+    def draw_points(self, xy_points, end_raise=True):
+        """
+        Draw lines between a series of xy points. The robot executes cartesian trajectories on impedance mode between all points on the list
+        Args:
+            xy_points: <np.ndarray> of size (N,2) containing the N points on the xy plane we want to be drawn
+
+        Returns: None
+        """
+
+        # TODO: Split into guarded moved motion and drawing_motion between points
+
+        draw_height = self._init_drawing(init_point_xy=xy_points[0])
+
+        rospy.sleep(.5)
+        for i, corner_i in enumerate(xy_points[1:]):
+
+            self._draw_to_point(corner_i, draw_height, end_raise=False)
+
+            if self.reactive and (i < len(xy_points)-2):
+                # Adjust the position when we reach the keypoint -------
+                self._adjust_tool_position(corner_i)
+
+        if end_raise:
+            # Raise the arm when we reach the last point
+            final_position = np.insert(xy_points[-1], 2, self.pre_height)
+            final_pose = np.concatenate([final_position, self.draw_quat], axis=0)
             self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(final_pose), frame_id='med_base')
 
     def draw_square(self, side_size=0.2, center=(0.55, -0.1), step_size=None, spread_evenly=True):
-        corners = np.asarray(center) + side_size * 0.5 * np.array([[1, 1],[1, -1], [-1, -1], [-1, 1], [1,1]])
+        corners = np.asarray(center) + side_size * 0.5 * np.array([[1, 1], [1, -1], [-1, -1], [-1, 1], [1,1]])
         if step_size is not None:
             corners = self._discretize_points(corners, step_size=step_size, spread_evenly=spread_evenly)
         self.draw_points(corners)
