@@ -149,12 +149,15 @@ class BubbleDataCollectionBase(DataCollectorBase):
                 else:
                     pass
 
+    def _get_recording_frames(self):
+        child_frames = ['pico_flexx_left_link', 'pico_flexx_right_link', 'pico_flexx_left_optical_frame', 'pico_flexx_right_optical_frame', 'grasp_frame', 'med_kuka_link_ee']
+        return child_frames
+
     def _record(self, fc=None):
-        # TODO: Record forces
         self.wrench_recorder.record(fc=fc, frame_names=['grasp_frame', 'med_base'])
         self.camera_parser_left.record(fc=fc)
         self.camera_parser_right.record(fc=fc)
-        child_names = ['pico_flexx_left_link', 'pico_flexx_right_link', 'pico_flexx_left_optical_frame', 'pico_flexx_right_optical_frame', 'grasp_frame', 'med_kuka_link_ee', 'calibration_tool']
+        child_names = self._get_recording_frames()
         parent_names = 'med_base'
         tf_save_path = os.path.join(self.save_path, self.scene_name, 'tfs')
         if fc is None:

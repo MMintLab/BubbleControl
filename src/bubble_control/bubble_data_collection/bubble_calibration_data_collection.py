@@ -52,6 +52,11 @@ class BubbleCalibrationDataCollection(BubbleDataCollectionBase):
     def _calibration_home(self):
         self.med.plan_to_joint_config(self.med.arm_group, self.calibration_home_conf)
 
+    def _get_recording_frames(self):
+        rec_frames = super()._get_recording_frames()
+        rec_frames = rec_frames + ['calibration_tool']
+        return rec_frames
+
     def _get_legend_column_names(self):
         column_names = ['UndeformedFC', 'DeformedFC',  'GraspForce', 'GraspWidth', 'CalibrationToolSize', 'CalibrationToolPose']
         return column_names
@@ -112,7 +117,7 @@ class BubbleCalibrationDataCollection(BubbleDataCollectionBase):
         # if we return multiple forces, collect them for the same position
         for i, grasp_force_i in enumerate(grasp_forces):
             # Record bubble state without deformation
-            undef_fc = (self.filecode+i)*2-1
+            undef_fc = self.get_new_filecode()
             self._record(fc=undef_fc)
             data_params['undeformed_fc'].append(undef_fc)
             # Grasp
@@ -125,7 +130,7 @@ class BubbleCalibrationDataCollection(BubbleDataCollectionBase):
 
             self.med.grasp(grasp_width, speed=10.)
             # rospy.sleep(2.0)
-            def_fc = (self.filecode+i)*2
+            def_fc = self.get_new_filecode()
             self._record(fc=def_fc)
             data_params['deformed_fc'].append(def_fc)
             # Move back to home position
