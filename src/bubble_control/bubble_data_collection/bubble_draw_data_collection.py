@@ -23,6 +23,7 @@ from bubble_control.bubble_data_collection.data_collector_base import DataCollec
 from bubble_control.bubble_data_collection.bubble_data_collection_base import BubbleDataCollectionBase
 from bubble_control.bubble_drawer.bubble_drawer import BubbleDrawer
 
+# TODO: Fix the filecode
 
 class BubbleDrawingDataCollection(BubbleDataCollectionBase):
 
@@ -31,21 +32,27 @@ class BubbleDrawingDataCollection(BubbleDataCollectionBase):
         super().__init__(*args, **kwargs)
         self.last_undeformed_fc = None
 
-    def record_gripper_calibration(self):
+    def _record_gripper_calibration(self):
+        self.bubble_drawer.set_grasp_pose()
         _ = input('Press enter to open the gripper and calibrate the bubbles')
         self.med.open_gripper()
         self._record(fc=self.filecode)
-        import pdb; pdb.set_trace()
-        self.last_undeformed_fc = None # TODO
+        self.last_undeformed_fc = self.filecode
+        self.filecode += 1
         _ = input('Press enter to close the gripper')
         self.med.set_grasping_force(5.0)
+        self.med.gripper.move(25.0)
         self.med.grasp(20.0, 30.0)
+        rospy.sleep(2.0)
         print('Calibration is done')
+        self.bubble_drawer.home_robot()
 
     def collect_data(self, num_data):
         print('Calibration undeformed state, please follow the instructions')
-        self.record_gripper_calibration()
-        return super().collect_data(num_data)
+        self._record_gripper_calibration()
+        out = super().collect_data(num_data)
+        self.bubble_drawer.home_robot()
+        return out
 
     def _get_med(self):
         return self.bubble_drawer.med
@@ -61,8 +68,8 @@ class BubbleDrawingDataCollection(BubbleDataCollectionBase):
             grasp_force_i = data_params['grasp_force'][i]
             grasp_width_i = data_params['grasp_width'][i]
             action_i = data_params['action']
-            scene_i = None # TODO: Fill scene
-            line_i = [self.last_undeformed_fc, init_fc_i, final_fc_i,  grasp_force_i, grasp_width_i, action_i, wrench_i, scene_i]
+            scene_i = self.scene_name
+            line_i = [self.last_undeformed_fc, init_fc_i, final_fc_i,  grasp_force_i, grasp_width_i, action_i, scene_i]
             legend_lines.append(line_i)
         return legend_lines
 
@@ -85,14 +92,13 @@ class BubbleDrawingDataCollection(BubbleDataCollectionBase):
         end_point_i = start_point_i + length_i * np.array([np.cos(direction_i), np.sin(direction_i)])
         grasp_width_i = 20
         # Sample the fcs:
-        init_fc = 2*self.filecode-1
+        init_fc = 2*self.filecode - 1
         final_fc = 2*self.filecode
 
         action_i = {'start_point': start_point_i,
                     'direction': direction_i,
                     'length': length_i,
                     }
-
 
         # Set the grasp width
         self.med.gripper.move(grasp_width_i, 10.0)
@@ -105,19 +111,18 @@ class BubbleDrawingDataCollection(BubbleDataCollectionBase):
         # record init state:
         self._record(fc=init_fc)
         # draw
-        self.bubble_drawer._draw_to_point(end_point_i, )
+        self.bubble_drawer._draw_to_point(end_point_i, draw_height)
 
         # record final_state
-        self._record(fc=init_fc)
+        self._record(fc=final_fc)
 
         # raise the arm at the end
-
+        # Raise the arm when we reach the last point
+        self.bubble_drawer._end_raise(end_point_i)
         data_params['initial_fc'].append(init_fc)
         data_params['final_fc'].append(final_fc)
         data_params['grasp_force'].append(grasp_force_i)
         data_params['grasp_width'].append(grasp_width_i)
         data_params['action'].append(action_i)
-
-
 
         return data_params

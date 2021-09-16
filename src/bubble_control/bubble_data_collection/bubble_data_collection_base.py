@@ -9,6 +9,7 @@ import tf
 import pandas as pd
 import tf.transformations as tr
 import mmint_utils
+from collections import defaultdict
 
 from arm_robots.med import Med
 from arc_utilities.listener import Listener
@@ -52,8 +53,7 @@ class WrenchRecorder(object):
     def record(self, fc=None, frame_names=None):
 
         wrench = self.wrench_listener.get(block_until_data=True)
-        import pdb; pdb.set_trace()
-        wrenches = []
+        wrenches = [wrench]
         if frame_names is not None:
         # record only the frame that the topic is published to
             for frame_name_i in frame_names:
@@ -69,13 +69,35 @@ class WrenchRecorder(object):
         df.to_csv(full_save_path, index=False)
 
     def _pack_wrenches(self, wrenches):
-        wrenches_data = []
-        columns = ['frame'] + ['force_x', 'force_y', 'force_z', 'tau_x', 'tau_y', 'tau_z']
-        import pdb; pdb.set_trace()
+        wrenches_dict = defaultdict(list)
         for i, wrench_i in enumerate(wrenches):
-            frame_i = None
-        wrenches_df = pd.DataFrame(wrenches_data, columns=columns)
+            wrench_dict_i = self._pack_message_as_dict(wrench_i)
+            for k, v in wrench_dict_i.items():
+                wrenches_dict[k].append(v)
+        wrenches_df = pd.DataFrame(wrenches_dict)
         return wrenches_df
+
+    def _pack_message_as_dict(self, msg):
+        output_dict = {}
+        for slot_name in msg.__slots__:
+            slot_value = getattr(msg, slot_name)
+            if isinstance(slot_value, rospy.rostime.Time):
+                keys = ['secs', 'nsecs']
+                sub_dict_updated = {}
+                for k in keys:
+                    sub_dict_updated['{}.{}'.format(slot_name, k)] = getattr(slot_value, k)
+                output_dict.update(sub_dict_updated)
+            elif '__slots__' in slot_value.__dir__():
+                sub_dict = self._pack_message_as_dict(slot_value)
+                # update keys:
+                sub_dict_updated = {}
+                for k, v in sub_dict.items():
+                    sub_dict_updated['{}.{}'.format(slot_name, k)] = v
+                output_dict.update(sub_dict_updated)
+            else:
+                output_dict[slot_name] = slot_value
+
+        return output_dict
 
 
 class BubbleDataCollectionBase(DataCollectorBase):
@@ -87,7 +109,11 @@ class BubbleDataCollectionBase(DataCollectorBase):
         self.wrench_topic = wrench_topic
         self.lock = threading.Lock()
         self.save_path = self.data_path # rename for backward compatibility
-        rospy.init_node(self.scene_name)
+        # Init ROS node
+        try:
+            rospy.init_node(self.scene_name)
+        except (rospy.exceptions.ROSInitException, rospy.exceptions.ROSException):
+            pass
         self.tf_listener = tf.TransformListener()
         self.tf2_listener = TF2Wrapper()
         self.wrench_listener = Listener(self.wrench_topic, WrenchStamped, wait_for_data=True)

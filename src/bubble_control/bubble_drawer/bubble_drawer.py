@@ -50,7 +50,13 @@ class BubbleDrawer(object):
         self._setup()
 
     def home_robot(self):
-        self.med.plan_to_joint_config(self.med.arm_group, [0, 1.0, 0, -0.8, 0, 0.9, 0])
+        # self.med.plan_to_joint_config(self.med.arm_group, [0, 1.0, 0, -0.8, 0, 0.9, 0])
+        self.med.plan_to_joint_config(self.med.arm_group, [0, 0.432, 0, -1.584, 0, 0.865, 0])
+
+    def set_grasp_pose(self):
+        grasp_pose_joints = [0.7613740469101997, 1.1146166859754167, -1.6834551714751782, -1.6882417308401203,
+                             0.47044861033517205, 0.8857417788890095, 0.8497585444122142]
+        self.med.plan_to_joint_config(self.med.arm_group, grasp_pose_joints)
 
     def _setup(self):
         self.med.connect()
@@ -123,11 +129,8 @@ class BubbleDrawer(object):
         self.med.follow_arms_joint_trajectory(plan_result.planning_result.plan.joint_trajectory,
                                                   stop_condition=self._stop_signal)
 
-
-
     def _init_drawing(self, init_point_xy, draw_quat=None, ref_frame=None):
         # Plan to the point_xy and perform a guarded move to start drawing
-
         # Variables:
         pre_height = self.pre_height
         draw_height_limit = self.draw_height_limit
@@ -209,10 +212,13 @@ class BubbleDrawer(object):
 
         if end_raise:
             # Raise the arm when we reach the last point
-            final_position = np.insert(point_xy, 2, self.pre_height)
-            final_pose = np.concatenate([final_position, self.draw_quat], axis=0)
-            self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(final_pose), frame_id='med_base')
+            self._end_raise(point_xy)
 
+
+    def _end_raise(self, point_xy):
+        final_position = np.insert(point_xy, 2, self.pre_height)
+        final_pose = np.concatenate([final_position, self.draw_quat], axis=0)
+        self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(final_pose), frame_id='med_base')
 
     def _adjust_tool_position(self, xy_point):
         # Adjust the position when we reach the keypoint -------
