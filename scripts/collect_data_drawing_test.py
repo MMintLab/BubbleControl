@@ -19,13 +19,9 @@ def collect_data_drawing_test(supervision=False, reactive=False):
     save_path = '/home/mmint/Desktop/drawing_data'
     scene_name = 'drawing_data_test'
 
-    dc = BubbleDrawingDataCollection(data_path=save_path, scene_name=scene_name)
+    dc = BubbleDrawingDataCollection(data_path=save_path, scene_name=scene_name, supervision=True)
     dc.collect_data(num_data=10)
 
 
-
-
-
 if __name__ == '__main__':
-
     collect_data_drawing_test()

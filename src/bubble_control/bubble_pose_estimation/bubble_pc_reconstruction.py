@@ -250,7 +250,7 @@ class BubblePCReconstructor(object):
             self.trees[key] = KDTree(self.reference_pcs['{}_pc'.format(key)][:, :3])
             tree = self.trees[key]
         qry_xyz = query_pc[:, :3]
-        near_qry_indxs = tree.query_ball_point(qry_xyz, d_threshold)
+        near_qry_indxs = tree.query_ball_point(qry_xyz, d_threshold) # DEBUG: This is very slow if we have 20k points
         far_qry_indxs = [i for i, x in enumerate(near_qry_indxs) if len(x) == 0]
         return far_qry_indxs
 

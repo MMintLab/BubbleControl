@@ -38,9 +38,6 @@ class BubbleCalibrationDataCollection(BubbleDataCollectionBase):
         self.grasp_forces = [10., 20]
         self._setup()
 
-    def _get_med(self):
-        return Med(display_goals=False)
-
     def _setup(self):
         self.med.connect()
         self.med.set_control_mode(ControlMode.JOINT_POSITION, vel=0.1)
