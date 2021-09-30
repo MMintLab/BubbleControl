@@ -1,23 +1,16 @@
 #! /usr/bin/env python
-import os
-import pdb
-import sys
 import numpy as np
-import threading
-import copy
 import rospy
 import tf
 import tf.transformations as tr
 
 from arm_robots.med import Med
 from arc_utilities.listener import Listener
-import tf2_geometry_msgs  # Needed by TF2Wrapper
 from arc_utilities.tf2wrapper import TF2Wrapper
 from victor_hardware_interface.victor_utils import Stiffness
-from victor_hardware_interface_msgs.msg import ControlMode, MotionStatus
+from victor_hardware_interface_msgs.msg import ControlMode
 
-from geometry_msgs.msg import Pose, PoseStamped, TransformStamped, Vector3, WrenchStamped
-from control_msgs.msg import FollowJointTrajectoryFeedback
+from geometry_msgs.msg import WrenchStamped
 from visualization_msgs.msg import Marker
 
 
@@ -429,8 +422,6 @@ if __name__ == '__main__':
     supervision = False
     reactive = True
     # reactive = False
-
-    from mmint_camera_utils.topic_recording import TopicRecorder, WrenchRecorder
 
     # topic_recorder = TopicRecorder()
     # wrench_recorder = WrenchRecorder('/med/wrench', ref_frame='world')

@@ -13,7 +13,6 @@ from collections import defaultdict
 
 from arm_robots.med import Med
 from arc_utilities.listener import Listener
-import tf2_geometry_msgs  # Needed by TF2Wrapper
 from arc_utilities.tf2wrapper import TF2Wrapper
 
 from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
@@ -30,6 +29,7 @@ from bubble_control.bubble_data_collection.data_collector_base import DataCollec
 
 package_path = os.path.join(os.path.dirname(os.path.abspath(__file__)).split('/bubble_control')[0], 'bubble_control')
 
+
 class WrenchRecorder(object):
     def __init__(self, wrench_topic, scene_name='scene', save_path=None):
         self.wrench_topic = wrench_topic
@@ -37,7 +37,6 @@ class WrenchRecorder(object):
         self.save_path = self._get_save_path(save_path)
         self.wrench_listener = Listener(self.wrench_topic, WrenchStamped, wait_for_data=True)
         self.tf2_listener = TF2Wrapper()
-        self.counter = 0
 
     def _get_save_path(self, save_path=None):
         if save_path is None:
@@ -53,8 +52,7 @@ class WrenchRecorder(object):
         return extended_save_path
 
     def record(self, fc=None, frame_names=None):
-        if fc is None:
-            fc = self.counter + 1
+
         wrench = self.wrench_listener.get(block_until_data=True)
         wrenches = [wrench]
         if frame_names is not None:
@@ -70,7 +68,6 @@ class WrenchRecorder(object):
             os.makedirs(self.save_path)
         full_save_path = os.path.join(self.save_path, '{}.csv'.format(filename))
         df.to_csv(full_save_path, index=False)
-        self.counter += 1
 
     def _pack_wrenches(self, wrenches):
         wrenches_dict = defaultdict(list)
@@ -103,8 +100,10 @@ class WrenchRecorder(object):
 
         return output_dict
 
-class MedDataCollectionBase(DataCollectorBase):
-    def __init__(self, data_path=None, supervision=False, scene_name='med_data_collection', wrench_topic='/med/wrench'):
+
+class BubbleDataCollectionBase(DataCollectorBase):
+
+    def __init__(self, data_path=None, supervision=False, scene_name='bubble_data_collection', wrench_topic='/med/wrench'):
         super().__init__(data_path=data_path)
         self.supervision = supervision
         self.scene_name = scene_name
@@ -120,71 +119,6 @@ class MedDataCollectionBase(DataCollectorBase):
         self.tf2_listener = TF2Wrapper()
         self.wrench_listener = Listener(self.wrench_topic, WrenchStamped, wait_for_data=True)
         self.med = self._get_med()
-        self.wrench_recorder = WrenchRecorder(self.wrench_topic, scene_name=self.scene_name, save_path=self.save_path)
-
-    def _get_med(self):
-        med = Med(display_goals=False)
-        med.connect()
-        return med
-
-    def _plan_to_pose(self, pose, supervision=False):
-        plan_success = False
-        execution_success = False
-        plan_found = False
-        while (not rospy.is_shutdown()) and not plan_found:
-            if supervision:
-                self.med.set_execute(False)
-            plan_result = self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(pose), frame_id='med_base')
-            plan_success = plan_result.success
-            execution_success = plan_result.execution_result.success
-            if not plan_success:
-                print('@' * 20 + '    Plan Failed    ' + '@' * 20)
-                import pdb;
-                pdb.set_trace()
-            if supervision or not plan_success:
-                for i in range(10):
-                    k = input('Execute plan (y: yes, r: replan, f: finish): ')
-                    if k == 'y':
-                        self.med.set_execute(True)
-                        execution_result = self.med.follow_arms_joint_trajectory(plan_result.planning_result.plan.joint_trajectory)
-                        execution_success = execution_result.success
-                        plan_found = True
-                        break
-                    elif k == 'r':
-                        break
-                    elif k == 'f':
-                        return
-                    else:
-                        pass
-            else:
-                plan_found = True
-
-        if not execution_success:
-            # It seams tha execution always fails (??)
-            print('-' * 20 + '    Execution Failed    ' + '-' * 20)
-
-        return plan_success, execution_success
-
-    def _get_recording_frames(self):
-        child_frames = ['grasp_frame', 'med_kuka_link_ee']
-        return child_frames
-
-    def _record(self, fc=None):
-        self.wrench_recorder.record(fc=fc, frame_names=['grasp_frame', 'med_base'])
-        child_names = self._get_recording_frames()
-        parent_names = 'med_base'
-        tf_save_path = os.path.join(self.save_path, self.scene_name, 'tfs')
-        if fc is None:
-            tf_fc = self.wrench_recorder.counter
-        else:
-            tf_fc = fc
-        save_tfs(child_names, parent_names, tf_save_path, file_name='recorded_tfs_{:06d}'.format(tf_fc))
-
-
-class BubbleDataCollectionBase(MedDataCollectionBase):
-
-    def __init__(self, data_path=None, supervision=False, scene_name='bubble_data_collection', wrench_topic='/med/wrench'):
-        super().__init__(data_path=data_path, supervision=supervision, scene_name=scene_name, wrench_topic=wrench_topic)
         self.camera_name_right = 'pico_flexx_right'
         self.camera_name_left = 'pico_flexx_left'
         self.camera_parser_right = PicoFlexxPointCloudParser(camera_name=self.camera_name_right,
@@ -192,16 +126,42 @@ class BubbleDataCollectionBase(MedDataCollectionBase):
         self.camera_parser_left = PicoFlexxPointCloudParser(camera_name=self.camera_name_left,
                                                             scene_name=self.scene_name, save_path=self.save_path)
 
+        self.wrench_recorder = WrenchRecorder(self.wrench_topic, scene_name=self.scene_name, save_path=self.save_path)
 
-    def _get_recording_frames(self):
-        super_frames = super()._get_recording_frames()
-        child_frames = super_frames + ['pico_flexx_left_link', 'pico_flexx_right_link', 'pico_flexx_left_optical_frame', 'pico_flexx_right_optical_frame']
-        return child_frames
+    @abc.abstractmethod
+    def _get_med(self):
+        pass
+
+    def _plan_to_pose(self, pose, supervision=False):
+        if supervision:
+            self.med.set_execute(False)
+        plan_result = self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(pose), frame_id='med_base')
+        if supervision:
+            for i in range(10):
+                k = input('Execute plan (y: yes, r: replan, f: finish): ')
+                if k == 'y':
+                    self.med.set_execute(True)
+                    self.med.follow_arms_joint_trajectory(plan_result.planning_result.plan.joint_trajectory)
+                    break
+                elif k == 'r':
+                    break
+                elif k == 'f':
+                    return
+                else:
+                    pass
 
     def _record(self, fc=None):
-        super()._record(fc=fc)
+        self.wrench_recorder.record(fc=fc, frame_names=['grasp_frame', 'med_base'])
         self.camera_parser_left.record(fc=fc)
         self.camera_parser_right.record(fc=fc)
+        child_names = ['pico_flexx_left_link', 'pico_flexx_right_link', 'pico_flexx_left_optical_frame', 'pico_flexx_right_optical_frame', 'grasp_frame', 'med_kuka_link_ee', 'calibration_tool']
+        parent_names = 'med_base'
+        tf_save_path = os.path.join(self.save_path, self.scene_name, 'tfs')
+        if fc is None:
+            tf_fc = self.camera_parser_left.counter['pointcloud']-1
+        else:
+            tf_fc = fc
+        save_tfs(child_names, parent_names, tf_save_path, file_name='recorded_tfs_{:06d}'.format(tf_fc))
 
 
 

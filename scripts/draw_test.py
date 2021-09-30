@@ -1,13 +1,5 @@
 #! /usr/bin/env python
-import os
-import pdb
-import sys
 import numpy as np
-import threading
-import copy
-import rospy
-import tf
-import tf.transformations as tr
 
 from bubble_control.bubble_drawer.bubble_drawer import BubbleDrawer
 
@@ -63,8 +55,6 @@ if __name__ == '__main__':
     supervision = False
     reactive = True
     # reactive = False
-
-    from mmint_camera_utils.topic_recording import TopicRecorder, WrenchRecorder
 
     # topic_recorder = TopicRecorder()
     # wrench_recorder = WrenchRecorder('/med/wrench', ref_frame='world')
