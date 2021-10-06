@@ -36,10 +36,9 @@ if __name__ == '__main__':
     # imprint_th = 0.0048 # for pen with gw 15
     # imprint_th = 0.0048 # for allen with gw 12
     imprint_th = 0.0053 # for marker with gw 20
-    # imprint_th = 0.006 # for spatula with gripper width of 15mm
     icp_th = 1. # consider all points
     icp_th = 0.005 # for allen key
-    bpe = BubblePoseEstimator(view=view, imprint_th=imprint_th, icp_th=icp_th, rate=5., verbose=view, object_name='marker', estimation_type='icp2d')
+    bpe = BubblePoseEstimator(view=view, imprint_th=imprint_th, icp_th=icp_th, rate=15., verbose=view, object_name='marker', estimation_type='icp2d')
 
 
 

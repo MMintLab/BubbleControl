@@ -2,6 +2,7 @@
 import os
 import pdb
 import sys
+import time
 import numpy as np
 import threading
 import copy
@@ -21,6 +22,63 @@ from control_msgs.msg import FollowJointTrajectoryFeedback
 from visualization_msgs.msg import Marker
 
 
+class TFBufferPublisher(object):
+    def __init__(self, rate=10.0):
+        self.rate = rate
+        self.is_alive = True
+        self.lock = threading.Lock()
+        self.tf = None
+        self.timeout = None
+        self.tf_broadcaster = tf.TransformBroadcaster()
+        self.publishing_thread = threading.Thread(target=self._publish_loop)
+
+    def _publish_loop(self):
+        rate = rospy.Rate(self.rate)
+        while not rospy.is_shutdown():
+            with self.lock:
+                if self.timeout is not None:
+                    if self.timeout < time.time():
+                        self.tf = None # Timeout reached, stop broadcasting
+                tf = copy.deepcopy(self.tf)
+            if tf is not None:
+                # broadcast the tf
+                self.tf_broadcaster.sendTransform(tf['pos'], tf['quat'], rospy.Time.now(), child=tf['child_frame_name'], parent=tf['parent_frame_name'])
+            rate.sleep()
+            with self.lock:
+                if not self.is_alive:
+                    return
+
+    def send_tf(self, translation, quaternion, parent_frame_name, child_frame_name, timeout=None):
+        """
+
+        Args:
+            translation:
+            quaternion:
+            parent_frame_name:
+            child_frame_name:
+            timeout: time to broadcast the tf in seconds. It will automatically stop after that time.
+                If None, the broadcasting will keep going until finish() or reset() are called or another tf is passed to send_tf.
+        """
+        # TODO: Finish
+        tf = {'pos': translation,
+              'quat': quaternion,
+              'parent_frame_name': parent_frame_name,
+              'child_frame_name': child_frame_name}
+        with self.lock:
+            self.tf = tf
+            if timeout is not None:
+                self.timeout = time.time() + timeout
+
+    def reset(self):
+        with self.lock:
+            self.tf = None
+            self.timeout = None
+
+    def finish(self):
+        with self.lock:
+            self.is_alive = False
+
+
 class ContactPointEstimator(object):
 
     def __init__(self, object_topic='estimated_object', plane_frame='med_base', rate=10):
@@ -32,6 +90,9 @@ class ContactPointEstimator(object):
         except (rospy.exceptions.ROSInitException, rospy.exceptions.ROSException):
             pass
         self.tf2_listener = TF2Wrapper()
+        self.tool_frame_br = TFBufferPublisher(self.rate)
+        self.tool_contact_point_br = TFBufferPublisher(self.rate)
+        self.tool_contact_point_fake_br = TFBufferPublisher(self.rate)
         self.pose_listener = Listener(self.object_topic, Marker, wait_for_data=False)
         self.estimate_contact_point()
         # rospy.spin()
@@ -61,13 +122,22 @@ class ContactPointEstimator(object):
 
         marker_axis_mpf = tr.quaternion_matrix(marker_quat)[:3,:3] @ marker_axis# in the marker_pose frame
         self.tf2_listener.send_transform(translation=marker_translation, quaternion=marker_quat, parent=marker_pose['frame'], child='tool_frame', is_static=False)
-        tool_pose_pf = self.tf2_listener.get_transform(parent=self.plane_frame, child='tool_frame')
+        # self.tool_frame_br.send_tf(translation=marker_translation, quaternion=marker_quat, parent_frame_name=marker_pose['frame'], child_frame_name='tool_frame')
+
         marker_parent_frame_pf = self.tf2_listener.get_transform(parent=self.plane_frame, child=marker_pose['frame'])
+        # get tf between plane_frame and tool_frame
+        # tool_pose_pf = self.tf2_listener.get_transform(parent=self.plane_frame, child='tool_frame')
+        # import pdb; pdb.set_trace()
+        tool_frame_to_marker_parent_frame = tr.quaternion_matrix(marker_quat)
+        tool_frame_to_marker_parent_frame[:3,3] = marker_translation
+        tool_pose_pf = marker_parent_frame_pf @ tool_frame_to_marker_parent_frame
 
         contact_point_pf = self._get_contact_point_plane_frame(tool_pose_pf, marker_axis, plane_normal_axis)
         parent_frame_pf = self._get_contact_point_plane_frame(marker_parent_frame_pf, np.array([0,0,1]) , plane_normal_axis)
         self.tf2_listener.send_transform(translation=contact_point_pf, quaternion=[0,0,0,1], parent=self.plane_frame, child='tool_contact_point', is_static=False)
         self.tf2_listener.send_transform(translation=parent_frame_pf, quaternion=[0,0,0,1], parent=self.plane_frame, child='tool_contact_point_fake', is_static=False)
+        # self.tool_contact_point_br.send_tf(translation=contact_point_pf, quaternion=[0,0,0,1], parent_frame_name=self.plane_frame, child_frame_name='tool_contact_point',)
+        # self.tool_contact_point_fake_br.send_tf(translation=parent_frame_pf, quaternion=[0,0,0,1], parent_frame_name=self.plane_frame, child_frame_name='tool_contact_point_fake')
 
     def _get_contact_point_plane_frame(self, pose_pf, tool_axis, plane_normal_axis):
         h = pose_pf[2, 3]
@@ -79,10 +149,11 @@ class ContactPointEstimator(object):
         return contact_point_pf
 
     def estimate_contact_point(self):
+        rate = rospy.Rate(self.rate)
         while not rospy.is_shutdown():
             try:
                 self._estimate_contact_point()
-                rospy.Rate(self.rate)
+                rate.sleep()
             except (rospy.ROSInterruptException, rospy.ROSException) as e:
                 print(e)
                 return None

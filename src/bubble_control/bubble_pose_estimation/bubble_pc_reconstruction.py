@@ -30,11 +30,12 @@ from bubble_control.bubble_pose_estimation.pose_estimators import ICP3DPoseEstim
 
 class BubblePCReconstructor(object):
 
-    def __init__(self, reconstruction_frame='grasp_frame', threshold=0.005, object_name='allen', estimation_type='icp3d'):
+    def __init__(self, reconstruction_frame='grasp_frame', threshold=0.005, object_name='allen', estimation_type='icp3d', view=False):
         self.object_name = object_name
         self.estimation_type = estimation_type
         self.reconstruction_frame = reconstruction_frame
         self.threshold = threshold
+        self.view = view
         self.left_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_left')
         self.right_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_right')
         self.reference_pcs = {
@@ -159,7 +160,7 @@ class BubblePCReconstructor(object):
         pose_estimator = None
         available_esttimation_types = ['icp3d', 'icp2d']
         if self.estimation_type == 'icp3d':
-            pose_estimator = ICP3DPoseEstimator(obj_model=self.object_model)
+            pose_estimator = ICP3DPoseEstimator(obj_model=self.object_model, view=self.view)
         elif self.estimation_type == 'icp2d':
             pose_estimator = ICP2DPoseEstimator(obj_model=self.object_model, projection_axis=(1,0,0), max_num_iterations=20)
         else:

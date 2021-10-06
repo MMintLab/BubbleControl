@@ -16,6 +16,8 @@ import tf
 import tf.transformations as tr
 from functools import reduce
 from sklearn.cluster import DBSCAN
+import threading
+import copy
 
 import sensor_msgs.point_cloud2 as pc2
 from std_msgs.msg import String
@@ -31,7 +33,7 @@ from bubble_control.bubble_pose_estimation.bubble_pc_reconstruction import Bubbl
 
 class BubblePoseEstimator(object):
 
-    def __init__(self, imprint_th=0.005, icp_th=0.01, rate=1.0, view=False, verbose=False, object_name='allen', estimation_type='icp3d'):
+    def __init__(self, imprint_th=0.005, icp_th=0.01, rate=5.0, view=False, verbose=False, object_name='allen', estimation_type='icp3d'):
         self.object_name = object_name
         self.imprint_th = imprint_th
         self.icp_th = icp_th
@@ -39,10 +41,15 @@ class BubblePoseEstimator(object):
         self.view = view
         self.verbose = verbose
         rospy.init_node('bubble_pose_estimator')
-        self.reconstructor = BubblePCReconstructor(threshold=self.imprint_th, object_name=self.object_name, estimation_type=estimation_type)
+        self.reconstructor = BubblePCReconstructor(threshold=self.imprint_th, object_name=self.object_name, estimation_type=estimation_type, view=self.verbose)
         self.marker_publisher = rospy.Publisher('estimated_object', Marker, queue_size=100)
         self.tf_broadcaster = tf.TransformBroadcaster()
+        self.tool_estimated_pose = None
+        self.alive = True
         self.calibrate()
+        self.lock = threading.Lock()
+        self.publisher_thread = threading.Thread(target=self._marker_publishing_loop)
+        self.publisher_thread.start()
         self.estimate_pose(verbose=self.verbose)
         rospy.spin()
 
@@ -56,17 +63,27 @@ class BubblePoseEstimator(object):
         while not rospy.is_shutdown():
             try:
                 icp_tr = self.reconstructor.estimate_pose(threshold=self.icp_th, view=self.view, verbose=verbose)
-                self._broadcast_tr(icp_tr)
+                with self.lock:
+                    # update the tool_estimated_pose
+                    t = icp_tr[:3, 3]
+                    q = tr.quaternion_from_matrix(icp_tr)
+                    self.tool_estimated_pose = np.concatenate([t, q])
             except rospy.ROSInterruptException:
+                self.finish()
                 break
 
-    def _broadcast_tr(self, icp_tr):
-        t = icp_tr[:3,3]
-        q = tr.quaternion_from_matrix(icp_tr)
-        marker_i = self._create_marker(t, q)
-        self.marker_publisher.publish(marker_i)
-        # add also the tf
-        # self.tf_broadcaster.sendTransform(list(t), list(q), rospy.Time.now(), self.reconstructor.reconstruction_frame, 'tool_obj_frame')
+    def _marker_publishing_loop(self):
+        publish_rate = rospy.Rate(self.rate)
+        while not rospy.is_shutdown():
+            with self.lock:
+                current_tool_pose = copy.deepcopy(self.tool_estimated_pose)
+            if current_tool_pose is not None:
+                marker_i = self._create_marker(current_tool_pose[:3], current_tool_pose[3:])
+                self.marker_publisher.publish(marker_i)
+            publish_rate.sleep()
+            with self.lock:
+                if not self.alive:
+                    return
 
     def _create_marker(self, t, q):
         mk = Marker()
@@ -89,6 +106,11 @@ class BubblePoseEstimator(object):
         mk.pose.orientation.z = q[2]
         mk.pose.orientation.w = q[3]
         return mk
+
+    def finish(self):
+        with self.lock:
+            self.alive = False
+        self.publisher_thread.join()
 
 
 if __name__ == '__main__':
