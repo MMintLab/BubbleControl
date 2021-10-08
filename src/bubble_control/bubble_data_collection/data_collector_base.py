@@ -20,7 +20,7 @@ class DataCollectorBase(abc.ABC):
         self.data_path, self.filename = self._get_data_path(data_path)
         self.datalegend_path = os.path.join(self.data_path, '{}_DataLegend.csv'.format(self.filename))
         self.last_filecode_pickle_path = os.path.join(self.data_path, 'lastFileCode.pickle')
-        self.filecode = 1
+        self.filecode = 0
         self._load()
 
     def _load(self):
@@ -31,11 +31,24 @@ class DataCollectorBase(abc.ABC):
         if not os.path.isfile(self.datalegend_path):
             legend_df = pd.DataFrame(columns=self._get_legend_column_names())
             legend_df.to_csv(self.datalegend_path, index=False)
-            with open(self.last_filecode_pickle_path, 'wb') as f:
-                pickle.dump(1, f)
+            self._save_filecode_pickle()
         else:
-            with open(self.last_filecode_pickle_path, 'rb') as f:
-                self.filecode = pickle.load(f)
+            self._load_filecode_pickle()
+
+
+    def _save_filecode_pickle(self):
+        with open(self.last_filecode_pickle_path, 'wb') as f:
+            pickle.dump(self.filecode, f)
+
+    def _load_filecode_pickle(self):
+        with open(self.last_filecode_pickle_path, 'rb') as f:
+            self.filecode = pickle.load(f)
+
+    def get_new_filecode(self, update_pickle=False):
+        self.filecode = self.filecode + 1
+        if update_pickle:
+            self._save_filecode_pickle()
+        return self.filecode
 
     @abc.abstractmethod
     def _get_legend_column_names(self):
@@ -94,14 +107,11 @@ class DataCollectorBase(abc.ABC):
             # Log data sample info to data legend
             legend_lines_vals = self._get_legend_lines(sample_params)
             num_data_collected = len(legend_lines_vals)
-            self.filecode += num_data_collected # update the filecode
             with open(self.datalegend_path, 'a+') as csv_file:
                 csv_file_writer = csv.writer(csv_file)
                 for line_val in legend_lines_vals:
                     csv_file_writer.writerow(line_val)
             csv_file.close() # make sure it is closed
-
             # Update the filecode
-            with open(self.last_filecode_pickle_path, 'wb') as f:
-                pickle.dump(self.filecode, f)
+            self._save_filecode_pickle()
 

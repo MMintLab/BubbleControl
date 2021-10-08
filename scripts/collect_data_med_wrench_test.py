@@ -16,11 +16,11 @@ from bubble_control.bubble_data_collection.med_wrench_data_collection import Med
 
 def collect_data_med_wrench_test(supervision=False, reactive=False):
 
-    save_path = '/home/mmint/Desktop/med_wrench_calibration_2'
+    save_path = '/home/mik/Desktop/medusa_wrench_calibration'
     scene_name = 'wrench_scene'
 
     dc = MedWrenchDataCollection(data_path=save_path, scene_name=scene_name, supervision=False)
-    dc.collect_data(num_data=10)
+    dc.collect_data(num_data=15)
 
 
 if __name__ == '__main__':
