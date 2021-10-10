@@ -3,6 +3,7 @@ import rospy
 import time
 import pandas as pd
 from collections import defaultdict
+from tqdm import tqdm
 
 from arc_utilities.listener import Listener
 from sensor_msgs.msg import JointState
@@ -87,21 +88,26 @@ class MedWrenchDataCollection(MedDataCollectionBase):
             data_params['FileCode'].append(fc_i)
             data_params['JointState'].append(joints_i.position)
 
-        if self.joint_sequence is None:
-            for i, position_i in enumerate(positions):
-                pose_i = np.concatenate([position_i, quat])
-                self.home_robot()
-                plan_success, execution_success = self._plan_to_pose(pose_i, supervision=self.supervision)
-                __record(sequence_i, i)
-            self.joint_sequence = joint_states
-        else:
-            for i, joint_state_i in enumerate(self.joint_sequence):
-                self.med.plan_to_joint_config(self.med.arm_group, joint_state_i.position[:-2])  # ONly the arm joints
-                __record(sequence_i, i)
-        # Repeat the sequence in the oposite direction
-        for i, joint_state_i in enumerate(reversed(joint_states)):
-            self.med.plan_to_joint_config(self.med.arm_group, joint_state_i.position[:-2]) # ONly the arm joints
-            __record(sequence_i, i+len(positions))
+        num_positions = 2*len(positions)
+        with tqdm(total=num_positions, bar_format='{l_bar} {postfix[0]}{bar}{r_bar}') as pbar:
+            if self.joint_sequence is None:
+                for i, position_i in enumerate(positions):
+                    pose_i = np.concatenate([position_i, quat])
+                    self.home_robot()
+                    plan_success, execution_success = self._plan_to_pose(pose_i, supervision=self.supervision)
+                    __record(sequence_i, i)
+                    pbar.update()
+                self.joint_sequence = joint_states
+            else:
+                for i, joint_state_i in enumerate(self.joint_sequence):
+                    self.med.plan_to_joint_config(self.med.arm_group, joint_state_i.position[:-2])  # ONly the arm joints
+                    __record(sequence_i, i)
+                    pbar.update()
+            # Repeat the sequence in the oposite direction
+            for i, joint_state_i in enumerate(reversed(joint_states)):
+                self.med.plan_to_joint_config(self.med.arm_group, joint_state_i.position[:-2]) # ONly the arm joints
+                __record(sequence_i, i+len(positions))
+                pbar.update()
 
 
         return data_params

@@ -108,11 +108,12 @@ class WrenchRecorder(object):
 
 class MedDataCollectionBase(DataCollectorBase):
 
-    def __init__(self, data_path=None, supervision=False, scene_name='med_data_collection', wrench_topic='/med/wrench'):
+    def __init__(self, data_path=None, supervision=False, scene_name='med_data_collection', wrench_topic='/med/wrench', verbose=False):
         super().__init__(data_path=data_path)
         self.supervision = supervision
         self.scene_name = scene_name
         self.wrench_topic = wrench_topic
+        self.verbose = verbose
         self.lock = threading.Lock()
         self.save_path = self.data_path # rename for backward compatibility
         # Init ROS node
@@ -185,7 +186,7 @@ class MedDataCollectionBase(DataCollectorBase):
             tf_fc = self.wrench_recorder.counter
         else:
             tf_fc = fc
-        save_tfs(child_names, parent_names, tf_save_path, file_name='recorded_tfs_{:06d}'.format(tf_fc))
+        save_tfs(child_names, parent_names, tf_save_path, file_name='recorded_tfs_{:06d}'.format(tf_fc), verbose=self.verbose)
 
 
 class BubbleDataCollectionBase(MedDataCollectionBase):
@@ -198,7 +199,6 @@ class BubbleDataCollectionBase(MedDataCollectionBase):
                                                              scene_name=self.scene_name, save_path=self.save_path)
         self.camera_parser_left = PicoFlexxPointCloudParser(camera_name=self.camera_name_left,
                                                             scene_name=self.scene_name, save_path=self.save_path)
-
 
     def _get_recording_frames(self):
         super_frames = super()._get_recording_frames()
