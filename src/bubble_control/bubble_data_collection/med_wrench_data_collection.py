@@ -89,9 +89,10 @@ class MedWrenchDataCollection(MedDataCollectionBase):
             data_params['JointState'].append(joints_i.position)
 
         num_positions = 2*len(positions)
-        with tqdm(total=num_positions, bar_format='{l_bar} {postfix[0]}{bar}{r_bar}') as pbar:
+        with tqdm(total=num_positions, bar_format='\t{postfix[0]} {postfix[1]}/{postfix[2]} - {l_bar}{bar}{r_bar}', postfix=['Forward', 1, len(positions)]) as pbar:
             if self.joint_sequence is None:
                 for i, position_i in enumerate(positions):
+                    pbar.postfix[1] = i+1
                     pose_i = np.concatenate([position_i, quat])
                     self.home_robot()
                     plan_success, execution_success = self._plan_to_pose(pose_i, supervision=self.supervision)
@@ -100,11 +101,14 @@ class MedWrenchDataCollection(MedDataCollectionBase):
                 self.joint_sequence = joint_states
             else:
                 for i, joint_state_i in enumerate(self.joint_sequence):
+                    pbar.postfix[1] = i + 1
                     self.med.plan_to_joint_config(self.med.arm_group, joint_state_i.position[:-2])  # ONly the arm joints
                     __record(sequence_i, i)
                     pbar.update()
             # Repeat the sequence in the oposite direction
+            pbar.postfix[0] = 'Backwards'
             for i, joint_state_i in enumerate(reversed(joint_states)):
+                pbar.postfix[1] = i + 1
                 self.med.plan_to_joint_config(self.med.arm_group, joint_state_i.position[:-2]) # ONly the arm joints
                 __record(sequence_i, i+len(positions))
                 pbar.update()
