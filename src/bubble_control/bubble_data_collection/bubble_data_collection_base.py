@@ -191,22 +191,32 @@ class MedDataCollectionBase(DataCollectorBase):
 
 class BubbleDataCollectionBase(MedDataCollectionBase):
 
-    def __init__(self, data_path=None, supervision=False, scene_name='bubble_data_collection', wrench_topic='/med/wrench'):
+    def __init__(self, data_path=None, supervision=False, scene_name='bubble_data_collection', wrench_topic='/med/wrench', right=True, left=True):
         super().__init__(data_path=data_path, supervision=supervision, scene_name=scene_name, wrench_topic=wrench_topic)
-        self.camera_name_right = 'pico_flexx_right'
-        self.camera_name_left = 'pico_flexx_left'
-        self.camera_parser_right = PicoFlexxPointCloudParser(camera_name=self.camera_name_right,
-                                                             scene_name=self.scene_name, save_path=self.save_path)
-        self.camera_parser_left = PicoFlexxPointCloudParser(camera_name=self.camera_name_left,
-                                                            scene_name=self.scene_name, save_path=self.save_path)
+        self.right = right
+        self.left = left
+        if self.right:
+            self.camera_name_right = 'pico_flexx_right'
+            self.camera_parser_right = PicoFlexxPointCloudParser(camera_name=self.camera_name_right,
+                                                                 scene_name=self.scene_name, save_path=self.save_path)
+        if self.left:
+            self.camera_name_left = 'pico_flexx_left'
+            self.camera_parser_left = PicoFlexxPointCloudParser(camera_name=self.camera_name_left,
+                                                                scene_name=self.scene_name, save_path=self.save_path)
 
     def _get_recording_frames(self):
         super_frames = super()._get_recording_frames()
         child_frames = super_frames + ['pico_flexx_left_link', 'pico_flexx_right_link', 'pico_flexx_left_optical_frame', 'pico_flexx_right_optical_frame']
+        if self.left:
+            child_frames += ['pico_flexx_left_link',  'pico_flexx_left_optical_frame']
+        if self.right:
+            child_frames += ['pico_flexx_right_link', 'pico_flexx_right_optical_frame']
         return child_frames
 
     def _record(self, fc=None):
         super()._record(fc=fc)
-        self.camera_parser_left.record(fc=fc)
-        self.camera_parser_right.record(fc=fc)
+        if self.left:
+            self.camera_parser_left.record(fc=fc)
+        if self.right:
+            self.camera_parser_right.record(fc=fc)
 
