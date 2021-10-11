@@ -8,6 +8,7 @@ import pickle
 import abc
 from collections import OrderedDict
 from tqdm import tqdm
+import time
 
 project_path = os.path.join(os.path.dirname(os.path.abspath(__file__)).split('/bubble_control')[0], 'bubble_control')
 package_path = project_path
@@ -114,4 +115,5 @@ class DataCollectorBase(abc.ABC):
             csv_file.close() # make sure it is closed
             # Update the filecode
             self._save_filecode_pickle()
+            time.sleep(0.5)
 
