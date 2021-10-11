@@ -89,7 +89,7 @@ class MedWrenchDataCollection(MedDataCollectionBase):
             data_params['JointState'].append(joints_i.position)
 
         num_positions = 2*len(positions)
-        with tqdm(total=num_positions, bar_format='\t{postfix[0]} {postfix[1]}/{postfix[2]} - {l_bar}{bar}{r_bar}', postfix=['Forward', 1, len(positions)]) as pbar:
+        with tqdm(total=num_positions, bar_format=' > {postfix[0]} {postfix[1]}/{postfix[2]}{l_bar}{bar}{r_bar}', postfix=['Forward', 1, len(positions)]) as pbar:
             if self.joint_sequence is None:
                 for i, position_i in enumerate(positions):
                     pbar.postfix[1] = i+1
