@@ -54,7 +54,7 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         action_fc = fc
         action = self._get_action(action_fc)
 
-        sample = {
+        sample_simple = {
             'init_imprint': init_imprint,
             'init_wrench': init_wrench,
             'init_pos': init_pos,
@@ -65,6 +65,9 @@ class BubbleDrawingDataset(BubbleDatasetBase):
             'final_quat': final_quat,
             'action': action,
         }
+        sample = self._reshape_sample(sample_simple)
+        sample = self._compute_delta_sample(sample) # Add delta values to sample
+
         return sample
 
     def _get_action(self, fc):
@@ -74,8 +77,28 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         action_i = dl_line[action_column_names].values.astype(np.float64)
         return action_i
 
+    def _compute_delta_sample(self, sample):
+        # TODO: improve this computation
+        input_keys = ['imprint', 'wrench', 'pos', 'quat']
+        time_keys = ['init', 'final']
+        for in_key in input_keys:
+            sample['delta_{}'.format(in_key)] = sample['final_{}'.format(in_key)] - sample['init_{}'.format(in_key)]
+        return sample
+
+    def _reshape_sample(self, sample):
+        input_keys = ['wrench', 'pos', 'quat']
+        time_keys = ['init', 'final']
+        # reshape the imprint
+        for time_key in time_keys:
+            imprint_x = sample['{}_imprint'.format(time_key)]
+            sample['{}_imprint'.format(time_key)] = imprint_x.transpose((0,3,1,2)).reshape(-1, *imprint_x.shape[1:3])
+            for in_key in input_keys:
+                sample['{}_{}'.format(time_key, in_key)] = sample['{}_{}'.format(time_key, in_key)].flatten()
+        sample['action'] = sample['action'].flatten()
+        return sample
 
 # DEBUG:
+
 if __name__ == '__main__':
     data_name = '/home/mmint/Desktop/drawing_data'
     dataset = BubbleDrawingDataset(data_name=data_name)
