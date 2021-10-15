@@ -25,7 +25,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from mmint_camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud
 from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
-from bubble_control.bubble_pose_estimation.pose_estimators import ICP3DPoseEstimator, ICP2DPoseEstimator
+from bubble_control.bubble_pose_estimation.pose_estimators import ICP3DPoseEstimator, ICP2DPoseEstimator, ExplicitICP3DPoseEstimator
 
 
 class BubblePCReconstructor(object):
@@ -143,6 +143,9 @@ class BubblePCReconstructor(object):
         paddle_pc = np.concatenate([plane_1, plane_2], axis=0)
         paddle_pcd = pack_o3d_pcd(paddle_pc)
 
+        custom_pc = self.get_custom_pc()
+        custom_pcd = pack_o3d_pcd(custom_pc)
+
         # object_model = cylinder_pcd
         # object_model = planes_pcd
         # object_model = pen_pcd
@@ -151,18 +154,20 @@ class BubblePCReconstructor(object):
         # object_model = allen_pcd
         # object_model = paddle_pcd
         # TODO: Add rest
-        models = {'allen': allen_pcd, 'marker': marker_pcd, 'pen': pen_pcd}
+        models = {'allen': allen_pcd, 'marker': marker_pcd, 'pen': pen_pcd, 'custom': custom_pcd}
         object_model = models[self.object_name]
 
         return object_model
 
     def _get_pose_estimator(self):
         pose_estimator = None
-        available_esttimation_types = ['icp3d', 'icp2d']
+        available_esttimation_types = ['icp3d', 'icp2d', 'exp_icp3d']
         if self.estimation_type == 'icp3d':
             pose_estimator = ICP3DPoseEstimator(obj_model=self.object_model, view=self.view)
         elif self.estimation_type == 'icp2d':
             pose_estimator = ICP2DPoseEstimator(obj_model=self.object_model, projection_axis=(1,0,0), max_num_iterations=20)
+        elif self.estimation_type == 'exp_icp3d':
+            pose_estimator = ExplicitICP3DPoseEstimator(obj_model=self.object_model, max_num_iterations=20, view=self.view)
         else:
             raise NotImplementedError('pose estimation algorithm named "{}" not implemented yet. Available options: {}'.format(self.estimation_type, available_esttimation_types))
         return pose_estimator

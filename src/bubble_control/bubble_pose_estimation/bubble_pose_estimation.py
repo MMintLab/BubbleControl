@@ -33,15 +33,16 @@ from bubble_control.bubble_pose_estimation.bubble_pc_reconstruction import Bubbl
 
 class BubblePoseEstimator(object):
 
-    def __init__(self, imprint_th=0.005, icp_th=0.01, rate=5.0, view=False, verbose=False, object_name='allen', estimation_type='icp3d'):
+    def __init__(self, reconstruction_frame='grasp_frame', imprint_th=0.005, icp_th=0.01, rate=5.0, view=False, verbose=False, object_name='allen', estimation_type='icp3d'):
         self.object_name = object_name
+        self.reconstruction_frame = reconstruction_frame
         self.imprint_th = imprint_th
         self.icp_th = icp_th
         self.rate = rate
         self.view = view
         self.verbose = verbose
         rospy.init_node('bubble_pose_estimator')
-        self.reconstructor = BubblePCReconstructor(threshold=self.imprint_th, object_name=self.object_name, estimation_type=estimation_type, view=self.verbose)
+        self.reconstructor = BubblePCReconstructor(reconstruction_frame=self.reconstruction_frame, threshold=self.imprint_th, object_name=self.object_name, estimation_type=estimation_type, view=self.verbose)
         self.marker_publisher = rospy.Publisher('estimated_object', Marker, queue_size=100)
         self.tf_broadcaster = tf.TransformBroadcaster()
         self.tool_estimated_pose = None

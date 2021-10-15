@@ -6,7 +6,7 @@ import copy
 import tf.transformations as tr
 from scipy.spatial import KDTree
 from tqdm import tqdm
-from mmint_utils.terminal_colors import term_colors
+#from mmint_utils.terminal_colors import term_colors
 
 
 class PCPoseEstimatorBase(abc.ABC):
@@ -26,12 +26,12 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
         super().__init__()
         self.object_model = obj_model
         self.last_tr = None
-        self.threshold = None# TODO
+        self.threshold = 0.02
         self.view = view
         self.verbose = verbose
 
     def estimate_pose(self, target_pc, init_tr=None):
-        target_pc = self._filter_input_pc(target_pc)
+       # target_pc = self._filter_input_pc(target_pc)
         target_pcd = pack_o3d_pcd(target_pc)
         if init_tr is None:
             init_tr = self._get_init_tr(target_pcd)
@@ -41,10 +41,9 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
             model_tr_pcd = copy.deepcopy(self.object_model)
             # model_tr_pcd.transform(init_tr)
             view_pointcloud([target_pcd, model_tr_pcd], frame=True)
-
         # Estimate the transformation
         icp_tr = self._icp(source_pcd=self.object_model, target_pcd=target_pcd, threshold=self.threshold, init_tr=init_tr)
-
+        print(icp_tr)
         if self.view:
             # Visualize the estimated transofrm:
             print('visualizing the ICP infered transformation')
@@ -95,9 +94,9 @@ class ICP3DPoseEstimator(ICPPoseEstimator):
 
     def _icp(self, source_pcd, target_pcd, threshold, init_tr):
         # Point-to-point:
-        reg_p2p = o3d.pipelines.registration.registration_icp(source_pcd, target_pcd, threshold, init_tr,
-                                                              o3d.pipelines.registration.TransformationEstimationPointToPoint(),
-                                                              o3d.pipelines.registration.ICPConvergenceCriteria(
+        reg_p2p = o3d.pipelines.registration.registration_icp(source=source_pcd, target=target_pcd, max_correspondence_distance=threshold, init=init_tr,
+                                                              estimation_method=o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+                                                              criteria=o3d.pipelines.registration.ICPConvergenceCriteria(
                                                                   max_iteration=1000))
         # point_to_plane:
         # > compute normals (required for point-to-plane icp)
@@ -119,6 +118,200 @@ class ICP3DPoseEstimator(ICPPoseEstimator):
         random_tr = tr.quaternion_matrix(tr.random_quaternion()) # no translation
         return random_tr
 
+class ExplicitICP3DPoseEstimator(ICPPoseEstimator):
+    """
+    Estimate the pose of the target_pc using Iterative Closest Points   
+    """
+    def __init__(self, *args, max_num_iterations=20, **kwargs):
+        self.max_num_iterations = max_num_iterations
+        super().__init__(*args, **kwargs)
+
+
+    def _get_init_tr(self, target_pcd):
+        if self.last_tr is None:
+            init_tr = np.eye(4)
+            _axis = np.random.uniform(-1, 1, 3)
+            axis = _axis / np.linalg.norm(_axis)
+            q_random = tr.quaternion_about_axis(np.random.uniform(-np.pi * 0.1, np.pi * 0.1), axis)
+            T_random = tr.quaternion_matrix(q_random)
+            # trans_init = T_random
+            init_tr[:3, 3] = np.mean(np.asarray(target_pcd.points))
+        else:
+            init_tr = self.last_tr
+        return init_tr
+
+    def _sample_random_tr(self):
+        random_tr = tr.quaternion_matrix(tr.random_quaternion()) # no translation
+        return random_tr
+
+    def _icp(self, source_pcd, target_pcd, threshold, init_tr):
+        """
+
+        Args:
+            source_pcd: (model)
+            target_pcd: (scene)
+            treshold:
+            init_tr:
+        Returns:
+        """
+        icp_tr = init_tr
+        source_points = np.asarray(source_pcd.points)
+        target_points = np.asarray(target_pcd.points)
+        if len(target_points) == 0:
+            print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
+            if self.last_tr is not None:
+                return self.last_tr
+            return init_tr
+        for i in range(self.max_num_iterations):
+            # transform model
+            source_tr = source_points @ icp_tr[:3, :3].T + icp_tr[:3, 3]
+
+            # view:
+            # if self.view:
+            #     print('{}/{}'.format(i+1, self.max_num_iterations))
+            #     model_tr_pcd = copy.deepcopy(self.object_model)
+            #     model_tr_pcd.transform(icp_tr)
+            #     view_pointcloud([target_pcd, model_tr_pcd], frame=True)
+
+            # Estimate Correspondences
+            tree = KDTree(source_tr[:, :3])
+            corr_distances, cp_indxs = tree.query(target_points[:, :3])
+            # cp_indxs = np.arange(len(target_points))
+            # Apply correspondences
+            source_points_corr = source_points[cp_indxs] # corresponed points in model to the scene points
+
+            # Estimate transformation in 3D
+            mu_m = np.mean(source_points_corr, axis=0) # model
+            mu_s = np.mean(target_points, axis=0) # scene
+            pm = source_points_corr - mu_m # model
+            ps = target_points - mu_s # scene
+            W = np.einsum('ij,ik->jk', ps, pm)
+            U, S, V = np.linalg.svd(W, full_matrices=True)
+            R_star = U @ V.T
+            t_star = mu_s - R_star @ mu_m
+            new_icp_tr = np.eye(4)
+            new_icp_tr[:3,:3] = R_star
+            new_icp_tr[:3,3] = t_star
+
+            icp_tr = new_icp_tr
+        if self.view:
+            print('VIEW Fitted pc')
+            source_tr = source_points @ icp_tr[:3, :3].T + icp_tr[:3, 3]
+            source_pc_tr = np.concatenate([source_tr, np.zeros((len(source_tr), 3))],axis=-1)
+            source_pc_tr[:,3] = 1
+            target_pc = np.concatenate([target_points, np.zeros((len(target_points), 3))],axis=-1)
+            target_pc[:,4] = 1
+
+            view_pointcloud([source_pc_tr, target_pc], frame=True)
+
+        return icp_tr
+
+class ContactICP3DPoseEstimator(ExplicitICP3DPoseEstimator):
+    """
+    Estimate the pose of the target_pc using Iterative Closest Points   
+    """
+    def __init__(self, penetration_tolerance, contact_tolerance, contact_constraint, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.penetration_tolerance = penetration_tolerance
+        self.contact_tolerance = contact_tolerance
+        self.contact_constraint = contact_constraint
+
+    def check_constraints(self, source_tr):
+        non_penetration = all(source_tr[:,2] > (-1) * self.penetration_tolerance)
+        contact = np.size(np.where(source_tr[:,2] <= self.contact_tolerance)) != 0
+        const_satisfied = all([non_penetration, contact == self.contact_constraint])
+        return const_satisfied
+
+    def randomize_tr(self, prev_tr):
+        R = prev_tr[:3,:3]
+        t = prev_tr[:3,3]
+        al, be, ga = tr.euler_from_matrix(R, axes='sxyz') + np.random.rand(3)
+        import pdb; pdb.set_trace()
+        return prev_tr
+
+    def adjust_to_constraints(self, current_points):
+        lowest_point_z = np.min(current_points[:,2])
+        if self.contact_constraint:
+            current_points[:,2] -= lowest_point_z
+        elif lowest_point_z < 0: 
+            current_points[:,2] += 0.005 - lowest_point_z 
+        return current_points
+
+
+    def _icp(self, source_pcd, target_pcd, threshold, init_tr):
+        """
+
+        Args:
+            source_pcd: (model)
+            target_pcd: (scene)
+            treshold:
+            init_tr:
+        Returns:
+        """
+        icp_tr = init_tr
+        source_points = np.asarray(source_pcd.points)
+        target_points = np.asarray(target_pcd.points)
+
+        if len(target_points) == 0:
+            print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
+            if self.last_tr is not None:
+                return self.last_tr
+            return init_tr
+
+        
+        for i in range(self.max_num_iterations):
+            # transform model
+            source_tr = source_points @ icp_tr[:3, :3].T + icp_tr[:3, 3]
+            source_tr = self.adjust_to_constraints(source_tr)
+
+            source_pc_tr = np.concatenate([source_tr, np.zeros((len(source_tr), 3))],axis=-1)
+            source_pc_tr[:,3] = 1
+            target_pc = np.concatenate([target_points, np.zeros((len(target_points), 3))],axis=-1)
+            target_pc[:,4] = 1
+            view_pointcloud([source_pc_tr, target_pc], frame=True)
+
+            # view:
+            # if self.view:
+            #     print('{}/{}'.format(i+1, self.max_num_iterations))
+            #     model_tr_pcd = copy.deepcopy(self.object_model)
+            #     model_tr_pcd.transform(icp_tr)
+            #     view_pointcloud([target_pcd, model_tr_pcd], frame=True)
+
+            # Estimate Correspondences
+            tree = KDTree(source_tr[:, :3])
+            corr_distances, cp_indxs = tree.query(target_points[:, :3])
+            # cp_indxs = np.arange(len(target_points))
+            # Apply correspondences
+            source_points_corr = source_points[cp_indxs] # corresponed points in model to the scene points
+
+            # Estimate transformation in 3D
+            mu_m = np.mean(source_points_corr, axis=0) # model
+            mu_s = np.mean(target_points, axis=0) # scene
+            pm = source_points_corr - mu_m # model
+            ps = target_points - mu_s # scene
+            W = np.einsum('ij,ik->jk', ps, pm)
+            U, S, V = np.linalg.svd(W, full_matrices=True)
+            R_star = U @ V.T
+            t_star = mu_s - R_star @ mu_m
+            new_icp_tr = np.eye(4)
+            new_icp_tr[:3,:3] = R_star
+            new_icp_tr[:3,3] = t_star
+ 
+            icp_tr = new_icp_tr
+
+        if self.view:
+            print('VIEW Fitted pc')
+            source_tr = source_points @ icp_tr[:3, :3].T + icp_tr[:3, 3]
+            if (not self.check_constraints(source_tr)):
+                print("Contact or no penetration constraint not satisfied")
+            source_pc_tr = np.concatenate([source_tr, np.zeros((len(source_tr), 3))],axis=-1)
+            source_pc_tr[:,3] = 1
+            target_pc = np.concatenate([target_points, np.zeros((len(target_points), 3))],axis=-1)
+            target_pc[:,4] = 1
+
+            view_pointcloud([source_pc_tr, target_pc], frame=True)
+
+        return icp_tr
 
 class ICP2DPoseEstimator(ICPPoseEstimator):
     """
@@ -273,6 +466,9 @@ if __name__ == '__main__':
         scene_model[:half_num_points, 2] = 0.5
         scene_model[half_num_points:, 2] = -0.5
 
+
+    view_pointcloud(obj_model, frame=True)
+    view_pointcloud(scene_model, frame=True)
     object_model_pcd = pack_o3d_pcd(obj_model)
     icp_estimator = ICP2DPoseEstimator(obj_model=object_model_pcd, view=True, verbose=True, projection_axis=projection_axis)
     icp_estimator.max_num_iterations = 20
