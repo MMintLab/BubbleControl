@@ -30,12 +30,13 @@ from bubble_control.bubble_pose_estimation.pose_estimators import ICP3DPoseEstim
 
 class BubblePCReconstructor(object):
 
-    def __init__(self, reconstruction_frame='grasp_frame', threshold=0.005, object_name='allen', estimation_type='icp3d', view=False):
+    def __init__(self, reconstruction_frame='grasp_frame', threshold=0.005, object_name='allen', estimation_type='icp3d', view=False, path=None):
         self.object_name = object_name
         self.estimation_type = estimation_type
         self.reconstruction_frame = reconstruction_frame
         self.threshold = threshold
         self.view = view
+        self.path = path
         self.left_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_left')
         self.right_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_right')
         self.reference_pcs = {
@@ -143,8 +144,9 @@ class BubblePCReconstructor(object):
         paddle_pc = np.concatenate([plane_1, plane_2], axis=0)
         paddle_pcd = pack_o3d_pcd(paddle_pc)
 
-        custom_pc = self.get_custom_pc()
-        custom_pcd = pack_o3d_pcd(custom_pc)
+        if self.object_name == 'custom':
+            custom_pc = o3d.io.read_point_cloud(self.path)
+            custom_pcd = pack_o3d_pcd(custom_pc)        
 
         # object_model = cylinder_pcd
         # object_model = planes_pcd
@@ -157,7 +159,7 @@ class BubblePCReconstructor(object):
         models = {'allen': allen_pcd, 'marker': marker_pcd, 'pen': pen_pcd, 'custom': custom_pcd}
         object_model = models[self.object_name]
 
-        return object_model
+        return object_model       
 
     def _get_pose_estimator(self):
         pose_estimator = None

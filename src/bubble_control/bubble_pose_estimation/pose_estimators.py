@@ -6,7 +6,7 @@ import copy
 import tf.transformations as tr
 from scipy.spatial import KDTree
 from tqdm import tqdm
-#from mmint_utils.terminal_colors import term_colors
+from mmint_utils.terminal_colors import term_colors
 
 
 class PCPoseEstimatorBase(abc.ABC):
