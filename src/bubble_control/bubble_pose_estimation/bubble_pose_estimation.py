@@ -27,13 +27,14 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from mmint_camera_utils.point_cloud_utils import *
 from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
+from wsg_50_utils.wsg_50_gripper import WSG50Gripper
 
 from bubble_control.bubble_pose_estimation.bubble_pc_reconstruction import BubblePCReconsturctorDepth, BubblePCReconsturctorTreeSearch
 
 
 class BubblePoseEstimator(object):
 
-    def __init__(self, imprint_th=0.005, icp_th=0.01, rate=5.0, view=False, verbose=False, object_name='allen', estimation_type='icp3d', reconstruction='depth'):
+    def __init__(self, imprint_th=0.005, icp_th=0.01, rate=5.0, view=False, verbose=False, object_name='allen', estimation_type='icp3d', reconstruction='depth', gripper_width=None):
         self.object_name = object_name
         self.imprint_th = imprint_th
         self.icp_th = icp_th
@@ -41,7 +42,9 @@ class BubblePoseEstimator(object):
         self.view = view
         self.verbose = verbose
         self.estimation_type = estimation_type
+        self.gripper_width = gripper_width
         rospy.init_node('bubble_pose_estimator')
+        self.gripper = WSG50Gripper()
         self.reconstructor = self._get_reconstructor(reconstruction)
         self.marker_publisher = rospy.Publisher('estimated_object', Marker, queue_size=100)
         self.tf_broadcaster = tf.TransformBroadcaster()
@@ -67,9 +70,22 @@ class BubblePoseEstimator(object):
         return reconstructor
 
     def calibrate(self):
-        _ = input('press enter to calibrate')
+        info_msg = 'Press enter to calibrate --'
+        if self.gripper_width is not None:
+            info_msg += '\n\t>>> We will open the gripper!\t'
+        _ = input(info_msg)
+        if self.gripper_width is not None:
+            # Open the gripper
+            self.gripper.open_gripper()
         self.reconstructor.reference()
-        _ = input('calibration done, press enter to continue')
+        info_msg = 'Calibration done! {}\nPress enter to continue :)'
+        additional_msg = ''
+        if self.gripper_width is not None:
+            additional_msg = '\n We will close the gripper to a width {}mm'.format(self.gripper_width)
+        _ = input(info_msg.format(additional_msg))
+        if self.gripper_width is not None:
+            # move gripper to gripper_width
+            self.gripper.move(self.gripper_width, speed=50.0)
 
     def estimate_pose(self, verbose=False):
         rate = rospy.Rate(self.rate)
