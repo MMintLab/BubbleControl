@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-from bubble_control.bubble_data_collection.bubble_data_collection import BubbleCalibrationDataCollection
+from bubble_utils.src.bubble_utils.bubble_data_collection.bubble_data_collection import BubbleCalibrationDataCollection
 
 def data_collection_test():
     bc = BubbleCalibrationDataCollection()

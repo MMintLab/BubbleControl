@@ -74,7 +74,6 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
         pass
 
 
-
 class ICP3DPoseEstimator(ICPPoseEstimator):
     """
     Estimate the pose of the target_pc using Iterative Closest Points from Open3D

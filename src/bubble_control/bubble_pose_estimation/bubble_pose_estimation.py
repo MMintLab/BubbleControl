@@ -28,20 +28,21 @@ from visualization_msgs.msg import Marker, MarkerArray
 from mmint_camera_utils.point_cloud_utils import *
 from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
 
-from bubble_control.bubble_pose_estimation.bubble_pc_reconstruction import BubblePCReconstructor
+from bubble_control.bubble_pose_estimation.bubble_pc_reconstruction import BubblePCReconsturctorDepth, BubblePCReconsturctorTreeSearch
 
 
 class BubblePoseEstimator(object):
 
-    def __init__(self, imprint_th=0.005, icp_th=0.01, rate=5.0, view=False, verbose=False, object_name='allen', estimation_type='icp3d'):
+    def __init__(self, imprint_th=0.005, icp_th=0.01, rate=5.0, view=False, verbose=False, object_name='allen', estimation_type='icp3d', reconstruction='depth'):
         self.object_name = object_name
         self.imprint_th = imprint_th
         self.icp_th = icp_th
         self.rate = rate
         self.view = view
         self.verbose = verbose
+        self.estimation_type = estimation_type
         rospy.init_node('bubble_pose_estimator')
-        self.reconstructor = BubblePCReconstructor(threshold=self.imprint_th, object_name=self.object_name, estimation_type=estimation_type, view=self.verbose)
+        self.reconstructor = self._get_reconstructor(reconstruction)
         self.marker_publisher = rospy.Publisher('estimated_object', Marker, queue_size=100)
         self.tf_broadcaster = tf.TransformBroadcaster()
         self.tool_estimated_pose = None
@@ -52,6 +53,18 @@ class BubblePoseEstimator(object):
         self.publisher_thread.start()
         self.estimate_pose(verbose=self.verbose)
         rospy.spin()
+
+    def _get_reconstructor(self, reconstruction_key):
+        reconstructors = {
+            'depth': BubblePCReconsturctorDepth,
+            'tree': BubblePCReconsturctorTreeSearch,
+        }
+        if reconstruction_key not in reconstructors:
+            raise KeyError('No reconstructor found for key {} -- Possible keys: {}'.format(reconstruction_key, reconstructors.keys()))
+        Reconstructor = reconstructors[reconstruction_key]
+        reconstructor = Reconstructor(threshold=self.imprint_th, object_name=self.object_name, estimation_type=self.estimation_type,
+                              view=self.view, verbose=self.verbose)
+        return reconstructor
 
     def calibrate(self):
         _ = input('press enter to calibrate')
@@ -71,6 +84,7 @@ class BubblePoseEstimator(object):
             except rospy.ROSInterruptException:
                 self.finish()
                 break
+            rate.sleep()
 
     def _marker_publishing_loop(self):
         publish_rate = rospy.Rate(self.rate)

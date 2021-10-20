@@ -33,12 +33,16 @@ if __name__ == '__main__':
     # Continuous  pose estimator:
     view = False
     # view = True
+    verbose = False
     # imprint_th = 0.0048 # for pen with gw 15
     # imprint_th = 0.0048 # for allen with gw 12
-    imprint_th = 0.0053 # for marker with gw 20
+    # imprint_th = 0.0053 # for marker with gw 20
+    imprint_th = 0.0085 # for depth method
     icp_th = 1. # consider all points
     icp_th = 0.005 # for allen key
-    bpe = BubblePoseEstimator(view=view, imprint_th=imprint_th, icp_th=icp_th, rate=15., verbose=view, object_name='marker', estimation_type='icp2d')
+
+    # bpe = BubblePoseEstimator(view=view, imprint_th=imprint_th, icp_th=icp_th, rate=2., verbose=verbose, object_name='marker', estimation_type='icp2d', reconstruction='tree')
+    bpe = BubblePoseEstimator(view=view, imprint_th=imprint_th, icp_th=icp_th, rate=2., verbose=verbose, object_name='marker', estimation_type='icp2d', reconstruction='depth')
 
 
 

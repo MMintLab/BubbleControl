@@ -1,16 +1,6 @@
 import numpy as np
-import sys
-import os
-import pandas as pd
-from torch.utils.data import Dataset
-import abc
-import matplotlib.pyplot as plt
-import torch
-from tqdm import tqdm
-from PIL import Image
 
-
-from bubble_control.bubble_learning.datasets.bubble_dataset_base import BubbleDatasetBase
+from bubble_utils.bubble_datasets.bubble_dataset_base import BubbleDatasetBase
 
 
 class BubbleDrawingDataset(BubbleDatasetBase):
