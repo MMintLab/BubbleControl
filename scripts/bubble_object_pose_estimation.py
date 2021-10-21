@@ -4,31 +4,17 @@ import sys
 import os
 import rospy
 import numpy as np
-import ros_numpy as rn
-import cv2
-import ctypes
-import struct
-from PIL import Image as imm
-import open3d as o3d
-from scipy.spatial import KDTree
-import copy
-import tf
-import tf.transformations as tr
-from functools import reduce
-from sklearn.cluster import DBSCAN
 import argparse
+import copy
+import threading
 
-import sensor_msgs.point_cloud2 as pc2
-from std_msgs.msg import String
-from sensor_msgs.msg import Image, CompressedImage, CameraInfo, PointCloud2
-from geometry_msgs.msg import TransformStamped, Pose
-from visualization_msgs.msg import Marker, MarkerArray
-
-from mmint_camera_utils.point_cloud_utils import *
-from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
 from bubble_control.bubble_pose_estimation.bubble_pose_estimation import BubblePoseEstimator
 from bubble_control.aux.load_confs import load_bubble_reconstruction_params
+from bubble_control.bubble_contact_point_estimation.tool_contact_point_estimator import ToolContactPointEstimator
 
+
+def estimate_contact_point():
+    tcpe = ToolContactPointEstimator()
 
 if __name__ == '__main__':
     # load params:
@@ -42,7 +28,6 @@ if __name__ == '__main__':
     parser.add_argument('--view', action='store_true')
     parser.add_argument('--verbose', action='store_true')
 
-
     args = parser.parse_args()
 
     object_name = args.object_name
@@ -52,6 +37,8 @@ if __name__ == '__main__':
     gripper_width = object_params['gripper_width']
 
     print('-- Estimating the pose of a {} --'.format(object_name))
+
+
     bpe = BubblePoseEstimator(object_name=object_name,
                               imprint_th=imprint_th,
                               icp_th=icp_th,

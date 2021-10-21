@@ -6,6 +6,7 @@ import tf.transformations as tr
 
 from arm_robots.med import Med
 from arc_utilities.listener import Listener
+import tf2_geometry_msgs  # Needed by TF2Wrapper
 from arc_utilities.tf2wrapper import TF2Wrapper
 from victor_hardware_interface.victor_utils import Stiffness
 from victor_hardware_interface_msgs.msg import ControlMode
@@ -207,7 +208,6 @@ class BubbleDrawer(object):
             # Raise the arm when we reach the last point
             self._end_raise(point_xy)
 
-
     def _end_raise(self, point_xy):
         final_position = np.insert(point_xy, 2, self.pre_height)
         final_pose = np.concatenate([final_position, self.draw_quat], axis=0)
@@ -264,20 +264,14 @@ class BubbleDrawer(object):
 
         Returns: None
         """
-
         # TODO: Split into guarded moved motion and drawing_motion between points
-
         draw_height = self._init_drawing(init_point_xy=xy_points[0])
-
         rospy.sleep(.5)
         for i, corner_i in enumerate(xy_points[1:]):
-
             self._draw_to_point(corner_i, draw_height, end_raise=False)
-
             if self.reactive and (i < len(xy_points)-2):
                 # Adjust the position when we reach the keypoint -------
                 self._adjust_tool_position(corner_i)
-
         if end_raise:
             # Raise the arm when we reach the last point
             final_position = np.insert(xy_points[-1], 2, self.pre_height)

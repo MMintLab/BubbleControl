@@ -9,7 +9,7 @@ import copy
 from arc_utilities.listener import Listener
 from sensor_msgs.msg import JointState
 
-from bubble_utils.src.bubble_utils.bubble_data_collection.bubble_data_collection_base import MedDataCollectionBase
+from bubble_utils.bubble_data_collection.med_data_collection_base import MedDataCollectionBase
 
 
 class MedWrenchDataCollection(MedDataCollectionBase):

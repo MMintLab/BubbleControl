@@ -43,7 +43,10 @@ class BubblePoseEstimator(object):
         self.verbose = verbose
         self.estimation_type = estimation_type
         self.gripper_width = gripper_width
-        rospy.init_node('bubble_pose_estimator')
+        try:
+            rospy.init_node('bubble_pose_estimator')
+        except (rospy.exceptions.ROSInitException, rospy.exceptions.ROSException):
+            pass
         self.gripper = WSG50Gripper()
         self.reconstructor = self._get_reconstructor(reconstruction)
         self.marker_publisher = rospy.Publisher('estimated_object', Marker, queue_size=100)
