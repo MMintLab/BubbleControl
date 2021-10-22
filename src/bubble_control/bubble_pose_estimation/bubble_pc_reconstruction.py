@@ -145,8 +145,10 @@ class BubblePCReconstructor(object):
         paddle_pcd = pack_o3d_pcd(paddle_pc)
 
         if self.object_name == 'custom':
-            custom_pc = o3d.io.read_point_cloud(self.path)
-            custom_pcd = pack_o3d_pcd(custom_pc)        
+            custom_pcd = o3d.io.read_point_cloud(self.path)
+            #custom_pcd = pack_o3d_pcd(custom_pc)
+        else:
+            custom_pcd = None     
 
         # object_model = cylinder_pcd
         # object_model = planes_pcd
