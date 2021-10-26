@@ -97,10 +97,10 @@ class ToolContactPointEstimator(object):
 
     def get_tool_angle_axis(self, ref_frame='med_base'):
         tool_frame_rf = self.tf2_listener.get_transform(parent=ref_frame, child='tool_frame')
-        z_axis = np.array([0,0,1])
+        z_axis = np.array([0, 0, 1])
         tool_axis_tf = np.array([0,0,-1]) # Tool axis on the tool_frame
         tool_axis_tf_h = np.append(tool_axis_tf,0)
-        tool_axis_rf_h = np.linalg.inv(tool_frame_rf) @ tool_axis_tf_h
+        tool_axis_rf_h = tool_frame_rf @ tool_axis_tf_h
         tool_axis_rf = tool_axis_rf_h[:-1] # remove homogeneous vector coordinates
         tool_angle = np.arccos(np.dot(tool_axis_rf, z_axis))
         _rot_axis = np.cross(tool_axis_rf, z_axis)
