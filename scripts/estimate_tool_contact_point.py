@@ -5,6 +5,7 @@ import argparse
 from arc_utilities.tf2wrapper import TF2Wrapper
 from bubble_control.bubble_contact_point_estimation.tool_contact_point_estimator import ToolContactPointEstimator
 import tf.transformations as tr
+from bubble_control.aux.load_confs import load_plane_params
 
 def estimate_tool_contact_point(plane_pose=None):
     if plane_pose is not None:
@@ -26,17 +27,26 @@ def estimate_tool_contact_point(plane_pose=None):
 if __name__ == '__main__':
     default_pos = np.zeros(3)
     default_ori = np.array([0, 0, 0, 1])
+    plane_params = load_plane_params()
 
     parser = argparse.ArgumentParser('Tool Contact Point Estimation')
     parser.add_argument('--pos', nargs=3, type=float, default=default_pos)
     parser.add_argument('--ori', nargs='+', type=float, default=default_ori)
+    parser.add_argument('--config', type=str, default='')
 
     args = parser.parse_args()
     pos = np.asarray(args.pos)
     ori = np.asarray(args.ori)
-    if len(ori) == 3:
-        # euler angles (otherwise quaternion)
-        ori = tr.quaternion_from_euler(ori[0], ori[1], ori[2])
-    plane_pose = np.concatenate([pos, ori])
-    print('Plane Pose:', plane_pose)
+    config_name = args.config
+    if config_name != '':
+        print('-- Loading plane configuration {} --'.format(config_name))
+        plane_pose_raw = plane_params[config_name]
+        plane_pose = np.asarray(plane_pose_raw)
+    else:
+        # Use the ori, pos provided
+        if len(ori) == 3:
+            # euler angles (otherwise quaternion)
+            ori = tr.quaternion_from_euler(ori[0], ori[1], ori[2])
+        plane_pose = np.concatenate([pos, ori])
+        print('Plane Pose:', plane_pose)
     estimate_tool_contact_point(plane_pose=plane_pose)
