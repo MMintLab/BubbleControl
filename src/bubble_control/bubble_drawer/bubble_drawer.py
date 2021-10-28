@@ -112,8 +112,10 @@ class BubbleDrawer(BubbleMed):
     def compensate_tool_position(self):
         contact_point = self.get_contact_point()
         angle, axis = self.get_tool_angle_axis()
-        self.rotation_along_axis_point_angle(axis=axis, angle=angle, point=contact_point,
+
+        plan = self.rotation_along_axis_point_angle(axis=axis, angle=angle, point=contact_point,
                                              num_steps=20, pos_tol=0.001, ori_tol=0.005) # TODO: Set as hyperparameter
+        return plan
 
     def _get_marker_compensated_pose(self, desired_marker_pose, ref_frame='med_base', tf_broadcast=False):
         desired_position, desired_quat = np.split(desired_marker_pose, [3])
@@ -242,6 +244,7 @@ class BubbleDrawer(BubbleMed):
             contact_pose = self.tf2_listener.get_transform('med_base', 'grasp_frame')
             draw_height = contact_pose[2, 3]
         rospy.sleep(.5)
+        self.set_control_mode(ControlMode.JOINT_POSITION, vel=0.1)
         for i, corner_i in enumerate(xy_points[1:]):
             self._draw_to_point(corner_i, draw_height, end_raise=False)
             if self.reactive and (i < len(xy_points)-2):
