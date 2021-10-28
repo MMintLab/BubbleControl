@@ -27,6 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('--rate', type=float, default=5.0, help='Estimated pose publishing rate (upper bound)')
     parser.add_argument('--view', action='store_true')
     parser.add_argument('--verbose', action='store_true')
+    parser.add_argument('--imprint_br', action='store_true')
 
     args = parser.parse_args()
 
@@ -45,6 +46,7 @@ if __name__ == '__main__':
                               rate=args.rate,
                               view=args.view,
                               verbose=args.verbose,
+                              broadcast_imprint=args.imprint_br,
                               estimation_type=args.estimation_type,
                               reconstruction=args.reconstruction,
                               gripper_width=gripper_width)

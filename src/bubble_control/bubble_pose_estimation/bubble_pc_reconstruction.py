@@ -19,8 +19,8 @@ from sklearn.cluster import DBSCAN
 import abc
 
 import sensor_msgs.point_cloud2 as pc2
-from std_msgs.msg import String
-from sensor_msgs.msg import Image, CompressedImage, CameraInfo, PointCloud2
+from std_msgs.msg import String, Header
+from sensor_msgs.msg import Image, CompressedImage, CameraInfo, PointCloud2, PointField
 from geometry_msgs.msg import TransformStamped, Pose
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -32,15 +32,17 @@ from bubble_control.bubble_pose_estimation.pose_estimators import ICP3DPoseEstim
 
 class BubblePCReconstructorBase(abc.ABC):
 
-    def __init__(self, reconstruction_frame='grasp_frame', threshold=0.005, object_name='allen', estimation_type='icp3d', view=False, verbose=False):
+    def __init__(self, reconstruction_frame='grasp_frame', threshold=0.005, object_name='allen', estimation_type='icp3d', view=False, verbose=False, broadcast_imprint=False):
         self.object_name = object_name
         self.estimation_type = estimation_type
         self.reconstruction_frame = reconstruction_frame
         self.threshold = threshold
         self.view = view
         self.verbose = verbose
+        self.broadcast_imprint = broadcast_imprint
         self.left_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_left', verbose=self.verbose)
         self.right_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_right', verbose=self.verbose)
+        self.imprint_broadcaster = rospy.Publisher('imprint_pc', PointCloud2)
         self.references = {
             'left': None,
             'left_frame': None,
@@ -62,6 +64,13 @@ class BubblePCReconstructorBase(abc.ABC):
     def get_imprint(self, view=False):
         # return the contact imprint
         pass
+
+    def _broadcast_imprint(self, imprint):
+        header = Header()
+        header.frame_id = self.reconstruction_frame
+        xyz_points = imprint[:,:3].astype(np.float32)
+        pc2_msg = pc2.create_cloud_xyz32(header, xyz_points)
+        self.imprint_broadcaster.publish(pc2_msg)
 
     def _get_object_model(self):
         cylinder_mesh = o3d.geometry.TriangleMesh.create_cylinder(radius=self.radius*0.5, height=self.height*0.1, split=50)
@@ -197,6 +206,8 @@ class BubblePCReconstructorBase(abc.ABC):
 
     def estimate_pose(self, threshold, view=False, verbose=False):
         imprint = self.get_imprint(view=view)
+        if self.broadcast_imprint:
+            self._broadcast_imprint(imprint)
         self.pose_estimator.threshold = threshold
         self.pose_estimator.verbose = verbose
         estimated_pose = self.pose_estimator.estimate_pose(imprint)
