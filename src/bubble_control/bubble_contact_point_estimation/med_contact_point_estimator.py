@@ -77,7 +77,7 @@ class ToolContactPointEstimator(object):
         lowering_z = 0.065 # we could go as low as 0.06
         # Update the calibration
         self.calibration_wrench = self.get_wrench()
-        self.med.set_xyz_cartesian(z_value=lowering_z, frame_id='grasp_frame', ref_frame='med_base', stop_condition=self._down_stop_signal)
+        self.med.set_xyz_cartesian(y_value = 0.1, z_value=lowering_z, frame_id='grasp_frame', ref_frame='med_base', stop_condition=self._down_stop_signal)
 
     def raise_up(self):
         z_value = 0.35
