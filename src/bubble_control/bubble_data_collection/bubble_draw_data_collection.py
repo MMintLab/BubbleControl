@@ -79,6 +79,9 @@ class BubbleDrawingDataCollectionBase(BubbleDataCollectionBase):
     def _do_post_action(self, action):
         pass
 
+    def _check_valid_action(self, action):
+        return True
+
     def _collect_data_sample(self, params=None):
         """
         Adjust the robot so the object has a constant pose (target_pose) in the reference ref_frame
@@ -88,10 +91,12 @@ class BubbleDrawingDataCollectionBase(BubbleDataCollectionBase):
         data_params = {}
 
         # Sample drawing parameters:
-        action_i = self._sample_action()
-        start_point_i = action_i['start_point']
-        end_point_i = action_i['end_point']
-        grasp_width_i = action_i['grasp_width']
+        is_valid_action = False
+        action_i = None
+        while not is_valid_action:
+            action_i = self._sample_action()
+            is_valid_action = self._check_valid_action(action_i)
+
         # Sample the fcs:
         init_fc = self.get_new_filecode()
         final_fc = self.get_new_filecode()
@@ -164,27 +169,36 @@ class ConstantSpace(gym.spaces.Space):
 
 class BubbleDrawingDataCollection(BubbleDrawingDataCollectionBase):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, prob_axis=0.08, drawing_area_center=(0.55, 0.), drawing_area_size=(.15, .15), drawing_length_limits=(0.01, 0.15), **kwargs):
+        self.prob_axis = prob_axis
         self.previous_end_point = None
         self.previous_draw_height = None
+        self.drawing_area_center_point = np.asarray(drawing_area_center)
+        self.drawing_area_size = np.asarray(drawing_area_size)
+        self.drawing_length_limits = drawing_length_limits
         super().__init__(*args, **kwargs)
 
     def _get_action_space(self):
-
-        drawing_area_center_point = np.array([0.55, 0.])
-        drawing_area_size = np.array([.1, .1])
+        drawing_area_center_point = self.drawing_area_center_point
+        drawing_area_size = self.drawing_area_size
 
         action_space_dict = OrderedDict()
         action_space_dict['lift'] = gym.spaces.MultiBinary(1)
         action_space_dict['start_point'] = gym.spaces.Box(drawing_area_center_point - drawing_area_size,
-                                          drawing_area_center_point + drawing_area_size, (2,)) # random uniform
-        action_space_dict['end_point'] = ConstantSpace(0)  # placeholder
-        action_space_dict['direction'] = AxisBiasedDirectionSpace(prob_axis=0.08)
-        action_space_dict['length'] = gym.spaces.Box(low=0.01, high=0.15, shape=())
+                                          drawing_area_center_point + drawing_area_size, (2,), dtype=np.float64) # random uniform
+        action_space_dict['end_point'] = gym.spaces.Box(drawing_area_center_point - drawing_area_size,
+                                          drawing_area_center_point + drawing_area_size, (2,), dtype=np.float64) # placeholder for the limits
+        action_space_dict['direction'] = AxisBiasedDirectionSpace(prob_axis=self.prob_axis)
+        action_space_dict['length'] = gym.spaces.Box(low=self.drawing_length_limits[0], high=self.drawing_length_limits[1], shape=())
         action_space_dict['grasp_width'] = ConstantSpace(20.)
 
         action_space = gym.spaces.Dict(action_space_dict)
         return action_space
+
+    def _check_valid_action(self, action):
+        end_point = action['end_point']
+        valid_action = end_point in self.action_space['end_point'] # since the end point is computed by ourselves based on direction and length, verify that the end point is within its limits,
+        return valid_action
 
     def _sample_action(self):
         action_sampled = super()._sample_action()
