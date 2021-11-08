@@ -55,7 +55,7 @@ def reactive_pivoting_demo():
     for i in range(num_iters):
         # bd.draw_regular_polygon(4, center=center, circumscribed_radius=0.15, init_angle=np.pi*0.25, end_raise=(i==num_iters-1))
         bd.draw_regular_polygon(4, center=center, circumscribed_radius=0.15, init_angle=np.pi * 0.25,
-                                end_raise=(i == num_iters - 1), end_adjust=True, init_drawing=i == 0)
+                                end_raise=(i == num_iters - 1), end_adjust=True, init_drawing=i == 0, step_size=None)
 
     _ = input('Please, rearange the marker and press enter. ')
     bd.reactive = False

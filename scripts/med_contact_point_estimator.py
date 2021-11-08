@@ -73,11 +73,11 @@ class ToolContactPointEstimator(object):
         out_flag = False
         return out_flag
 
-    def lower_down(self):
+    def lower_down(self, **kwargs):
         lowering_z = 0.065 # we could go as low as 0.06
         # Update the calibration
         self.calibration_wrench = self.get_wrench()
-        self.med.set_xyz_cartesian(z_value=lowering_z, frame_id='grasp_frame', ref_frame='med_base', stop_condition=self._down_stop_signal)
+        self.med.set_xyz_cartesian(z_value=lowering_z, frame_id='grasp_frame', ref_frame='med_base', stop_condition=self._down_stop_signal, **kwargs)
 
     def raise_up(self):
         z_value = 0.35
@@ -116,7 +116,7 @@ class ToolContactPointEstimator(object):
         rospy.sleep(3.0)
         # move on the plane
         move_dist = 0.2
-        self.med.cartesian_delta_motion([0,move_dist,0])
+        self.med.cartesian_delta_motion([0, move_dist, 0])
         rospy.sleep(2.0)
         self.raise_up()
         rospy.sleep(2.0)
@@ -164,32 +164,33 @@ class ToolContactPointEstimator(object):
         self.lower_down()
         rospy.sleep(3.0)
         contact_point = self.get_contact_point()
-        self.med.rotation_along_axis_point_angle(axis=np.array([1, 0, 0]), angle=np.pi / 4, point=contact_point, num_steps=num_steps, pos_tol=0.001, ori_tol=0.005)
+        self.med.rotation_along_axis_point_angle(axis=np.array([1, 0, 0]), angle=np.pi / 4, point=contact_point, num_steps=num_steps, position_tol=0.001, orientation_tol=0.005)
         rospy.sleep(3.0)
         contact_point = self.get_contact_point()
-        self.med.rotation_along_axis_point_angle(axis=np.array([1, 0, 0]), angle=-np.pi / 4, point=contact_point, num_steps=num_steps, pos_tol=0.001, ori_tol=0.005)
+        self.med.rotation_along_axis_point_angle(axis=np.array([1, 0, 0]), angle=-np.pi / 4, point=contact_point, num_steps=num_steps, position_tol=0.001, orientation_tol=0.005)
         rospy.sleep(3.0)
         contact_point = self.get_contact_point()
         self.med.rotation_along_axis_point_angle(axis=np.array([1, 0, 0]), angle=np.pi / 4, point=contact_point,
-                                                 num_steps=num_steps, pos_tol=0.001, ori_tol=0.005)
+                                                 num_steps=num_steps, position_tol=0.001, orientation_tol=0.005)
         rospy.sleep(3.0)
         contact_point = self.get_contact_point()
         self.med.rotation_along_axis_point_angle(axis=np.array([0, 1, 0]), angle=np.pi / 15, point=contact_point,
-                                                 num_steps=num_steps, pos_tol=0.001, ori_tol=0.005)
+                                                 num_steps=num_steps, position_tol=0.001, orientation_tol=0.005)
         rospy.sleep(3.0)
         contact_point = self.get_contact_point()
         self.med.rotation_along_axis_point_angle(axis=np.array([0, 1, 0]), angle=-2*np.pi / 15, point=contact_point,
-                                                 num_steps=num_steps, pos_tol=0.001, ori_tol=0.005)
+                                                 num_steps=num_steps, position_tol=0.001, orientation_tol=0.005)
         rospy.sleep(3.0)
         contact_point = self.get_contact_point()
         self.med.rotation_along_axis_point_angle(axis=np.array([0, 1, 0]), angle=np.pi / 15, point=contact_point,
-                                                 num_steps=num_steps, pos_tol=0.001, ori_tol=0.005)
+                                                 num_steps=num_steps, position_tol=0.001, orientation_tol=0.005)
         rospy.sleep(3.0)
         contact_point = self.get_contact_point()
         self.med.rotation_along_axis_point_angle(axis=np.array([1, 0, 0]), angle=-np.pi / 5, point=contact_point,
-                                                 num_steps=num_steps, pos_tol=0.001, ori_tol=0.005)
+                                                 num_steps=num_steps, position_tol=0.001, orientation_tol=0.005)
         rospy.sleep(2.0)
         self.raise_up()
+
 
     def compensate_tool(self):
         num_steps = 20
@@ -204,7 +205,7 @@ class ToolContactPointEstimator(object):
             angle, axis = self.get_tool_angle_axis()
 
             self.med.rotation_along_axis_point_angle(axis=axis, angle=angle, point=contact_point,
-                                                     num_steps=num_steps, pos_tol=0.001, ori_tol=0.005)
+                                                     num_steps=num_steps, position_tol=0.001, orientation_tol=0.005)
             rospy.sleep(3.0)
         self.raise_up()
         rospy.sleep(2.0)
@@ -216,9 +217,9 @@ class ToolContactPointEstimator(object):
 def contact_point_estimation_with_actions():
     force_threshold = 5.0
     tcpe = ToolContactPointEstimator(force_threshold=force_threshold)
-    # tcpe.estimate_motion()
-    # tcpe.rotation_test_motion()
-    tcpe.compensate_tool()
+    tcpe.estimate_motion()
+    tcpe.rotation_test_motion()
+    # tcpe.compensate_tool()
     tcpe.close()
 
 

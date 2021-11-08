@@ -20,7 +20,7 @@ from bubble_control.bubble_contact_point_estimation.contact_point_marker_publish
 
 class BubbleDrawer(BubbleMed):
 
-    def __init__(self, *args, object_topic='estimated_object', force_threshold=5., reactive=False, adjust_lift=False, **kwargs):
+    def __init__(self, *args, object_topic='estimated_object', force_threshold=5., reactive=False, adjust_lift=False, compensate_xy_point=False, **kwargs):
         self.object_topic = object_topic
         self.reactive = reactive # adjust drawing at keypoints/
         self.adjust_lift = adjust_lift
@@ -32,6 +32,7 @@ class BubbleDrawer(BubbleMed):
         self.draw_quat = np.array([-np.cos(np.pi / 4), np.cos(np.pi / 4), 0, 0])
         self.marker_pose = None
         self.calibration_wrench = None
+        self.compensate_xy_point = compensate_xy_point
         super().__init__(*args, **kwargs)
         self.pose_listener = Listener(self.object_topic, Marker, wait_for_data=False)
         self.tf_broadcaster = tf.TransformBroadcaster()
@@ -39,7 +40,7 @@ class BubbleDrawer(BubbleMed):
         self.setup()
 
     def set_grasp_pose(self):
-        self.set_robot_conf('grasp_pose')
+        self.set_robot_conf('grasp_conf')
 
     def setup(self):
         self.home_robot()
@@ -114,7 +115,7 @@ class BubbleDrawer(BubbleMed):
         angle, axis = self.get_tool_angle_axis()
 
         plan = self.rotation_along_axis_point_angle(axis=axis, angle=angle, point=contact_point,
-                                             num_steps=20, pos_tol=0.001, ori_tol=0.005) # TODO: Set as hyperparameter
+                                             num_steps=20, position_tol=0.001, orientation_tol=0.005) # TODO: Set as hyperparameter
         return plan
 
     def _get_marker_compensated_pose(self, desired_marker_pose, ref_frame='med_base', tf_broadcast=False):
@@ -175,14 +176,21 @@ class BubbleDrawer(BubbleMed):
         draw_height = max(contact_z - draw_contact_gap, draw_height_limit)
         # read force
         first_contact_wrench = self.get_wrench()
-        print('contact wrench: ', first_contact_wrench.wrench)
+        # print('contact wrench: ', first_contact_wrench.wrench)
         self.force_threshold = 18  # Increase the force threshold
 
         self.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.1)  # change speed
         return draw_height
 
     def _draw_to_point(self, point_xy, draw_height, end_raise=False):
-        position_i = np.insert(point_xy, 2, draw_height)
+        if self.compensate_xy_point:
+            tcp_gf = self.tf_wrapper.get_transform('tool_contact_point',
+                                          'grasp_frame')  # transform from the contact point to the grasp frame
+            point_xy = point_xy + tcp_gf[:2,3]
+        position_i = np.insert(point_xy, 2, draw_height) # position of the poin in the world frame
+
+
+
         plan_result = self.plan_to_position_cartesian(self.arm_group, 'grasp_frame', target_position=list(position_i),stop_condition=self._stop_signal)
         if end_raise:
             # Raise the arm when we reach the last point
@@ -219,14 +227,16 @@ class BubbleDrawer(BubbleMed):
             draw_height = max(contact_z - self.draw_contact_gap, self.draw_height_limit)
             # read force
             first_contact_wrench = self.get_wrench()
-            print('contact wrench: ', first_contact_wrench.wrench)
+            # print('contact wrench: ', first_contact_wrench.wrench)
             self.force_threshold = 18  # Increase the force threshold
             self.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.1)
             rospy.sleep(.5)
         else:
             # Rotate along the contact point to correct the tool positions
             self.compensate_tool_position()
-            draw_height = self.draw_height_limit
+            current_pose = self.get_current_pose()
+            # draw_height = self.draw_height_limit
+            draw_height = max(current_pose[2]-0.001, self.draw_height_limit)
         return draw_height
 
     def draw_points(self, xy_points, end_raise=True, end_adjust=True, init_drawing=True):
@@ -262,11 +272,13 @@ class BubbleDrawer(BubbleMed):
             corners = self._discretize_points(corners, step_size=step_size, spread_evenly=spread_evenly)
         self.draw_points(corners, **kwargs)
 
-    def draw_regular_polygon(self, num_sides, circumscribed_radius=0.2, center=(0.55, -0.1), init_angle=0, **kwargs):
+    def draw_regular_polygon(self, num_sides, circumscribed_radius=0.2, center=(0.55, -0.1), init_angle=0, step_size=None, **kwargs):
         _angles = 2 * np.pi * np.arange(num_sides+1)/(num_sides)
         angles = (init_angle + _angles )%(2*np.pi)
         basic_vertices = np.stack([np.cos(angles), np.sin(angles)], axis=1)
         corners = np.asarray(center) + circumscribed_radius * 0.5 * basic_vertices
+        if step_size is not None:
+            corners = self._discretize_points(corners, step_size=step_size)
         self.draw_points(corners, **kwargs)
 
     def draw_circle(self, radius=0.2, num_points=100, center=(0.55, -0.1), **kwargs):
