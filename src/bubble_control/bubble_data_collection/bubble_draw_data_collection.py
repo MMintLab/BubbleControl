@@ -12,18 +12,24 @@ from bubble_control.bubble_drawer.bubble_drawer import BubbleDrawer
 
 class BubbleDrawingDataCollectionBase(BubbleDataCollectionBase):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, impedance_mode=False, reactive=False, force_threshold=5., **kwargs):
+        self.impedance_mode = impedance_mode
+        self.reactive = reactive
+        self.force_threshold = force_threshold
         self.action_space = self._get_action_space()
         super().__init__(*args, **kwargs)
         self.last_undeformed_fc = None
-
 
     @abc.abstractmethod
     def _get_action_space(self):
         pass
 
     def _get_med(self):
-        med = BubbleDrawer(object_topic='estimated_object', wrench_topic='/med/wrench', force_threshold=5., reactive=False) # TODO: Pass these parameters to the consturctor
+        med = BubbleDrawer(object_topic='estimated_object',
+                           wrench_topic='/med/wrench',
+                           force_threshold=self.force_threshold,
+                           reactive=self.reactive,
+                           impedance_mode=self.impedance_mode)
         med.connect()
         return med
 
@@ -50,7 +56,7 @@ class BubbleDrawingDataCollectionBase(BubbleDataCollectionBase):
 
     def _get_legend_column_names(self):
         action_keys = self._sample_action().keys()
-        column_names = ['Scene', 'UndeformedFC', 'InitialStateFC',  'FinalStateFC', 'GraspForce'] + list(action_keys)
+        column_names = ['Scene', 'UndeformedFC', 'InitialStateFC',  'FinalStateFC', 'GraspForce'] + ['ImpedanceMode', 'Reactive', 'ForceThreshold'] + list(action_keys)
         return column_names
 
     def _get_legend_lines(self, data_params):
@@ -62,7 +68,7 @@ class BubbleDrawingDataCollectionBase(BubbleDataCollectionBase):
         scene_i = self.scene_name
         action_keys = self._sample_action().keys()
         action_values = [action_i[k] for k in action_keys]
-        line_i = [scene_i, self.last_undeformed_fc, init_fc_i, final_fc_i,  grasp_force_i] + action_values
+        line_i = [scene_i, self.last_undeformed_fc, init_fc_i, final_fc_i,  grasp_force_i] + [self.impedance_mode, self.reactive, self.force_threshold] + action_values
         legend_lines.append(line_i)
         return legend_lines
 
@@ -169,7 +175,7 @@ class ConstantSpace(gym.spaces.Space):
 
 class BubbleDrawingDataCollection(BubbleDrawingDataCollectionBase):
 
-    def __init__(self, *args, prob_axis=0.08, drawing_area_center=(0.55, 0.), drawing_area_size=(.15, .15), drawing_length_limits=(0.01, 0.15), **kwargs):
+    def __init__(self, *args, prob_axis=0.08, drawing_area_center=(0.55, 0.), drawing_area_size=(.15, .15), drawing_length_limits=(0.01, 0.15),**kwargs):
         self.prob_axis = prob_axis
         self.previous_end_point = None
         self.previous_draw_height = None
@@ -205,13 +211,14 @@ class BubbleDrawingDataCollection(BubbleDrawingDataCollectionBase):
         lift = action_sampled['lift']
         if self.previous_end_point is None:
             action_sampled['lift'][0] = 1
-        elif lift == 1:
+        elif lift == 0:
+            # if we do not lift, start at the end point
             action_sampled['start_point'] = copy.deepcopy(self.previous_end_point)
         start_point_i = action_sampled['start_point']
         length_i = action_sampled['length']
         direction_i = action_sampled['direction']
         action_sampled['end_point'] = start_point_i + length_i * np.array([np.cos(direction_i), np.sin(direction_i)])
-        self.previous_end_point = copy.deepcopy(action_sampled['end_point'])
+
         return action_sampled
 
     def _do_pre_action(self, action):
@@ -221,10 +228,13 @@ class BubbleDrawingDataCollection(BubbleDrawingDataCollectionBase):
         self.med.gripper.move(grasp_width_i, 10.0)
         # Init the drawing
         if lift == 1:
-            self.med._end_raise(start_point_i)
+            self.med._end_raise()
             draw_height = self.med._init_drawing(start_point_i)
             self.previous_draw_height = copy.deepcopy(draw_height)
         else:
+            if self.reactive:
+                # Adjust the object pose:
+                self.med._adjust_tool_position(start_point_i)
             draw_height = self.previous_draw_height
         action['draw_height'] = draw_height # Override action to add draw_height so it is available at _do_action
 
@@ -236,5 +246,6 @@ class BubbleDrawingDataCollection(BubbleDrawingDataCollectionBase):
 
     def _do_post_action(self, action):
         end_point_i = action['end_point']
+        self.previous_end_point = copy.deepcopy(action['end_point'])
         # raise the arm at the end
         # Raise the arm when we reach the last point

@@ -20,11 +20,12 @@ from bubble_control.bubble_contact_point_estimation.contact_point_marker_publish
 
 class BubbleDrawer(BubbleMed):
 
-    def __init__(self, *args, object_topic='estimated_object', force_threshold=5., reactive=False, adjust_lift=False, compensate_xy_point=False, **kwargs):
+    def __init__(self, *args, object_topic='estimated_object', force_threshold=5., reactive=False, adjust_lift=False, compensate_xy_point=False, impedance_mode=True, **kwargs):
         self.object_topic = object_topic
         self.reactive = reactive # adjust drawing at keypoints/
         self.adjust_lift = adjust_lift
         self.force_threshold = force_threshold
+        self.impedance_mode = impedance_mode
         # Parameters:
         self.draw_contact_gap = 0.005  # TODO: Consider reducing this value to reduce the force
         self.pre_height = 0.13
@@ -52,9 +53,16 @@ class BubbleDrawer(BubbleMed):
         calibrated_fz = measured_fz-self.calibration_wrench.wrench.force.z
         flag_force = np.abs(calibrated_fz) >= np.abs(self.force_threshold)
         if flag_force:
-            print('force z: {} (measured: {}) --- flag: {} ({} | {})'.format(calibrated_fz, measured_fz, flag_force, np.abs(calibrated_fz), np.abs(self.force_threshold)))
+            # print('force z: {} (measured: {}) --- flag: {} ({} | {})'.format(calibrated_fz, measured_fz, flag_force, np.abs(calibrated_fz), np.abs(self.force_threshold)))
             self.contact_point_marker_publisher.show = True
         return flag_force
+
+    def _set_vel(self, vel):
+        if self.impedance_mode:
+            self.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF,
+                                  vel=vel)
+        else:
+            self.set_control_mode(ControlMode.JOINT_POSITION, vel=vel)
 
     def get_marker_pose(self):
         data = self.pose_listener.get(block_until_data=True)
@@ -167,8 +175,7 @@ class BubbleDrawer(BubbleMed):
             self.plan_to_pose(self.arm_group, 'grasp_frame', target_pose=list(pre_pose), frame_id='med_base')
         # self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.075)  # Low val for safety
         rospy.sleep(.5)
-        self.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF,
-                                  vel=0.03)  # Very Low val for precision
+        self._set_vel(0.03)  # Very Low val for precision
         # lower down:
         self.force_threshold = 5.
         contact_z = self.lower_down(z_value=draw_z)
@@ -179,7 +186,7 @@ class BubbleDrawer(BubbleMed):
         # print('contact wrench: ', first_contact_wrench.wrench)
         self.force_threshold = 18  # Increase the force threshold
 
-        self.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.1)  # change speed
+        self._set_vel(0.1)  # change speed
         return draw_height
 
     def _draw_to_point(self, point_xy, draw_height, end_raise=False):
@@ -189,17 +196,23 @@ class BubbleDrawer(BubbleMed):
             point_xy = point_xy + tcp_gf[:2,3]
         position_i = np.insert(point_xy, 2, draw_height) # position of the poin in the world frame
 
-
-
         plan_result = self.plan_to_position_cartesian(self.arm_group, 'grasp_frame', target_position=list(position_i),stop_condition=self._stop_signal)
         if end_raise:
             # Raise the arm when we reach the last point
             self._end_raise(point_xy)
 
-    def _end_raise(self, point_xy):
-        final_position = np.insert(point_xy, 2, self.pre_height)
-        final_pose = np.concatenate([final_position, self.draw_quat], axis=0)
-        self.plan_to_pose(self.arm_group, 'grasp_frame', target_pose=list(final_pose), frame_id='med_base')
+    def _end_raise(self, point_xy=None):
+        if point_xy is not None:
+            # set the raise on the xy
+            final_position = np.insert(point_xy, 2, self.pre_height)
+            final_pose = np.concatenate([final_position, self.draw_quat], axis=0)
+            self.plan_to_pose(self.arm_group, 'grasp_frame', target_pose=list(final_pose), frame_id='med_base')
+        else:
+            # just raise up on z direction
+            self.set_xyz_cartesian(z_value=self.pre_height)
+
+
+
 
     def _adjust_tool_position(self, xy_point, lift=None):
         if lift is None:
@@ -220,8 +233,8 @@ class BubbleDrawer(BubbleMed):
                                                 target_pose=list(compensated_marker_pose['pose']), frame_id='med_base')
             # Go down again
             rospy.sleep(.5)
-            self.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF,
-                                      vel=0.05)  # Very Low val for precision
+            self._set_vel(0.05)  # Very Low val for precision
+
             # lower down:
             contact_z = self.lower_down()
             draw_height = max(contact_z - self.draw_contact_gap, self.draw_height_limit)
@@ -229,7 +242,8 @@ class BubbleDrawer(BubbleMed):
             first_contact_wrench = self.get_wrench()
             # print('contact wrench: ', first_contact_wrench.wrench)
             self.force_threshold = 18  # Increase the force threshold
-            self.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.1)
+
+            self._set_vel(0.1)
             rospy.sleep(.5)
         else:
             # Rotate along the contact point to correct the tool positions
@@ -254,7 +268,7 @@ class BubbleDrawer(BubbleMed):
             contact_pose = self.tf2_listener.get_transform('med_base', 'grasp_frame')
             draw_height = contact_pose[2, 3]
         rospy.sleep(.5)
-        self.set_control_mode(ControlMode.JOINT_POSITION, vel=0.1)
+        self._set_vel(0.1)
         for i, corner_i in enumerate(xy_points[1:]):
             self._draw_to_point(corner_i, draw_height, end_raise=False)
             if self.reactive and (i < len(xy_points)-2):
