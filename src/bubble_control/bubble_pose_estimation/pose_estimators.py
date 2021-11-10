@@ -3,11 +3,12 @@ import abc
 from mmint_camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud
 import open3d as o3d
 import copy
+from mmint_camera_utils.ros_utils.publisher_wrapper import PublisherWrapper
 import tf.transformations as tr
 from scipy.spatial import KDTree
 from tqdm import tqdm
 from mmint_utils.terminal_colors import term_colors
-
+from std_msgs.msg import Bool
 
 class PCPoseEstimatorBase(abc.ABC):
     """
@@ -15,6 +16,8 @@ class PCPoseEstimatorBase(abc.ABC):
     """
     def __init__(self):
         super().__init__()
+        self.tool_detected_publisher = PublisherWrapper(topic_name='tool_detected', msg_type=Bool)
+
 
     @abc.abstractmethod
     def estimate_pose(self, target_pc):
@@ -30,9 +33,19 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
         self.view = view
         self.verbose = verbose
 
-    def estimate_pose(self, target_pc, init_tr=None):
+    def estimate_pose(self, target_pc, target_pc_r, target_pc_l, init_tr=None):
+        print('Before filter 1')
         target_pc = self._filter_input_pc(target_pc)
+        print('After filter 1')
         target_pcd = pack_o3d_pcd(target_pc)
+        print('Before filter 2')
+        #target_pc_r = self._filter_input_pc(target_pc_r)
+        print('After filter 2')
+        target_pcd_r = pack_o3d_pcd(target_pc_r)
+        print('Before filter 3')
+        #target_pc_l = self._filter_input_pc(target_pc_l)
+        print('After filter 3')
+        target_pcd_l = pack_o3d_pcd(target_pc_l)        
         if init_tr is None:
             init_tr = self._get_init_tr(target_pcd)
         if self.view:
@@ -43,7 +56,7 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
             view_pointcloud([target_pcd, model_tr_pcd], frame=True)
 
         # Estimate the transformation
-        icp_tr = self._icp(source_pcd=self.object_model, target_pcd=target_pcd, threshold=self.threshold, init_tr=init_tr)
+        icp_tr = self._icp(source_pcd=self.object_model, target_pcd=target_pcd, target_pcd_r=target_pcd_r, target_pcd_l=target_pcd_l, threshold=self.threshold, init_tr=init_tr)
 
         if self.view:
             # Visualize the estimated transofrm:
@@ -56,6 +69,7 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
         return icp_tr
 
     def _filter_input_pc(self, input_pc):
+        print('Here')
         return input_pc
 
     def _get_init_tr(self, target_pcd):
@@ -92,7 +106,7 @@ class ICP3DPoseEstimator(ICPPoseEstimator):
             init_tr = self.last_tr
         return init_tr
 
-    def _icp(self, source_pcd, target_pcd, threshold, init_tr):
+    def _icp(self, source_pcd, target_pcd, traget_pdc_r, target_pcd_l, threshold, init_tr):
         # Point-to-point:
         reg_p2p = o3d.pipelines.registration.registration_icp(source_pcd, target_pcd, threshold, init_tr,
                                                               o3d.pipelines.registration.TransformationEstimationPointToPoint(),
@@ -108,6 +122,9 @@ class ICP3DPoseEstimator(ICPPoseEstimator):
         return icp_transformation
 
     def _filter_input_pc(self, input_pc):
+        print('Filtering: ', input_pc)
+        if(len(input_pc) == 0):
+            return input_pc
         input_mean = np.mean(input_pc[:, :3], axis=0)
         dists = np.linalg.norm(input_pc[:, :3] - input_mean, axis=1)
         d_th = 0.015
@@ -164,7 +181,7 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
         random_tr = tr.quaternion_matrix(tr.quaternion_about_axis(random_angle, z_axis))
         return random_tr
 
-    def _icp(self, source_pcd, target_pcd, threshold, init_tr):
+    def _icp(self, source_pcd, target_pcd, target_pcd_r, target_pcd_l, threshold, init_tr):
         """
 
         Args:
@@ -177,11 +194,30 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
         icp_tr = init_tr
         source_points = self._project_pc(np.asarray(source_pcd.points))
         target_points = self._project_pc(np.asarray(target_pcd.points))
-        if len(target_points) == 0:
+        # print(1)
+        distance_bubbles = None
+        print('Aqui no hauria dhaver fallat encara')
+        # print('Crec que aixo falla', len(target_pcd_l.points) > 0)
+        # if len(target_pcd_l.points) > 0 and len(target_pcd_r.points) > 0:
+        #     print(2)
+            # tree = KDTree(target_pcd_r.points)
+            # corr_distances, cp_indxs = tree.query(target_pcd_l.points)
+            # if len(corr_distances) > 0:
+            #     distance_bubbles = np.min(corr_distances)
+            # else:
+            #     print("Something weird happens")
+        print(3)
+
+        if len(target_points) == 0 or (distance_bubbles is not None and distance_bubbles < 0.002):
+            print(4)
             print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
+            self.tool_detected_publisher.data = False
             if self.last_tr is not None:
                 return self.last_tr
             return init_tr
+        else:
+            print("Tool true")
+            self.tool_detected_publisher.data = True
         for i in range(self.max_num_iterations):
             # transform model
             source_tr = source_points @ icp_tr[:3, :3].T + icp_tr[:3, 3]

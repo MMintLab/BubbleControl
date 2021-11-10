@@ -205,12 +205,12 @@ class BubblePCReconstructorBase(abc.ABC):
         return filtered_pc
 
     def estimate_pose(self, threshold, view=False, verbose=False):
-        imprint = self.get_imprint(view=view)
+        imprint, imprint_r, imprint_l = self.get_imprint(view=view)
         if self.broadcast_imprint:
             self._broadcast_imprint(imprint)
         self.pose_estimator.threshold = threshold
         self.pose_estimator.verbose = verbose
-        estimated_pose = self.pose_estimator.estimate_pose(imprint)
+        estimated_pose = self.pose_estimator.estimate_pose(imprint, imprint_r, imprint_l)
         return estimated_pose
 
 
@@ -261,7 +261,7 @@ class BubblePCReconsturctorTreeSearch(BubblePCReconstructorBase):
         if view:
             print('visualizing the imprint on green')
             view_pointcloud([imprint_r, imprint_l], frame=True)
-        return np.concatenate([imprint_r, imprint_l], axis=0)
+        return np.concatenate([imprint_r, imprint_l], axis=0), imprint_r, imprint_l
 
     def _get_far_points_indxs(self, query_pc, d_threshold, key):
         """
@@ -328,7 +328,7 @@ class BubblePCReconsturctorDepth(BubblePCReconstructorBase):
             imprint_r[:, 4] = 1  # paint it green
             imprint_l[:, 4] = 1  # paint it green
             view_pointcloud([imprint_r, imprint_l], frame=True)
-        return np.concatenate([imprint_r, imprint_l], axis=0)
+        return np.concatenate([imprint_r, imprint_l], axis=0), imprint_r, imprint_l
 
 
 
