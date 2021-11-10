@@ -34,17 +34,11 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
         self.verbose = verbose
 
     def estimate_pose(self, target_pc, target_pc_r, target_pc_l, init_tr=None):
-        print('Before filter 1')
         target_pc = self._filter_input_pc(target_pc)
-        print('After filter 1')
         target_pcd = pack_o3d_pcd(target_pc)
-        print('Before filter 2')
-        #target_pc_r = self._filter_input_pc(target_pc_r)
-        print('After filter 2')
+        target_pc_r = self._filter_input_pc(target_pc_r)
         target_pcd_r = pack_o3d_pcd(target_pc_r)
-        print('Before filter 3')
-        #target_pc_l = self._filter_input_pc(target_pc_l)
-        print('After filter 3')
+        target_pc_l = self._filter_input_pc(target_pc_l)
         target_pcd_l = pack_o3d_pcd(target_pc_l)        
         if init_tr is None:
             init_tr = self._get_init_tr(target_pcd)
@@ -69,8 +63,13 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
         return icp_tr
 
     def _filter_input_pc(self, input_pc):
-        print('Here')
-        return input_pc
+        if(len(input_pc) == 0):
+            return input_pc
+        input_mean = np.mean(input_pc[:, :3], axis=0)
+        dists = np.linalg.norm(input_pc[:, :3] - input_mean, axis=1)
+        d_th = 0.03
+        filtered_input = input_pc[np.where(dists <= d_th)]
+        return filtered_input
 
     def _get_init_tr(self, target_pcd):
         if self.last_tr is None:
@@ -122,7 +121,6 @@ class ICP3DPoseEstimator(ICPPoseEstimator):
         return icp_transformation
 
     def _filter_input_pc(self, input_pc):
-        print('Filtering: ', input_pc)
         if(len(input_pc) == 0):
             return input_pc
         input_mean = np.mean(input_pc[:, :3], axis=0)
@@ -194,29 +192,26 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
         icp_tr = init_tr
         source_points = self._project_pc(np.asarray(source_pcd.points))
         target_points = self._project_pc(np.asarray(target_pcd.points))
-        # print(1)
         distance_bubbles = None
-        print('Aqui no hauria dhaver fallat encara')
-        # print('Crec que aixo falla', len(target_pcd_l.points) > 0)
-        # if len(target_pcd_l.points) > 0 and len(target_pcd_r.points) > 0:
-        #     print(2)
-            # tree = KDTree(target_pcd_r.points)
-            # corr_distances, cp_indxs = tree.query(target_pcd_l.points)
-            # if len(corr_distances) > 0:
-            #     distance_bubbles = np.min(corr_distances)
-            # else:
-            #     print("Something weird happens")
-        print(3)
+        if len(target_pcd_l.points) > 0 and len(target_pcd_r.points) > 0:
+            tree = KDTree(target_pcd_r.points)
+            corr_distances, _ = tree.query(target_pcd_l.points)
+            distance_bubbles = np.mean(corr_distances)
 
-        if len(target_points) == 0 or (distance_bubbles is not None and distance_bubbles < 0.002):
-            print(4)
+
+        if len(target_points) < 4:
             print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
             self.tool_detected_publisher.data = False
             if self.last_tr is not None:
                 return self.last_tr
             return init_tr
+        elif (distance_bubbles is not None and distance_bubbles < 0.01):
+            print(f"{term_colors.WARNING}Warning: No tool detected{term_colors.ENDC}")
+            self.tool_detected_publisher.data = False
+            if self.last_tr is not None:
+                return self.last_tr
+            return init_tr
         else:
-            print("Tool true")
             self.tool_detected_publisher.data = True
         for i in range(self.max_num_iterations):
             # transform model
