@@ -142,7 +142,16 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
 
         self.log('batch', batch_idx)
         self.log('train_loss', loss)
-        # TODO: Consider logging reconstructed images or image errors
+        # add image:
+        desired_shape = [x for x in imprint_delta.shape]
+        desired_shape[-1] *= imprint_delta.shape[1]
+        desired_shape[1] = 1
+        # grid = torchvision.utils.make_grid(torch.cat((imprint_delta.view(desired_shape), imprint_d_gth.view(desired_shape))))
+        # self.logger.experiment.add_image('images', grid, self.global_step)
+        predicted_grid = torchvision.utils.make_grid(imprint_delta.view(desired_shape))
+        gth_grid = torchvision.utils.make_grid(imprint_d_gth.view(desired_shape))
+        self.logger.experiment.add_image('delta_imprint_predicted', predicted_grid, self.global_step)
+        self.logger.experiment.add_image('delt_imprint_gth', gth_grid, self.global_step)
         return loss
 
     def validation_step(self, val_batch, batch_idx):
@@ -174,7 +183,7 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
         
         imprint_reconstruction_loss = self.mse_loss(imprint_delta, imprint_d_gth)
         wrench_loss = self.mse_loss(wrench_delta, wrench_d_gth)
-        pos_loss = self.mse_loss(pos_delta, pos_d_gth)# TODO: improve
+        pos_loss = self.mse_loss(pos_delta, pos_d_gth)
         quat_loss = self.mse_loss(quat_delta, quat_d_gth) # TODO: Improve
 
         loss = imprint_reconstruction_loss + wrench_loss + pos_loss + quat_loss
