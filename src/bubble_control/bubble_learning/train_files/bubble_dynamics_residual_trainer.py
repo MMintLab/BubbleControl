@@ -6,7 +6,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import random_split
 
 from bubble_control.bubble_learning.models.bubble_dynamics_residual_model import BubbleDynamicsResidualModel
-from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
+from bubble_pivoting.datasets.bubble_pivoting_dataset import BubblePivotingDataset
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 
 
@@ -14,7 +14,7 @@ from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 if __name__ == '__main__':
 
     # params:
-    data_name = '/home/mmint/Desktop/drawing_data_cartesian'
+    data_name = '/home/mireia/Documents/research/bubble_pivoting_data'
 
     batch_size = 5
     max_epochs = 500
@@ -38,7 +38,7 @@ if __name__ == '__main__':
     # Load dataset
     num_workers = 8
     trs = [QuaternionToAxis()]
-    dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame', dtype=torch.float32, transformation=trs)
+    dataset = BubblePivotingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame', dtype=torch.float32, transformation=trs)
     train_size = int(len(dataset) * train_fraction)
     val_size = len(dataset) - train_size
     train_data, val_data = random_split(dataset, [train_size, val_size],  generator=torch.Generator().manual_seed(seed))
