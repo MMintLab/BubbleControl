@@ -1,4 +1,5 @@
 import numpy as np
+import tf.transformations as tr
 
 from bubble_utils.bubble_datasets.bubble_dataset_base import BubbleDatasetBase
 
@@ -30,9 +31,8 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         final_imprint_r = self._get_depth_imprint(undef_fc=undef_fc, def_fc=final_fc, scene_name=scene_name, camera_name='right')
         final_imprint_l = self._get_depth_imprint(undef_fc=undef_fc, def_fc=final_fc, scene_name=scene_name, camera_name='left')
         final_imprint = np.stack([final_imprint_r, final_imprint_l], axis=0)
-        final_wrench = self._get_wrench(fc=init_fc, scene_name=scene_name, frame_id=self.wrench_frame)
+        final_wrench = self._get_wrench(fc=final_fc, scene_name=scene_name, frame_id=self.wrench_frame)
 
-        # TODO: Add frames on sample
         init_tf = self._get_tfs(init_fc, scene_name=scene_name, frame_id=self.tf_frame)
         final_tf = self._get_tfs(final_fc, scene_name=scene_name, frame_id=self.tf_frame)
         init_pos = init_tf[..., :3]
@@ -69,10 +69,12 @@ class BubbleDrawingDataset(BubbleDatasetBase):
 
     def _compute_delta_sample(self, sample):
         # TODO: improve this computation
-        input_keys = ['imprint', 'wrench', 'pos', 'quat']
+        input_keys = ['imprint', 'wrench', 'pos']
         time_keys = ['init', 'final']
         for in_key in input_keys:
             sample['delta_{}'.format(in_key)] = sample['final_{}'.format(in_key)] - sample['init_{}'.format(in_key)]
+        # for quaternion, compute the delta quaternion q_delta @ q_init = q_final <=> q_delta
+        sample['delta_quat'] = tr.quaternion_multiply(sample['final_quat'], tr.quaternion_inverse(sample['init_quat']))
         return sample
 
     def _reshape_sample(self, sample):
@@ -90,8 +92,8 @@ class BubbleDrawingDataset(BubbleDatasetBase):
 # DEBUG:
 
 if __name__ == '__main__':
-    data_name = '/home/mmint/Desktop/drawing_data'
-    dataset = BubbleDrawingDataset(data_name=data_name)
+    data_name = '/home/mmint/Desktop/drawing_data_cartesian'
+    dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame')
     print('Dataset Name: ', dataset.name)
     print('Dataset Length:', len(dataset))
     sample_0 = dataset[0]

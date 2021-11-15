@@ -7,13 +7,14 @@ from torch.utils.data import random_split
 
 from bubble_control.bubble_learning.models.bubble_dynamics_residual_model import BubbleDynamicsResidualModel
 from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
+from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 
 
 
 if __name__ == '__main__':
 
     # params:
-    data_name = '/home/mmint/Desktop/drawing_data'
+    data_name = '/home/mmint/Desktop/drawing_data_cartesian'
 
     batch_size = 5
     max_epochs = 500
@@ -36,7 +37,8 @@ if __name__ == '__main__':
 
     # Load dataset
     num_workers = 8
-    dataset = BubbleDrawingDataset(data_name=data_name)
+    trs = [QuaternionToAxis()]
+    dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame', dtype=torch.float32, transformation=trs)
     train_size = int(len(dataset) * train_fraction)
     val_size = len(dataset) - train_size
     train_data, val_data = random_split(dataset, [train_size, val_size],  generator=torch.Generator().manual_seed(seed))
@@ -50,6 +52,8 @@ if __name__ == '__main__':
         'data_name': data_name,
         'num_train_samples': len(train_data),
         'num_val_samples': len(val_data),
+        'wrench_frame': dataset.wrench_frame,
+        'tf_frame': dataset.tf_frame,
     }
 
     model = BubbleDynamicsResidualModel(input_sizes=sizes,
