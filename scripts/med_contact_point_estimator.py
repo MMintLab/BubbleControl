@@ -218,7 +218,7 @@ def contact_point_estimation_with_actions():
     force_threshold = 5.0
     tcpe = ToolContactPointEstimator(force_threshold=force_threshold)
     tcpe.estimate_motion()
-    tcpe.rotation_test_motion()
+    # tcpe.rotation_test_motion()
     # tcpe.compensate_tool()
     tcpe.close()
 

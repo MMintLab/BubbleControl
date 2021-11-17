@@ -59,7 +59,6 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
         return self.get_name()
 
     def _get_img_encoder(self):
-        # TODO: Debug
         sizes = self._get_sizes()
         img_size = sizes['imprint']# (C_in, W_in, H_in)
         img_encoder = ImageEncoder(input_size=img_size,
@@ -190,3 +189,7 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
         
         return loss
 
+
+
+class BubbleDynamicsResidualModelNoImageEncoders(BubbleDynamicsResidualModel):
+    pass

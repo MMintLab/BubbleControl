@@ -62,9 +62,12 @@ class BubbleDrawingDataset(BubbleDatasetBase):
 
     def _get_action(self, fc):
         # TODO: Load from file instead of the logged values in the dl
-        action_column_names = ['GraspForce', 'grasp_width', 'direction', 'length']
         dl_line = self.dl.iloc[fc]
-        action_i = dl_line[action_column_names].values.astype(np.float64)
+        # action_column_names = ['GraspForce', 'grasp_width', 'direction', 'length']
+        # action_i = dl_line[action_column_names].values.astype(np.float64)
+        direction = dl_line['direction']
+        length = dl_line['length']
+        action_i = length * np.array([np.cos(direction), np.sin(direction)])
         return action_i
 
     def _compute_delta_sample(self, sample):

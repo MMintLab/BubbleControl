@@ -52,14 +52,17 @@ class ImageDecoder(nn.Module):
             conv_modules.append(conv_i)
             if i < len(self.hidden_dims)-2:
                 conv_modules.append(self.act)
-        conv_encoder = nn.Sequential(*conv_modules)
+        if len(conv_modules) > 0:
+            conv_encoder = nn.Sequential(*conv_modules)
+        else:
+            conv_encoder = nn.Identity() # no operation needed since there are no convolutions
         # compute the tensor sizes:
         conv_img_in_size_wh = self.output_size[1:] - (ks-1) * self.num_convs
         conv_img_in_size = np.insert(conv_img_in_size_wh, 0, self.hidden_dims[0]) # ( C_in, H_in, W_in)
         return conv_encoder, conv_img_in_size
 
     def _get_fc_decoder(self):
-        fc_out_size = np.prod(self.conv_in_size)
+        fc_out_size = int(np.prod(self.conv_in_size))
         sizes = [self.latent_size] + [self.fc_hidden_size]*(self.num_fcs-1) + [fc_out_size]
         fc_encoder = FCModule(sizes, activation='relu')
         return fc_encoder
