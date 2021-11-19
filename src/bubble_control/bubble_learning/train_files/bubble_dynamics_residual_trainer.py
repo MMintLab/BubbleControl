@@ -8,6 +8,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import random_split
 
 from bubble_control.bubble_learning.models.bubble_dynamics_residual_model import BubbleDynamicsResidualModel
+from bubble_control.bubble_learning.models.bubble_depth_autoencoder import BubbleDepthAutoEncoderModel
 from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 
@@ -37,6 +38,8 @@ if __name__ == '__main__':
         'skip_layers' : None,
 
         'num_workers' : 8,
+
+        'model': BubbleDynamicsResidualModel.get_name(),
     }
     default_types = {
         'batch_size': int,
@@ -72,12 +75,12 @@ if __name__ == '__main__':
     fc_h_dim = params.fc_h_dim
     skip_layers = params.skip_layers
     num_workers = params.num_workers
+    model_name = params.model
 
     # Load dataset
     trs = [QuaternionToAxis()]
     dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame', dtype=torch.float32, transformation=trs)
-    import pdb; pdb.set_trace()
-    train_size = int(len(dataset) * train_fraction)
+    train_size = int( len(dataset) * train_fraction )
     val_size = len(dataset) - train_size
     train_data, val_data = random_split(dataset, [train_size, val_size],  generator=torch.Generator().manual_seed(seed))
     if batch_size is None:
@@ -98,22 +101,29 @@ if __name__ == '__main__':
         'tf_frame': dataset.tf_frame,
     }
 
-    model = BubbleDynamicsResidualModel(input_sizes=sizes,
-                                        img_embedding_size=img_embedding_size,
-                                        encoder_num_convs=encoder_num_convs,
-                                        decoder_num_convs=decoder_num_convs,
-                                        encoder_conv_hidden_sizes=encoder_conv_hidden_sizes,
-                                        decoder_conv_hidden_sizes=decoder_conv_hidden_sizes,
-                                        ks=ks,
-                                        num_fcs=num_fcs,
-                                        num_encoder_fcs=num_encoder_fcs,
-                                        num_decoder_fcs=num_decoder_fcs,
-                                        fc_h_dim=fc_h_dim,
-                                        skip_layers=skip_layers,
-                                        lr=lr,
-                                        dataset_params=dataset_params,
-                                        activation=activation
-                                        )
+    models_dict = {
+        BubbleDynamicsResidualModel.get_name() : BubbleDynamicsResidualModel,
+        BubbleDepthAutoEncoderModel.get_name() : BubbleDepthAutoEncoderModel,
+    }
+
+    Model = models_dict[model_name]
+
+    model = Model(input_sizes=sizes,
+                    img_embedding_size=img_embedding_size,
+                    encoder_num_convs=encoder_num_convs,
+                    decoder_num_convs=decoder_num_convs,
+                    encoder_conv_hidden_sizes=encoder_conv_hidden_sizes,
+                    decoder_conv_hidden_sizes=decoder_conv_hidden_sizes,
+                    ks=ks,
+                    num_fcs=num_fcs,
+                    num_encoder_fcs=num_encoder_fcs,
+                    num_decoder_fcs=num_decoder_fcs,
+                    fc_h_dim=fc_h_dim,
+                    skip_layers=skip_layers,
+                    lr=lr,
+                    dataset_params=dataset_params,
+                    activation=activation
+                )
 
     logger = TensorBoardLogger(os.path.join(data_name, 'tb_logs'), name=model.name)
 

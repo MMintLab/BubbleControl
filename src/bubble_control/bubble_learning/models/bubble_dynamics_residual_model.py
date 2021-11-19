@@ -111,7 +111,7 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
         return imprint_delta, wrench_delta, pos_delta, quat_delta
 
     def _get_sizes(self):
-        imprint_size = self.input_sizes['init_imprint'] # TODO: Set
+        imprint_size = self.input_sizes['init_imprint']
         wrench_size = np.prod(self.input_sizes['init_wrench'])
         pose_size = np.prod(self.input_sizes['init_pos'])
         quat_size = + np.prod(self.input_sizes['init_quat'])
@@ -125,54 +125,45 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
         return sizes
 
     def training_step(self, train_batch, batch_idx):
-        imprint_t = train_batch['init_imprint']
-        wrench_t = train_batch['init_wrench']
-        pos_t = train_batch['init_pos']
-        quat_t = train_batch['init_quat']
-        action = train_batch['action']
-        imprint_d_gth = train_batch['delta_imprint']
-        wrench_d_gth = train_batch['delta_wrench']
-        pos_d_gth = train_batch['delta_pos']
-        quat_d_gth = train_batch['delta_quat']
-
-        imprint_delta, wrench_delta, pos_delta, quat_delta = self.forward(imprint_t, wrench_t, pos_t, quat_t, action)
-
-        loss = self._compute_loss(imprint_delta, wrench_delta, pos_delta, quat_delta, imprint_d_gth, wrench_d_gth, pos_d_gth, quat_d_gth)
-
-        self.log('batch', batch_idx)
-        self.log('train_loss', loss)
-        # add image:
-        desired_shape = [x for x in imprint_delta.shape]
-        desired_shape[-1] *= imprint_delta.shape[1]
-        desired_shape[1] = 1
-        # grid = torchvision.utils.make_grid(torch.cat((imprint_delta.view(desired_shape), imprint_d_gth.view(desired_shape))))
-        # self.logger.experiment.add_image('images', grid, self.global_step)
-        predicted_grid = torchvision.utils.make_grid(imprint_delta.view(desired_shape))
-        gth_grid = torchvision.utils.make_grid(imprint_d_gth.view(desired_shape))
-        self.logger.experiment.add_image('delta_imprint_predicted', predicted_grid, self.global_step)
-        self.logger.experiment.add_image('delt_imprint_gth', gth_grid, self.global_step)
+        loss = self._step(train_batch, batch_idx, phase='train')
         return loss
 
     def validation_step(self, val_batch, batch_idx):
-        imprint_t = val_batch['init_imprint']
-        wrench_t = val_batch['init_wrench']
-        pos_t = val_batch['init_pos']
-        quat_t = val_batch['init_quat']
-        action = val_batch['action']
-        imprint_d_gth = val_batch['delta_imprint']
-        wrench_d_gth = val_batch['delta_wrench']
-        pos_d_gth = val_batch['delta_pos']
-        quat_d_gth = val_batch['delta_quat']
+        loss = self._step(val_batch, batch_idx, phase='val')
+        return loss
+    
+    def _step(self, batch, batch_idx, phase='train'):
+        imprint_t = batch['init_imprint']
+        wrench_t = batch['init_wrench']
+        pos_t = batch['init_pos']
+        quat_t = batch['init_quat']
+        action = batch['action']
+        imprint_d_gth = batch['delta_imprint']
+        wrench_d_gth = batch['delta_wrench']
+        pos_d_gth = batch['delta_pos']
+        quat_d_gth = batch['delta_quat']
 
         imprint_delta, wrench_delta, pos_delta, quat_delta = self.forward(imprint_t, wrench_t, pos_t, quat_t, action)
 
         loss = self._compute_loss(imprint_delta, wrench_delta, pos_delta, quat_delta, imprint_d_gth, wrench_d_gth,
                                   pos_d_gth, quat_d_gth)
 
-        self.log('val_batch', batch_idx)
-        self.log('val_loss', loss)
-        # TODO: Consider logging reconstructed images or image errors
-        return loss
+        self.log('{}_batch'.format(phase), batch_idx)
+        self.log('{}_loss'.format(phase), loss)
+
+        predicted_grid = self._get_image_grid(imprint_delta)
+        gth_grid = self._get_image_grid(imprint_d_gth)
+        self.logger.experiment.add_image('delta_imprint_predicted_{}'.format(phase), predicted_grid, self.global_step)
+        self.logger.experiment.add_image('delta_imprint_gt_{}'.format(phase), gth_grid, self.global_step)
+
+    def _get_image_grid(self, batched_img):
+        # swap the axis so the grid is (batch_size, num_channels, h, w)
+        desired_shape = [x for x in batched_img.shape]
+        desired_shape[-1] *= batched_img.shape[1]
+        desired_shape[1] = 1
+        grid_img = torchvision.utils.make_grid(batched_img.view(desired_shape))
+        return grid_img
+        
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
@@ -191,5 +182,3 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
 
 
 
-class BubbleDynamicsResidualModelNoImageEncoders(BubbleDynamicsResidualModel):
-    pass
