@@ -11,8 +11,8 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         self.tf_frame = tf_frame
         super().__init__(*args, **kwargs)
 
-    @property
-    def name(self):
+    @classmethod
+    def get_name(self):
         return 'bubble_drawing_dataset'
 
     def _get_sample(self, fc):

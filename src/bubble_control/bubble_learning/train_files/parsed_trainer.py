@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import random_split
 
+from bubble_utils.bubble_datasets.bubble_dataset_base import DatasetBase, BubbleDatasetBase
 
 class ParsedTrainer(object):
     """
@@ -35,7 +36,7 @@ class ParsedTrainer(object):
         except TypeError as te:
             Model = [Model]
             model_list = list(Model)
-        model_names = [Model.name for Model in model_list]
+        model_names = [Model.get_name() for Model in model_list]
         model_dict = dict(zip(model_names, model_list))
         return model_dict
     
@@ -45,7 +46,7 @@ class ParsedTrainer(object):
         except TypeError as te:
             Dataset = [Dataset]
             dataset_list = list(Dataset)
-        dataset_names = [d.name for d in dataset_list]
+        dataset_names = [d.get_name() for d in dataset_list]
         dataset_dict = dict(zip(dataset_names, dataset_list))
         return dataset_dict
 
@@ -76,27 +77,33 @@ class ParsedTrainer(object):
     def _get_parser(self):
         parser_name = '{}_parser'.format(self.__class__.__name__.lower())
         parser = argparse.ArgumentParser(parser_name)
-        self._add_common_args(parser)
-        self._add_dataset_args(parser)
         self._add_model_args(parser)
+        self._add_dataset_args(parser)
+        self._add_common_args(parser)
         return parser
 
     def _add_common_args(self, parser):
         # Default args common for all models:
-        parser.add_argument('model', type=str, default=list(self.models_dict.keys())[0], help='used to select the model name. (Possible options: {})'.format(self.models_dict.keys()))
-        parser.add_argument('dataset', type=str, default=list(self.models_dict.keys())[0], help='used to select the model name. (Possible options: {})'.format(self.models_dict.keys()))
         common_params = self._get_common_params()
         for k, v in common_params.items():
             self._add_argument(parser, arg_name=k, default_value=v)
+        args = vars(parser.parse_known_args()[0])
+        for k,v in self.default_args.items():
+            if k not in args:
+                self._add_argument(parser, k, v)
 
     def _add_dataset_args(self, parser):
-        parser.add_argument('')
-        # TODO: Implement
-
+        # TODO: Try to add it as another subparser, but it looks like only one subparser is allowed
+        # subparsers = parser.add_subparsers(dest='dataset_name', help='used to select the model name. (Possible options: {})'.format(self.models_dict.keys()))
+        parser.add_argument('dataset_name', type=str, default=list(self.models_dict.keys())[0], help='used to select the model name. (Possible options: {})'.format(self.models_dict.keys()))
+        for dataset_name, Dataset_i in self.datasets_dict.items():
+            arguments_i = self._get_dataset_constructor_arguments(Dataset_i)
+            # TODO: Implement by adding the defua
 
     def _add_model_args(self, parser):
-        subparsers = parser.add_subparsers(dest='model_name')
-        for i, Model_i in enumerate(self.models_dict):
+        subparsers = parser.add_subparsers(dest='model_name',help='used to select the model name. (Possible options: {})'.format(self.models_dict.keys()))
+        # subparsers = parser.add_subparsers('model_name', type=str, default=list(self.models_dict.keys())[0], help='used to select the model name. (Possible options: {})'.format(self.models_dict.keys()))
+        for model_name, Model_i in self.models_dict.items():
             model_name_i = Model_i.get_name()
             subparser_i = subparsers.add_parser(model_name_i)
             # add Model_i arguments:
@@ -107,16 +114,18 @@ class ParsedTrainer(object):
                     pass
                     # TODO
                 else:
-                    self._add_argument(subparser_i, param_name, param_i, extra_help=' - ({})'.format(model_name_i))
+                    self._add_argument(subparser_i, param_name, param_i.default, extra_help=' - ({})'.format(model_name_i))
 
     def _add_argument(self, parser, arg_name, default_value, extra_help=None):
         # If we have to consider special cases (types, multiple args...), extend this method.
-        if arg_name in self.default_types:
+        if arg_name in self.default_args:
+            default_value = self.default_args[arg_name]
+            param_type = type(default_value)
+        elif arg_name in self.default_types:
             param_type = self.default_types[arg_name]
         else:
             param_type = type(default_value)# get the same param type as the parameter
-        if arg_name in self.default_args:
-            default_value = self.default_args[arg_name]
+
             
         help_str = '{}'.format(arg_name)
         if extra_help is not None:
@@ -132,19 +141,21 @@ class ParsedTrainer(object):
         Dataset = self.datasets_dict[self.args['dataset_name']]
         # TODO: Add dataset args
         # # Get the specific parsed parameters
-        dataset_arg_names = list(inspect.signature(Dataset).parameters.keys())
-        dataset_args = {}
+        dataset_args = self._get_dataset_constructor_arguments(Dataset)
+        dataset_arg_names = list(dataset_args.keys())
+        dataset_constructor_args = {}
         # TODO: Add dataset specific arguments to be logged
-        # for k, v in self.args.items():
-        #     if k in dataset_arg_names:
-        #         dataset_args[k] = v
+        for k, v in self.args.items():
+            if k in dataset_arg_names:
+                dataset_constructor_args[k] = v
         # # Add dataset params
-        dataset_args['data_name'] = self.args['data_name']
-        model = self._init_dataset(Dataset, dataset_args)
-        return model
+        dataset_constructor_args['data_name'] = self.args['data_name']
+        dataset = self._init_dataset(Dataset, dataset_constructor_args)
+        return dataset
 
     def _init_dataset(self, Dataset, dataset_args):
         # TODO: Override this if our model has special inputs
+        import pdb; pdb.set_trace()
         dataset = Dataset(**dataset_args)
         return dataset
 
@@ -174,12 +185,12 @@ class ParsedTrainer(object):
         }
         # log important information
         self.args['datasaet_params'] = dataset_params
-        self.args['sizes'] = sizes
+        self.args['input_sizes'] = sizes
 
         return train_loader, val_loader
 
     def _get_model(self):
-        Model = self.models_dict[self.args['model']]  # Select the model class
+        Model = self.models_dict[self.args['model_name']]  # Select the model class
 
         # Get the specific parsed parameters
         model_arg_names = list(inspect.signature(Model).parameters.keys())
@@ -196,6 +207,7 @@ class ParsedTrainer(object):
     
     def _init_model(self, Model, model_args):
         # TODO: Override this if our model has special inputs
+        import pdb; pdb.set_trace()
         model = Model(**model_args)
         return model
 
@@ -203,10 +215,34 @@ class ParsedTrainer(object):
         logger = TensorBoardLogger(os.path.join(self.args['data_name'], 'tb_logs'), name=self.model.name)
         return logger
 
-    def train(self):
+    def train(self, gpu=None):
+        import pdb; pdb.set_trace()
         logger = self._get_logger()
         gpus = 0
-        if torch.cuda.is_available() and self.gpu:
+        if gpu is None:
+            gpu = self.gpu
+        if torch.cuda.is_available() and gpu:
             gpus = 1
         trainer = pl.Trainer(gpus=gpus, max_epochs=self.args['max_epochs'], logger=logger)
         trainer.fit(self.model, self.train_loader, self.val_loader)
+
+    def _get_dataset_constructor_arguments(self, Dataset):
+        # It turns out that because Datasets inehrit from ABC, inspect does not have access to parents arguments.
+        # Therefore, this hacks it by recursively explorign the partents
+        constructor_arguments = {}
+        exclude_args = ['self', 'args', 'kwargs']
+        # Recursively search for all parameters:
+        current_params = inspect.signature(Dataset.__init__).parameters
+        for k,v in current_params.items():
+            if k not in exclude_args:
+                if v.kind is not v.empty:
+                    constructor_arguments[k] = v.default
+        # forward the parent classes:
+        for parent_class in Dataset.__bases__:
+            if issubclass(parent_class, DatasetBase):
+                parent_params = self._get_dataset_constructor_arguments(parent_class)
+                # combine
+                for k,v in parent_params.items():
+                    if k not in constructor_arguments:
+                        constructor_arguments[k] = v
+        return constructor_arguments

@@ -153,6 +153,7 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
 
         predicted_grid = self._get_image_grid(imprint_delta)
         gth_grid = self._get_image_grid(imprint_d_gth)
+        self.logger.experiment.add_image('init_imprint_{}'.format(phase), self._get_image_grid(imprint_t), self.global_step)
         self.logger.experiment.add_image('delta_imprint_predicted_{}'.format(phase), predicted_grid, self.global_step)
         self.logger.experiment.add_image('delta_imprint_gt_{}'.format(phase), gth_grid, self.global_step)
 
