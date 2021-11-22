@@ -12,6 +12,7 @@ from bubble_control.bubble_learning.models.bubble_depth_autoencoder import Bubbl
 from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 
+from bubble_control.bubble_learning.train_files.parsed_trainer import ParsedTrainer
 
 if __name__ == '__main__':
 
@@ -77,9 +78,10 @@ if __name__ == '__main__':
     num_workers = params.num_workers
     model_name = params.model
 
-    # Load dataset
+    # Load dataset ---------
     trs = [QuaternionToAxis()]
     dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame', dtype=torch.float32, transformation=trs)
+
     train_size = int( len(dataset) * train_fraction )
     val_size = len(dataset) - train_size
     train_data, val_data = random_split(dataset, [train_size, val_size],  generator=torch.Generator().manual_seed(seed))
