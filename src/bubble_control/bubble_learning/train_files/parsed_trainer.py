@@ -30,17 +30,21 @@ class ParsedTrainer(object):
         self.model = self._get_model()
     
     def _get_models(self, Model):
-        if type(Model) == type(object):
+        try:
+            model_list = list(Model)
+        except TypeError as te:
             Model = [Model]
-        model_list = list(Model)
+            model_list = list(Model)
         model_names = [Model.name for Model in model_list]
         model_dict = dict(zip(model_names, model_list))
         return model_dict
     
     def _get_datasets(self, Dataset):
-        if type(Dataset) == type(object):
+        try:
+            dataset_list = list(Dataset)
+        except TypeError as te:
             Dataset = [Dataset]
-        dataset_list = list(Dataset)
+            dataset_list = list(Dataset)
         dataset_names = [d.name for d in dataset_list]
         dataset_dict = dict(zip(dataset_names, dataset_list))
         return dataset_dict
