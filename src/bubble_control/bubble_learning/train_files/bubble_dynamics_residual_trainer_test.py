@@ -27,7 +27,7 @@ if __name__ == '__main__':
         # 'lr' : 1e-4,
         # 'seed' : 0,
         # 'activation' : 'relu',
-        'img_embedding_size' : 20,
+        'img_embedding_size' : 100,
         # 'encoder_num_convs' : 3,
         # 'decoder_num_convs' : 3,
         # 'encoder_conv_hidden_sizes' : None,

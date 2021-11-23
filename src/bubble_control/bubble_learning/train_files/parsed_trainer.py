@@ -76,9 +76,9 @@ class ParsedTrainer(object):
     def _get_parser(self):
         parser_name = '{}_parser'.format(self.__class__.__name__.lower())
         parser = argparse.ArgumentParser(parser_name)
-        self._add_model_args(parser)
         self._add_dataset_args(parser)
         self._add_common_args(parser)
+        self._add_model_args(parser)
         return parser
 
     def _add_common_args(self, parser):
