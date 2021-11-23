@@ -56,4 +56,4 @@ if __name__ == '__main__':
     Dataset = BubbleDrawingDataset
     parsed_trainer = ParsedTrainer(Model, Dataset, default_args=default_params, default_types=default_types)
 
-    parsed_trainer.train(gpu=False)
+    parsed_trainer.train()

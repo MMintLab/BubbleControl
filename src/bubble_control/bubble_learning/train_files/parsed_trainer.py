@@ -17,8 +17,7 @@ class ParsedTrainer(object):
     All options are provided on the commandline using argparse
     """
 
-    def __init__(self, Model, Dataset, default_args=None, default_types=None, gpu=True):
-        self.gpu = gpu
+    def __init__(self, Model, Dataset, default_args=None, default_types=None):
         self.default_args = default_args
         self.models_dict = self._get_models(Model)
         self.datasets_dict = self._get_datasets(Dataset)
@@ -91,6 +90,8 @@ class ParsedTrainer(object):
         for k,v in self.default_args.items():
             if k not in args:
                 self._add_argument(parser, k, v)
+        # Add no_gpu option
+        parser.add_argument('--no_gpu', action='set_true', help='avoid using the gpu even when it is available')
 
     def _add_dataset_args(self, parser):
         # TODO: Try to add it as another subparser, but it looks like only one subparser is allowed
@@ -223,7 +224,7 @@ class ParsedTrainer(object):
         logger = self._get_logger()
         gpus = 0
         if gpu is None:
-            gpu = self.gpu
+            gpu = not self.args['no_gpu']
         if torch.cuda.is_available() and gpu:
             gpus = 1
         trainer = pl.Trainer(gpus=gpus, max_epochs=self.args['max_epochs'], logger=logger)
