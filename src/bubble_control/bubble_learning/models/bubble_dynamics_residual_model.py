@@ -23,7 +23,7 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
         - End effector pose: Position and orientation of the end effector
     * The depth images are embedded into a vector which is later concatenated with the wrench and pose information
     """
-    def __init__(self, input_sizes, img_embedding_size, encoder_num_convs=3, decoder_num_convs=3, encoder_conv_hidden_sizes=None, decoder_conv_hidden_sizes=None, ks=3, num_fcs=2, num_encoder_fcs=2, num_decoder_fcs=2, fc_h_dim=100, skip_layers=None, lr=1e-4, dataset_params=None, activation='relu'):
+    def __init__(self, input_sizes, img_embedding_size=10, encoder_num_convs=3, decoder_num_convs=3, encoder_conv_hidden_sizes=None, decoder_conv_hidden_sizes=None, ks=3, num_fcs=2, num_encoder_fcs=2, num_decoder_fcs=2, fc_h_dim=100, skip_layers=None, lr=1e-4, dataset_params=None, activation='relu'):
         super().__init__()
         self.input_sizes = input_sizes
         self.img_embedding_size = img_embedding_size

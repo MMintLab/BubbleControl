@@ -91,12 +91,12 @@ class ParsedTrainer(object):
             if k not in args:
                 self._add_argument(parser, k, v)
         # Add no_gpu option
-        parser.add_argument('--no_gpu', action='set_true', help='avoid using the gpu even when it is available')
+        parser.add_argument('--no_gpu', action='store_true', help='avoid using the gpu even when it is available')
 
     def _add_dataset_args(self, parser):
         # TODO: Try to add it as another subparser, but it looks like only one subparser is allowed
         # subparsers = parser.add_subparsers(dest='dataset_name', help='used to select the model name. (Possible options: {})'.format(self.models_dict.keys()))
-        parser.add_argument('dataset_name', type=str, default=list(self.models_dict.keys())[0], help='used to select the model name. (Possible options: {})'.format(self.models_dict.keys()))
+        parser.add_argument('dataset_name', type=str, default=list(self.datasets_dict.keys())[0], help='used to select the model name. (Possible options: {})'.format(self.models_dict.keys()))
         for dataset_name, Dataset_i in self.datasets_dict.items():
             arguments_i = self._get_dataset_constructor_arguments(Dataset_i)
             # TODO: Implement by adding the defua
@@ -110,7 +110,8 @@ class ParsedTrainer(object):
             # add Model_i arguments:
             model_constructor_args = self._get_model_constructor_arguments(Model_i)
             for param_name, param_i in model_constructor_args.items():
-                if param_i is inspect._empty:
+                if False:
+                # if param_i is inspect._empty:
                     # No default value cse
                     pass
                 else:
@@ -125,8 +126,6 @@ class ParsedTrainer(object):
             param_type = self.default_types[arg_name]
         else:
             param_type = type(default_value)# get the same param type as the parameter
-
-            
         help_str = '{}'.format(arg_name)
         if extra_help is not None:
             help_str += ' {}'.format(extra_help)
@@ -155,7 +154,7 @@ class ParsedTrainer(object):
 
     def _init_dataset(self, Dataset, dataset_args):
         # TODO: Override this if our model has special inputs
-        print(' -- Model Parameters --')
+        print(' -- Dataset Parameters --')
         for k, v in dataset_args.items():
             print('\t{}: {}'.format(k, v))
         dataset = Dataset(**dataset_args)
@@ -205,13 +204,12 @@ class ParsedTrainer(object):
         model_args['dataset_params'] = self.args['dataset_params']
         # TODO: Add dataset specific arguments to be logged
         model = self._init_model(Model, model_args)
-        
         return model 
     
     def _init_model(self, Model, model_args):
         # TODO: Override this if our model has special inputs
         print(' -- Model Parameters --')
-        for k,v in model_args.items():
+        for k, v in model_args.items():
             print('\t{}: {}'.format(k, v))
         model = Model(**model_args)
         return model
