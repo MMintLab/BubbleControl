@@ -76,9 +76,9 @@ class ParsedTrainer(object):
     def _get_parser(self):
         parser_name = '{}_parser'.format(self.__class__.__name__.lower())
         parser = argparse.ArgumentParser(parser_name)
-        self._add_model_args(parser)
         self._add_dataset_args(parser)
         self._add_common_args(parser)
+        self._add_model_args(parser)
         return parser
 
     def _add_common_args(self, parser):
@@ -91,7 +91,7 @@ class ParsedTrainer(object):
             if k not in args:
                 self._add_argument(parser, k, v)
         # Add no_gpu option
-        parser.add_argument('--no_gpu', action='set_true', help='avoid using the gpu even when it is available')
+        parser.add_argument('--no_gpu', action='store_true', help='avoid using the gpu even when it is available')
 
     def _add_dataset_args(self, parser):
         # TODO: Try to add it as another subparser, but it looks like only one subparser is allowed
@@ -110,7 +110,8 @@ class ParsedTrainer(object):
             # add Model_i arguments:
             model_constructor_args = self._get_model_constructor_arguments(Model_i)
             for param_name, param_i in model_constructor_args.items():
-                if param_i is inspect._empty:
+                if False:
+                #if param_i is inspect._empty:
                     # No default value cse
                     pass
                 else:
