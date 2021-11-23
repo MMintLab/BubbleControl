@@ -13,14 +13,15 @@ from bubble_control.bubble_learning.models.aux.img_decoder import ImageDecoder
 from bubble_control.bubble_learning.models.bubble_dynamics_residual_model import BubbleDynamicsResidualModel
 
 
-class BubbleDepthAutoEncoderModel(BubbleDynamicsResidualModel):
+class BubbleAutoEncoderModel(BubbleDynamicsResidualModel):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, reconstruct_key='delta_imprint',**kwargs):
+        self.reconstruct_key = reconstruct_key
         super().__init__(*args, **kwargs)
 
     @classmethod
     def get_name(cls):
-        return 'bubble_depth_autoencoder_model'
+        return 'bubble_autoencoder_model'
 
     def _get_dyn_model(self):
         return None # We do not have a dyn model in this case
@@ -31,12 +32,12 @@ class BubbleDepthAutoEncoderModel(BubbleDynamicsResidualModel):
         return imprint_reconstructed
 
     def _get_sizes(self):
-        imprint_size = self.input_sizes['delta_imprint']
+        imprint_size = self.input_sizes[self.reconstruct_key]
         sizes = {'imprint': imprint_size}
         return sizes
 
     def _step(self, batch, batch_idx, phase='train'):
-        imprint_t = batch['delta_imprint']
+        imprint_t = batch[self.reconstruct_key]
         imprint_rec = self.forward(imprint_t)
         loss = self._compute_loss(imprint_t, imprint_rec)
         self.log('{}_batch'.format(phase), batch_idx)
@@ -44,8 +45,8 @@ class BubbleDepthAutoEncoderModel(BubbleDynamicsResidualModel):
         # add image:
         reconstructed_grid = self._get_image_grid(imprint_rec)
         gth_grid = self._get_image_grid(imprint_t)
-        self.logger.experiment.add_image('delta_imprint_reconstructed_{}'.format(phase), reconstructed_grid, self.global_step)
-        self.logger.experiment.add_image('delta_imprint_gth_{}'.format(phase), gth_grid, self.global_step)
+        self.logger.experiment.add_image('{}_reconstructed_{}'.format(self.reconstruct_key, phase), reconstructed_grid, self.global_step)
+        self.logger.experiment.add_image('{}_gth_{}'.format(self.reconstruct_key, phase), gth_grid, self.global_step)
         return loss
 
     def training_step(self, train_batch, batch_idx):

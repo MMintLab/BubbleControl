@@ -107,14 +107,13 @@ class ParsedTrainer(object):
             model_name_i = Model_i.get_name()
             subparser_i = subparsers.add_parser(model_name_i)
             # add Model_i arguments:
-            model_i_signature = inspect.signature(Model_i)
-            for param_name, param_i in model_i_signature.parameters.items():
-                if param_i.default is param_i.empty:
+            model_constructor_args = self._get_model_constructor_arguments(Model_i)
+            for param_name, param_i in model_constructor_args.items():
+                if param_i is inspect._empty:
                     # No default value cse
                     pass
-                    # TODO
                 else:
-                    self._add_argument(subparser_i, param_name, param_i.default, extra_help=' - ({})'.format(model_name_i))
+                    self._add_argument(subparser_i, param_name, param_i, extra_help=' - ({})'.format(model_name_i))
 
     def _add_argument(self, parser, arg_name, default_value, extra_help=None):
         # If we have to consider special cases (types, multiple args...), extend this method.
@@ -155,7 +154,9 @@ class ParsedTrainer(object):
 
     def _init_dataset(self, Dataset, dataset_args):
         # TODO: Override this if our model has special inputs
-        import pdb; pdb.set_trace()
+        print(' -- Model Parameters --')
+        for k, v in dataset_args.items():
+            print('\t{}: {}'.format(k, v))
         dataset = Dataset(**dataset_args)
         return dataset
 
@@ -184,7 +185,7 @@ class ParsedTrainer(object):
             'num_val_samples': len(val_data),
         }
         # log important information
-        self.args['datasaet_params'] = dataset_params
+        self.args['dataset_params'] = dataset_params
         self.args['input_sizes'] = sizes
 
         return train_loader, val_loader
@@ -193,12 +194,13 @@ class ParsedTrainer(object):
         Model = self.models_dict[self.args['model_name']]  # Select the model class
 
         # Get the specific parsed parameters
-        model_arg_names = list(inspect.signature(Model).parameters.keys())
+        model_arg_names = list(self._get_model_constructor_arguments(Model))
         model_args = {}
         for k, v in self.args.items():
             if k in model_arg_names:
                 model_args[k] = v
         # Add dataset params
+        model_args['dataset_params'] = self.args['dataset_params']
         model_args['dataset_params'] = self.args['dataset_params']
         # TODO: Add dataset specific arguments to be logged
         model = self._init_model(Model, model_args)
@@ -207,7 +209,9 @@ class ParsedTrainer(object):
     
     def _init_model(self, Model, model_args):
         # TODO: Override this if our model has special inputs
-        import pdb; pdb.set_trace()
+        print(' -- Model Parameters --')
+        for k,v in model_args.items():
+            print('\t{}: {}'.format(k, v))
         model = Model(**model_args)
         return model
 
@@ -216,7 +220,6 @@ class ParsedTrainer(object):
         return logger
 
     def train(self, gpu=None):
-        import pdb; pdb.set_trace()
         logger = self._get_logger()
         gpus = 0
         if gpu is None:
@@ -246,3 +249,25 @@ class ParsedTrainer(object):
                     if k not in constructor_arguments:
                         constructor_arguments[k] = v
         return constructor_arguments
+
+    def _get_model_constructor_arguments(self, Model):
+        # It turns out that because Datasets inehrit from ABC, inspect does not have access to parents arguments.
+        # Therefore, this hacks it by recursively explorign the partents
+        constructor_arguments = {}
+        exclude_args = ['self', 'args', 'kwargs']
+        # Recursively search for all parameters:
+        current_params = inspect.signature(Model.__init__).parameters
+        for k, v in current_params.items():
+            if k not in exclude_args:
+                if v.kind is not v.empty:
+                    constructor_arguments[k] = v.default
+        # forward the parent classes:
+        for parent_class in Model.__bases__:
+            if issubclass(parent_class, pl.LightningModule):
+                parent_params = self._get_model_constructor_arguments(parent_class)
+                # combine
+                for k, v in parent_params.items():
+                    if k not in constructor_arguments:
+                        constructor_arguments[k] = v
+        return constructor_arguments
+
