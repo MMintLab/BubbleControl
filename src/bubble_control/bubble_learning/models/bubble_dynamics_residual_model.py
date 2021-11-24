@@ -2,7 +2,10 @@ import pdb
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import pytorch_lightning as pl
+import matplotlib.pyplot as plt
+from matplotlib import cm
 import torchvision
 import numpy as np
 import os
@@ -142,7 +145,6 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
         wrench_d_gth = batch['delta_wrench']
         pos_d_gth = batch['delta_pos']
         quat_d_gth = batch['delta_quat']
-
         imprint_delta, wrench_delta, pos_delta, quat_delta = self.forward(imprint_t, wrench_t, pos_t, quat_t, action)
 
         loss = self._compute_loss(imprint_delta, wrench_delta, pos_delta, quat_delta, imprint_d_gth, wrench_d_gth,
@@ -153,33 +155,50 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
 
         predicted_grid = self._get_image_grid(imprint_delta)
         gth_grid = self._get_image_grid(imprint_d_gth)
-        self.logger.experiment.add_image('init_imprint_{}'.format(phase), self._get_image_grid(imprint_t), self.global_step)
-        self.logger.experiment.add_image('delta_imprint_predicted_{}'.format(phase), predicted_grid, self.global_step)
-        self.logger.experiment.add_image('delta_imprint_gt_{}'.format(phase), gth_grid, self.global_step)
+        if batch_idx == 0:
+            if self.current_epoch == 0:
+                self.logger.experiment.add_image('init_imprint_{}'.format(phase), self._get_image_grid(imprint_t), self.global_step)
+                self.logger.experiment.add_image('delta_imprint_gt_{}'.format(phase), gth_grid, self.global_step)
+            self.logger.experiment.add_image('delta_imprint_predicted_{}'.format(phase), predicted_grid, self.global_step)
+        return loss
 
-    def _get_image_grid(self, batched_img):
-        # swap the axis so the grid is (batch_size, num_channels, h, w)
-        desired_shape = [x for x in batched_img.shape]
-        desired_shape[-1] *= batched_img.shape[1]
-        desired_shape[1] = 1
-        grid_img = torchvision.utils.make_grid(batched_img.view(desired_shape))
+    def _get_image_grid(self, batched_img, cmap='jet'):
+        # reshape the batched_img to have the same imprints one above the other
+        batched_img = batched_img.detach()
+        batched_img_r = batched_img.reshape(*batched_img.shape[:1],-1,*batched_img.shape[3:]) # (batch_size, 2*W, H)
+        # Add padding
+        padding_pixels = 5
+        batched_img_padded = F.pad(input=batched_img_r,
+                                   pad=(padding_pixels, padding_pixels, padding_pixels, padding_pixels),
+                                   mode='constant',
+                                   value=0)
+        batched_img_cmap = self._cmap_tensor(batched_img_padded, cmap=cmap) # size (..., w,h, 3)
+        num_dims = len(batched_img_cmap.shape)
+        grid_input = batched_img_cmap.permute(*np.arange(num_dims-3), -1, -3, -2)
+        grid_img = torchvision.utils.make_grid(grid_input)
         return grid_img
-        
+
+    def _cmap_tensor(self, img_tensor, cmap='jet'):
+        cmap = cm.get_cmap(cmap)
+        mapped_img_ar = cmap(img_tensor/torch.max(img_tensor)) # (..,w,h,4)
+        mapped_img_ar = mapped_img_ar[..., :3] # (..,w,h,3) -- get rid of the alpha value
+        mapped_img = torch.tensor(mapped_img_ar).to(self.device)
+        return mapped_img
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return optimizer
 
     def _compute_loss(self, imprint_delta, wrench_delta, pos_delta, quat_delta, imprint_d_gth, wrench_d_gth, pos_d_gth, quat_d_gth): # TODO: Add inputs
-        
         imprint_reconstruction_loss = self.mse_loss(imprint_delta, imprint_d_gth)
         wrench_loss = self.mse_loss(wrench_delta, wrench_d_gth)
         pos_loss = self.mse_loss(pos_delta, pos_d_gth)
         quat_loss = self.mse_loss(quat_delta, quat_d_gth) # TODO: Improve
-
         loss = imprint_reconstruction_loss + wrench_loss + pos_loss + quat_loss
-        
         return loss
+
+
+
 
 
 

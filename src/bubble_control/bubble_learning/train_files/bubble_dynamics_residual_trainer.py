@@ -8,7 +8,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import random_split
 
 from bubble_control.bubble_learning.models.bubble_dynamics_residual_model import BubbleDynamicsResidualModel
-from bubble_control.bubble_learning.models.bubble_depth_autoencoder import BubbleDepthAutoEncoderModel
+from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleDepthAutoEncoderModel
 from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 
