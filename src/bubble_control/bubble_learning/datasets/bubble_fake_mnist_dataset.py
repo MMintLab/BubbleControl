@@ -12,13 +12,16 @@ class BubbleFakeMNISTDataset(BubbleDatasetBase):
         super().__init__(*args, **kwargs)
         self.mnist_dataset = self._get_mnist_dataset()
 
+    @classmethod
+    def get_name(cls):
+        return 'bubble_fake_mnist_dataset'
 
     @property
     def name(self):
         dataset_type = 'train'
         if not self.train:
             dataset_type = 'test'
-        return 'bubble_fake_mnist_dataset_{}'.format(dataset_type)
+        return '{}_{}'.format(self.get_name(), dataset_type)
 
     def _get_mnist_dataset(self):
         import pdb; pdb.set_trace()
