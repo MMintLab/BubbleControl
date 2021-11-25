@@ -2,19 +2,27 @@ import numpy as np
 import tf.transformations as tr
 import torchvision
 
-from bubble_utils.bubble_datasets.bubble_dataset_base import BubbleDatasetBase
+from bubble_utils.bubble_datasets.dataset_base import DatasetBase
 
 
-class BubbleFakeMNISTDataset(BubbleDatasetBase):
+class FakeMNISTDataset(DatasetBase):
 
     def __init__(self, *args, train=True, **kwargs):
         self.train = train
+        self.mnist_dataset = None
         super().__init__(*args, **kwargs)
+
+    def _get_datalegend(self):
+        return None
+
+    def _get_filecodes(self):
         self.mnist_dataset = self._get_mnist_dataset()
+        filecodes = np.arange(len(self.mnist_dataset))
+        return filecodes
 
     @classmethod
     def get_name(cls):
-        return 'bubble_fake_mnist_dataset'
+        return 'fake_mnist_dataset'
 
     @property
     def name(self):
@@ -35,9 +43,6 @@ class BubbleFakeMNISTDataset(BubbleDatasetBase):
             ])
            )
         return dataset
-
-    def __len__(self):
-        return self.mnist_dataset.__len__()
 
     def _get_sample(self, idx):
         return self.mnist_dataset[idx]
