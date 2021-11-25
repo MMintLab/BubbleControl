@@ -10,7 +10,6 @@ from torch.utils.data import random_split
 from bubble_control.bubble_learning.models.bubble_dynamics_residual_model import BubbleDynamicsResidualModel
 from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoEncoderModel
 from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
-from bubble_control.bubble_learning.datasets.bubble_fake_mnist_dataset import BubbleFakeMNISTDataset
 from bubble_control.bubble_learning.models.bubble_pca_dynamics_residual_model import BubblePCADynamicsResidualModel
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 
@@ -55,7 +54,7 @@ if __name__ == '__main__':
         'val_batch_size': int
     }
     Model = [BubbleDynamicsResidualModel, BubbleAutoEncoderModel, BubblePCADynamicsResidualModel]
-    Dataset = [BubbleDrawingDataset, BubbleFakeMNISTDataset]
+    Dataset = BubbleDrawingDataset
     parsed_trainer = ParsedTrainer(Model, Dataset, default_args=default_params, default_types=default_types)
 
     parsed_trainer.train()

@@ -96,7 +96,7 @@ class ParsedTrainer(object):
     def _add_dataset_args(self, parser):
         # TODO: Try to add it as another subparser, but it looks like only one subparser is allowed
         # subparsers = parser.add_subparsers(dest='dataset_name', help='used to select the model name. (Possible options: {})'.format(self.models_dict.keys()))
-        parser.add_argument('dataset_name', type=str, default=list(self.datasets_dict.keys())[0], help='used to select the model name. (Possible options: {})'.format(self.models_dict.keys()))
+        parser.add_argument('dataset_name', type=str, default=list(self.datasets_dict.keys())[0], help='used to select the dataset name. (Possible options: {})'.format(self.datasets_dict.keys()))
         for dataset_name, Dataset_i in self.datasets_dict.items():
             arguments_i = self._get_dataset_constructor_arguments(Dataset_i)
             # TODO: Implement by adding the defua
@@ -160,11 +160,17 @@ class ParsedTrainer(object):
         dataset = Dataset(**dataset_args)
         return dataset
 
-    def _get_loaders(self):
+    def _get_train_val_data(self):
         train_size = int(len(self.dataset) * self.args['train_fraction'])
         val_size = len(self.dataset) - train_size
         train_data, val_data = random_split(self.dataset, [train_size, val_size],
                                             generator=torch.Generator().manual_seed(self.args['seed']))
+        return train_data, val_data
+
+    def _get_loaders(self):
+        train_data, val_data = self._get_train_val_data()
+        train_size = len(train_data)
+        val_size = len(val_data)
         batch_size = self.args['batch_size']
         val_batch_size = self.args['val_batch_size']
         if batch_size is None:
@@ -212,6 +218,8 @@ class ParsedTrainer(object):
         for k, v in model_args.items():
             print('\t{}: {}'.format(k, v))
         model = Model(**model_args)
+        print(' -- MODEL -- ')
+        print(model)
         return model
 
     def _get_logger(self):
