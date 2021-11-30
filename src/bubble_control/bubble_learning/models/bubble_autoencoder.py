@@ -15,7 +15,7 @@ from bubble_control.bubble_learning.models.bubble_dynamics_residual_model import
 
 class BubbleAutoEncoderModel(BubbleDynamicsResidualModel):
 
-    def __init__(self, *args, reconstruct_key='delta_imprint',**kwargs):
+    def __init__(self, *args, reconstruct_key='delta_imprint', **kwargs):
         self.reconstruct_key = reconstruct_key
         super().__init__(*args, **kwargs)
 

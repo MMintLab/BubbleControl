@@ -47,6 +47,7 @@ class FakeMNISTDataset(DatasetBase):
         mnist_sample = self.mnist_dataset[idx]
         sample = {
             'x': mnist_sample[0],
-            'label': mnist_sample[1],                               
-            }
+            'label': mnist_sample[1],
+        }
         return sample
+
