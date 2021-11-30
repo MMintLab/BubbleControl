@@ -2,7 +2,7 @@ import numpy as np
 import tf.transformations as tr
 
 from bubble_utils.bubble_datasets.bubble_dataset_base import BubbleDatasetBase
-
+from bubble_control.bubble_learning.aux.img_trs import BlockMeanDownSamplingTr
 
 class BubbleDrawingDataset(BubbleDatasetBase):
 
@@ -91,6 +91,24 @@ class BubbleDrawingDataset(BubbleDatasetBase):
                 sample['{}_{}'.format(time_key, in_key)] = sample['{}_{}'.format(time_key, in_key)].flatten()
         sample['action'] = sample['action'].flatten()
         return sample
+
+
+
+class BubbleDrawingDownsampledDataset(object):
+    def __init__(self, *args, downsample_factor=5, **kwargs):
+        self.downsample_factor = downsample_factor
+        self.block_mean_downsampling_tr = BlockMeanDownSamplingTr(factor=downsample_factor) #downsample all imprint values
+        # add the block_mean_downsampling_tr to the tr list
+        import pdb; pdb.set_trace()
+        transformations = [self.block_mean_downsampling_tr]
+        super().__init__(*args, transformations=transformations, **kwargs)
+
+    @classmethod
+    def get_name(self):
+        return 'bubble_drawing_downsampled_dataset'
+
+
+
 
 # DEBUG:
 

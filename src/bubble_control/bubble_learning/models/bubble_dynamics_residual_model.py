@@ -164,7 +164,7 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
 
     def _get_image_grid(self, batched_img, cmap='jet'):
         # reshape the batched_img to have the same imprints one above the other
-        batched_img = batched_img.detach()
+        batched_img = batched_img.detach().cpu()
         batched_img_r = batched_img.reshape(*batched_img.shape[:1],-1,*batched_img.shape[3:]) # (batch_size, 2*W, H)
         # Add padding
         padding_pixels = 5
