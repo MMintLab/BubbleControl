@@ -15,12 +15,34 @@ from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 
 from bubble_control.bubble_learning.train_files.parsed_trainer import ParsedTrainer
 
+
+class MNISTAutoencoderTrainer(ParsedTrainer):
+
+    def __init__(self, Model, default_args=None, default_types=None):
+        super().__init__(Model, None, default_args=default_args, default_types=default_types)
+
+
+    def _add_dataset_args(self, parser):
+        pass
+
+    def _get_dataset(self):
+        train_dataset =
+        val_dataset =
+
+    def _get_train_val_data(self):
+
+
+
+
+
+
 if __name__ == '__main__':
 
+
+
     # params:
-    trs = [QuaternionToAxis()]
     default_params = {
-        'data_name' : '/home/mmint/Desktop/drawing_data_cartesian',
+        'data_name' : '/home/mik/',
         # 'batch_size' : None,
         # 'val_batch_size' : None,
         # 'max_epochs' : 500,
