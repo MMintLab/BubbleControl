@@ -93,15 +93,20 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         return sample
 
 
-
-class BubbleDrawingDownsampledDataset(object):
+class BubbleDrawingDownsampledDataset(BubbleDrawingDataset):
     def __init__(self, *args, downsample_factor=5, **kwargs):
         self.downsample_factor = downsample_factor
         self.block_mean_downsampling_tr = BlockMeanDownSamplingTr(factor=downsample_factor) #downsample all imprint values
         # add the block_mean_downsampling_tr to the tr list
-        import pdb; pdb.set_trace()
-        transformations = [self.block_mean_downsampling_tr]
-        super().__init__(*args, transformations=transformations, **kwargs)
+        if 'transformation' in kwargs:
+            if type(kwargs['transformation']) in (list, tuple):
+                kwargs['transformation'] = list(kwargs['transformation']) + [self.block_mean_downsampling_tr]
+            else:
+                print('')
+                raise AttributeError('Not supportes trasformations: {} type {}'.format(kwargs['transformation'], type(kwargs['transformation'])))
+        else:
+            kwargs['transformation'] = [self.block_mean_downsampling_tr]
+        super().__init__(*args, **kwargs)
 
     @classmethod
     def get_name(self):
