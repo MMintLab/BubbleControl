@@ -32,7 +32,6 @@ class FakeMNISTDataset(DatasetBase):
         return '{}_{}'.format(self.get_name(), dataset_type)
 
     def _get_mnist_dataset(self):
-        import pdb; pdb.set_trace()
         dataset = torchvision.datasets.MNIST(
             self.data_path,
             train=self.train,
@@ -45,5 +44,9 @@ class FakeMNISTDataset(DatasetBase):
         return dataset
 
     def _get_sample(self, idx):
-        return self.mnist_dataset[idx]
-
+        mnist_sample = self.mnist_dataset[idx]
+        sample = {
+            'x': mnist_sample[0],
+            'label': mnist_sample[1],                               
+            }
+        return sample

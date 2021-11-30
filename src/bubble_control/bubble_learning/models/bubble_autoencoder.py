@@ -43,10 +43,11 @@ class BubbleAutoEncoderModel(BubbleDynamicsResidualModel):
         self.log('{}_batch'.format(phase), batch_idx)
         self.log('{}_loss'.format(phase), loss)
         # add image:
-        reconstructed_grid = self._get_image_grid(imprint_rec)
-        gth_grid = self._get_image_grid(imprint_t)
-        self.logger.experiment.add_image('{}_reconstructed_{}'.format(self.reconstruct_key, phase), reconstructed_grid, self.global_step)
-        self.logger.experiment.add_image('{}_gth_{}'.format(self.reconstruct_key, phase), gth_grid, self.global_step)
+        if batch_idx == 0:
+            reconstructed_grid = self._get_image_grid(imprint_rec)
+            gth_grid = self._get_image_grid(imprint_t)
+            self.logger.experiment.add_image('{}_reconstructed_{}'.format(self.reconstruct_key, phase), reconstructed_grid, self.global_step)
+            self.logger.experiment.add_image('{}_gth_{}'.format(self.reconstruct_key, phase), gth_grid, self.global_step)
         return loss
 
     def training_step(self, train_batch, batch_idx):

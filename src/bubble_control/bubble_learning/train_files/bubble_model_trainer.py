@@ -33,7 +33,7 @@ if __name__ == '__main__':
         # 'encoder_num_convs' : 3,
         # 'decoder_num_convs' : 3,
         # 'encoder_conv_hidden_sizes' : None,
-        # 'decoder_conv_hidden_sizes' : None,
+        'decoder_conv_hidden_sizes' : [10,10,10],
         # 'ks' : 3,
         # 'num_fcs' : 3,
         # 'num_encoder_fcs' : 2,
