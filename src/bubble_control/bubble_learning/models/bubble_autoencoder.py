@@ -44,7 +44,7 @@ class BubbleAutoEncoderModel(BubbleDynamicsResidualModel):
         self.log('{}_loss'.format(phase), loss)
         # add image:
         if batch_idx == 0:
-            reconstructed_grid = self._get_image_grid(imprint_rec)
+            reconstructed_grid = self._get_image_grid(imprint_rec*torch.max(imprint_rec)/torch.max(imprint_t))
             gth_grid = self._get_image_grid(imprint_t)
             self.logger.experiment.add_image('{}_reconstructed_{}'.format(self.reconstruct_key, phase), reconstructed_grid, self.global_step)
             self.logger.experiment.add_image('{}_gth_{}'.format(self.reconstruct_key, phase), gth_grid, self.global_step)
