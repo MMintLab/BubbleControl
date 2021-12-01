@@ -117,7 +117,7 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
         imprint_size = self.input_sizes['init_imprint']
         wrench_size = np.prod(self.input_sizes['init_wrench'])
         pose_size = np.prod(self.input_sizes['init_pos'])
-        quat_size = + np.prod(self.input_sizes['init_quat'])
+        quat_size = np.prod(self.input_sizes['init_quat'])
         action_size = np.prod(self.input_sizes['action'])
         sizes = {'imprint': imprint_size,
                  'wrench': wrench_size,
@@ -153,7 +153,7 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
         self.log('{}_batch'.format(phase), batch_idx)
         self.log('{}_loss'.format(phase), loss)
 
-        predicted_grid = self._get_image_grid(imprint_delta)
+        predicted_grid = self._get_image_grid(imprint_delta*torch.max(imprint_delta)/torch.min(imprint_d_gth)) # trasform so they are in the same range
         gth_grid = self._get_image_grid(imprint_d_gth)
         if batch_idx == 0:
             if self.current_epoch == 0:
@@ -165,7 +165,7 @@ class BubbleDynamicsResidualModel(pl.LightningModule):
     def _get_image_grid(self, batched_img, cmap='jet'):
         # reshape the batched_img to have the same imprints one above the other
         batched_img = batched_img.detach().cpu()
-        batched_img_r = batched_img.reshape(*batched_img.shape[:1],-1,*batched_img.shape[3:]) # (batch_size, 2*W, H)
+        batched_img_r = batched_img.reshape(*batched_img.shape[:1], -1, *batched_img.shape[3:]) # (batch_size, 2*W, H)
         # Add padding
         padding_pixels = 5
         batched_img_padded = F.pad(input=batched_img_r,
