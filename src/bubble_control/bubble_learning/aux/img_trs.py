@@ -1,12 +1,14 @@
 import numpy as np
 import torch
 import copy
-from scipy import ndimage
+import abc
 
-class BlockMeanDownSamplingTr(object):
 
-    def __init__(self, factor, keys_to_tr=None):
-        self.factor = factor
+class BlockDownSamplingBaseTr(abc.ABC):
+    def __init__(self, factor_x, factor_y, keys_to_tr=None):
+        super().__init__()
+        self.factor_x = factor_x
+        self.factor_y = factor_y
         self.keys_to_tr = keys_to_tr
 
     def __call__(self, sample):
@@ -43,13 +45,56 @@ class BlockMeanDownSamplingTr(object):
         # downsample the image using block mean
         in_shape = x.shape
         size_x, size_y = x.shape[-2], x.shape[-1]
-        factor_x = self.factor
-        factor_y = self.factor
+        factor_x = self.factor_x
+        factor_y = self.factor_y
         new_size_x = size_x//factor_x
         new_size_y = size_y//factor_y
 
         x_r = x.reshape(*in_shape[:-2], new_size_x, factor_x, size_y)
         x_rr = x_r.swapaxes(-2, -1).reshape(*in_shape[:-2], new_size_x, factor_x, new_size_y, factor_y)
-        x_rrr = x_rr.reshape(*in_shape[:-2],new_size_x, new_size_y, factor_y*factor_x)
+        x_rrr = x_rr.reshape(*in_shape[:-2], new_size_x, new_size_y, factor_y*factor_x)
+        x_down = self._reduction(x_rrr)
+        return x_down
+
+    @abc.abstractmethod
+    def _reduction(self, x_rrr):
+        pass
+
+
+class BlockMeanDownSamplingTr(BlockDownSamplingBaseTr):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _reduction(self, x_rrr):
         x_down = np.mean(x_rrr, axis=-1)
+        return x_down
+
+
+class BlockMaxDownSamplingTr(BlockDownSamplingBaseTr):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _reduction(self, x_rrr):
+        x_down = np.max(x_rrr, axis=-1)
+        return x_down
+
+
+class BlockDownSamplingTr(BlockDownSamplingBaseTr):
+
+    def __init__(self, *args, reduction='mean', **kwargs):
+        self.reduction = reduction
+        super().__init__(*args, **kwargs)
+
+    def _reduction(self, x_rrr):
+        implemented_reductions = ['mean', 'max', 'min']
+        if self.reduction == 'mean':
+            x_down = np.mean(x_rrr, axis=-1)
+        elif self.reduction == 'max':
+            x_down = np.max(x_rrr, axis=-1)
+        elif self.reduction == 'min':
+            x_down = np.min(x_rrr, axis=-1)
+        else:
+            raise NotImplemented('Reduction {} not yet implemented. Only {} available'.format(implemented_reductions))
         return x_down
