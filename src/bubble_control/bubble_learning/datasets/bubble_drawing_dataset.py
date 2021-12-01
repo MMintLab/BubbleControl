@@ -98,7 +98,7 @@ class BubbleDrawingDownsampledDataset(BubbleDrawingDataset):
         self.downsample_factor_x = downsample_factor_x
         self.downsample_factor_y = downsample_factor_y
         self.downsample_reduction = downsample_reduction
-        self.block_mean_downsampling_tr = BlockDownSamplingTr(factor_x=downsample_factor_x, factor_y=downsample_factor_y, downsample_reduction=self.downsample_reduction) #downsample all imprint values
+        self.block_mean_downsampling_tr = BlockDownSamplingTr(factor_x=downsample_factor_x, factor_y=downsample_factor_y, reduction=self.downsample_reduction) #downsample all imprint values
         # add the block_mean_downsampling_tr to the tr list
         if 'transformation' in kwargs:
             if type(kwargs['transformation']) in (list, tuple):
@@ -114,7 +114,14 @@ class BubbleDrawingDownsampledDataset(BubbleDrawingDataset):
     def get_name(self):
         return 'bubble_drawing_downsampled_dataset'
 
-
+    # @property
+    # def name(self):
+    #     """
+    #     Returns an unique identifier of the dataset
+    #     :return:
+    #     """
+    #     # Override this so every reduction has its name
+    #     return '{}_fx_fy_self.get_name()
 
 
 # DEBUG:
