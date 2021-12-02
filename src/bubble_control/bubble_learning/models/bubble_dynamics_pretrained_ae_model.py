@@ -36,6 +36,7 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
         self.activation = activation
 
         self.autoencoder = self._load_autoencoder(load_version=load_autoencoder_version, data_path=dataset_params['data_name'])
+        self.autoencoder.freeze()
         self.img_embedding_size = self.autoencoder.img_embedding_size # load it from the autoencoder
 
         self.dyn_model = self._get_dyn_model()
