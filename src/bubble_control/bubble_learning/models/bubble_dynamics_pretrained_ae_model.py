@@ -25,7 +25,7 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
         - Depth image from each of the bubbles
     * The depth images are embedded into a vector which is later concatenated with the wrench and pose information
     """
-    def __init__(self, input_sizes, load_autoencoder_version=31, num_fcs=2, fc_h_dim=100, skip_layers=None, lr=1e-4, dataset_params=None, activation='relu'):
+    def __init__(self, input_sizes, load_autoencoder_version=31, num_fcs=2, fc_h_dim=100, skip_layers=None, lr=1e-4, dataset_params=None, load_norm=False, activation='relu'):
         super().__init__()
         self.input_sizes = input_sizes
         self.num_fcs = num_fcs
@@ -34,6 +34,7 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
         self.lr = lr
         self.dataset_params = dataset_params
         self.activation = activation
+        self.load_norm = load_norm
 
         self.autoencoder = self._load_autoencoder(load_version=load_autoencoder_version, data_path=dataset_params['data_name'])
         self.autoencoder.freeze()
@@ -83,11 +84,18 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
 
     def forward(self, imprint, action):
         sizes = self._get_sizes()
-        imprint_input_emb = self.autoencoder.encode(imprint)
-        dyn_input = torch.cat([imprint_input_emb, action], dim=-1)
-        dyn_output_delta = self.dyn_model(dyn_input)
-        imprint_output_emb = imprint_input_emb + dyn_output_delta
-        imprint_next = self.autoencoder.decode(imprint_output_emb)
+        if self.load_norm:
+            imprint_input_emb = self.autoencoder.img_encoder(imprint)
+            dyn_input = torch.cat([imprint_input_emb, action], dim=-1)
+            dyn_output_delta = self.dyn_model(dyn_input)
+            imprint_output_emb = imprint_input_emb + dyn_output_delta
+            imprint_next = self.autoencoder.img_decoder(imprint_output_emb)
+        else:
+            imprint_input_emb = self.autoencoder.encode(imprint)
+            dyn_input = torch.cat([imprint_input_emb, action], dim=-1)
+            dyn_output_delta = self.dyn_model(dyn_input)
+            imprint_output_emb = imprint_input_emb + dyn_output_delta
+            imprint_next = self.autoencoder.decode(imprint_output_emb)
         return imprint_next
 
     def _get_sizes(self):
@@ -115,6 +123,10 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
     def _step(self, batch, batch_idx, phase='train'):
         imprint_t = batch['init_imprint']
         imprint_next = batch['final_imprint']
+        if self.load_norm:
+            # normalize the tensors
+            imprint_t = self.autoencoder.batch_norm(imprint_t)
+            imprint_next = self.autoencoder.batch_norm(imprint_t)
         action = batch['action']
 
         imprint_next_rec = self.forward(imprint_t, action)
