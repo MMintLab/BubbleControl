@@ -123,8 +123,8 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
         self.log('{}_batch'.format(phase), batch_idx)
         self.log('{}_loss'.format(phase), loss)
 
-        predicted_grid = self._get_image_grid(imprint_next_rec*torch.max(imprint_next_rec)/torch.min(imprint_t)) # trasform so they are in the same range
-        gth_grid = self._get_image_grid(imprint_next*torch.max(imprint_next)/torch.min(imprint_t))
+        predicted_grid = self._get_image_grid(imprint_next_rec*torch.max(imprint_next_rec)/torch.max(imprint_next)) # trasform so they are in the same range
+        gth_grid = self._get_image_grid(imprint_next)
         if batch_idx == 0:
             if self.current_epoch == 0:
                 self.logger.experiment.add_image('init_imprint_{}'.format(phase), self._get_image_grid(imprint_t), self.global_step)
