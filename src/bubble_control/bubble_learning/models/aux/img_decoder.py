@@ -62,7 +62,7 @@ class ImageDecoder(nn.Module):
 
         conv_img_in_size_wh = self.output_size[1:]
         for i in range(self.num_convs):
-            conv_img_in_size_wh = (conv_img_in_size_wh - ks)/stride + 1
+            conv_img_in_size_wh = (conv_img_in_size_wh - ks)//stride + 1
         conv_img_in_size = np.insert(conv_img_in_size_wh, 0, self.hidden_dims[0]) # ( C_in, H_in, W_in)
         return conv_encoder, conv_img_in_size
 

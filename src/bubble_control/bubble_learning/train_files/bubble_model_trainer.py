@@ -33,7 +33,7 @@ if __name__ == '__main__':
         # 'encoder_num_convs' : 3,
         # 'decoder_num_convs' : 3,
         # 'encoder_conv_hidden_sizes' : None,
-        'decoder_conv_hidden_sizes' : [10,10,10],
+        'decoder_conv_hidden_sizes' : [10,50],
         # 'ks' : 3,
         # 'num_fcs' : 3,
         # 'num_encoder_fcs' : 2,
@@ -45,7 +45,10 @@ if __name__ == '__main__':
         'wrench_frame' : 'med_base',
         'tf_frame' : 'grasp_frame',
         'dtype' : torch.float32,
-        'transformation' : trs
+        'transformation' : trs,
+        'downsample_factor_x': 7,
+        'downsample_factor_y': 7,
+        'downsample_reduction': 'max',
 
     }
     default_types = {
