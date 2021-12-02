@@ -10,7 +10,7 @@ from torch.utils.data import random_split
 from bubble_control.bubble_learning.models.bubble_dynamics_residual_model import BubbleDynamicsResidualModel
 from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoEncoderModel
 from bubble_control.bubble_learning.models.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel
-from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset, BubbleDrawingDownsampledDataset
+from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset, BubbleDrawingDownsampledDataset, BubbleDrawingDownsampledCombinedDataset
 from bubble_control.bubble_learning.datasets.fake_mnist_dataset import FakeMNISTDataset
 from bubble_control.bubble_learning.models.bubble_pca_dynamics_residual_model import BubblePCADynamicsResidualModel
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
@@ -57,7 +57,7 @@ if __name__ == '__main__':
         'val_batch_size': int
     }
     Model = [BubbleDynamicsResidualModel, BubbleAutoEncoderModel, BubblePCADynamicsResidualModel, BubbleDynamicsPretrainedAEModel]
-    Dataset = [BubbleDrawingDataset, FakeMNISTDataset, BubbleDrawingDownsampledDataset]
+    Dataset = [BubbleDrawingDataset, FakeMNISTDataset, BubbleDrawingDownsampledDataset, BubbleDrawingDownsampledCombinedDataset]
     parsed_trainer = ParsedTrainer(Model, Dataset, default_args=default_params, default_types=default_types)
 
     parsed_trainer.train()

@@ -68,6 +68,7 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
                                            'epoch={}-step={}.ckpt'.format(load_epoch, load_step))
 
         model = Model.load_from_checkpoint(checkpoint_path)
+
         return model
 
 

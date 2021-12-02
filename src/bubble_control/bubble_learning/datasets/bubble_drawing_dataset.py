@@ -114,15 +114,32 @@ class BubbleDrawingDownsampledDataset(BubbleDrawingDataset):
     def get_name(self):
         return 'bubble_drawing_downsampled_dataset'
 
-    # @property
-    # def name(self):
-    #     """
-    #     Returns an unique identifier of the dataset
-    #     :return:
-    #     """
-    #     # Override this so every reduction has its name
-    #     return '{}_fx_fy_self.get_name()
 
+class BubbleDrawingDownsampledCombinedDataset(BubbleDrawingDownsampledDataset):
+    """"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @classmethod
+    def get_name(self):
+        return 'bubble_drawing_downsampled_combined_dataset'
+
+    def _get_filecodes(self):
+        # duplicate the filecodes:
+        fcs = np.arange(2 * len(super()._get_filecodes()))
+        return fcs
+
+    def _get_sample(self, indx):
+        # fc: index of the line in the datalegend (self.dl) of the sample
+        true_indx = indx // 2
+        dl_line = self.dl.iloc[true_indx]
+        sample = super()._get_sample(true_indx)
+        if indx % 2 == 0:
+            # sample is the initial
+            sample['imprint'] = sample['init_imprint']
+        else:
+            sample['imprint'] = sample['final_imprint']
+        return sample
 
 # DEBUG:
 
