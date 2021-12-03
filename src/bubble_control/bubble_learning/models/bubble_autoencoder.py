@@ -36,7 +36,7 @@ class BubbleAutoEncoderModel(BubbleDynamicsResidualModel):
         # method to query the model once trained.
         # It normalizes the imprint before embedding.
         imprint_norm = self._norm_imprint(imprint)
-        imprint_emb = self.img_encoder(imprint)
+        imprint_emb = self.img_encoder(imprint_norm)
         return imprint_emb
 
     def decode(self, imprint_emb):

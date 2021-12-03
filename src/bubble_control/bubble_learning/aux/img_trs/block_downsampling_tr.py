@@ -98,3 +98,4 @@ class BlockDownSamplingTr(BlockDownSamplingBaseTr):
         else:
             raise NotImplemented('Reduction {} not yet implemented. Only {} available'.format(implemented_reductions))
         return x_down
+
