@@ -55,7 +55,7 @@ class BlockUpSamplingTr(abc.ABC):
             x_t = torch.tensor(x).reshape(-1,1,size_x, x.shape[-1]) # add num channels (expected (batch, num_channels, depth, height))
             new_size = (size_x*self.factor_x, size_y*self.factor_y)
             x_upsampled_t = F.interpolate(x_t, size=new_size, mode=self.method, align_corners=True)
-            x_upsampled = x_t.reshape(*x.shape[:-2], *new_size).cpu().detach().numpy()
+            x_upsampled = x_upsampled_t.reshape(*x.shape[:-2], *new_size).cpu().detach().numpy()
         else:
             raise NotImplemented('method {} not available yet. Available methods: {}'.format(self.metod, ['repeat']))
         return x_upsampled

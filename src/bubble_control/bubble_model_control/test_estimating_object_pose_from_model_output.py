@@ -18,7 +18,7 @@ if __name__ == '__main__':
 
     load_version = 11
 
-    block_downsample_tr = BlockDownSamplingTr(factor_x=7, factor_y=7, reduction='max')
+    block_downsample_tr = BlockDownSamplingTr(factor_x=7, factor_y=7, reduction='max', keys_to_tr=['init_imprint'])
     block_upsample_tr = BlockUpSamplingTr(factor_x=7, factor_y=7, method='bilinear')
 
     # load model:
@@ -30,20 +30,22 @@ if __name__ == '__main__':
     checkpoint_path = os.path.join(version_chkp_path, checkpoints_fs[0])
 
     model = Model.load_from_checkpoint(checkpoint_path)
+    import pdb; pdb.set_trace()
 
     # load one sample:
     sample = dataset[0]
 
     # Downsample
+    sample['init_imprint'] = sample['init_imprint'].cpu().detach().numpy()
     sample_down = block_downsample_tr(sample)
 
     #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Query model   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    imprint_t = torch.tensor(sample_down['init_imprint'])
-    action_t = torch.tensor(sample_down['action'])
+    imprint_t = torch.tensor(sample_down['init_imprint']).unsqueeze(0)
+    action_t = sample_down['action'].unsqueeze(0)
 
     # predict next imprint
-    next_imprint = model(imprint_t, action_t)
+    next_imprint = model(imprint_t, action_t).squeeze()
 
 
     # Upsample ouptut
