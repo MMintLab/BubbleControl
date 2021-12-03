@@ -125,8 +125,8 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
         imprint_next = batch['final_imprint']
         if self.load_norm:
             # normalize the tensors
-            imprint_t = self.autoencoder.batch_norm(imprint_t)
-            imprint_next = self.autoencoder.batch_norm(imprint_t)
+            imprint_t = self.autoencoder._norm_imprint(imprint_t)
+            imprint_next = self.autoencoder._norm_imprint(imprint_next)
         action = batch['action']
 
         imprint_next_rec = self.forward(imprint_t, action)
