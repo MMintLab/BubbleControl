@@ -82,7 +82,7 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
         dyn_model = FCModule(sizes=dyn_model_sizes, skip_layers=self.skip_layers, activation=self.activation)
         return dyn_model
 
-    def forward(self, imprint, action):
+    def query(self, imprint, action):
         sizes = self._get_sizes()
         if self.load_norm:
             imprint_input_emb = self.autoencoder.img_encoder(imprint)
@@ -96,6 +96,16 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
             dyn_output_delta = self.dyn_model(dyn_input)
             imprint_output_emb = imprint_input_emb + dyn_output_delta
             imprint_next = self.autoencoder.decode(imprint_output_emb)
+        return imprint_next
+
+    def forward(self, imprint, action):
+        if self.load_norm:
+            # apply the normalization to the imprint input, and then to the output, because the model has been trained on the normalized space.
+            imprint_t = self.autoencoder._norm_imprint(imprint)
+            imprint_next = self.query(imprint_t, action)
+            imprint_next = self.autoencoder._denorm_imprint(imprint_next)
+        else:
+            imprint_next = self.query(imprint, action)
         return imprint_next
 
     def _get_sizes(self):
@@ -129,7 +139,7 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
             imprint_next = self.autoencoder._norm_imprint(imprint_next)
         action = batch['action']
 
-        imprint_next_rec = self.forward(imprint_t, action)
+        imprint_next_rec = self.query(imprint_t, action)
 
         loss = self._compute_loss(imprint_next_rec, imprint_next)
         self.log('{}_batch'.format(phase), batch_idx)

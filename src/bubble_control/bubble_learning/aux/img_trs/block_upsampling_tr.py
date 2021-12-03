@@ -1,5 +1,6 @@
 import numpy as np
-from scipy import interpolate
+import torch
+import torch.nn.functional as F
 import copy
 import abc
 
@@ -46,10 +47,15 @@ class BlockUpSamplingTr(abc.ABC):
         # ---- repeat upsampling ----
         if self.method == 'repeat':
             x_upsampled = x.repeat(self.factor_x, axis=-2).repeat(self.factor_y, axis=-1)
-        elif self.method == 'interpolation':
+        elif self.method in ['bilinear', 'bicubic']:
             # ---- interpolation upsampling -- (TODO)
-            # TODO: Add
-            raise NotImplemented('method interpolation not available yet')
+            # Use pytorch interpolate for batched interpolation
+            size_x = x.shape[-2]
+            size_y = x.shape[-1]
+            x_t = torch.tensor(x).reshape(-1,1,size_x, x.shape[-1]) # add num channels (expected (batch, num_channels, depth, height))
+            new_size = (size_x*self.factor_x, size_y*self.factor_y)
+            x_upsampled_t = F.interpolate(x_t, size=new_size, mode=self.method, align_corners=True)
+            x_upsampled = x_t.reshape(*x.shape[:-2], *new_size).cpu().detach().numpy()
         else:
             raise NotImplemented('method {} not available yet. Available methods: {}'.format(self.metod, ['repeat']))
         return x_upsampled

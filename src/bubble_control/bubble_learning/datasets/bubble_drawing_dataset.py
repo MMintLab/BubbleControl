@@ -2,7 +2,8 @@ import numpy as np
 import tf.transformations as tr
 
 from bubble_utils.bubble_datasets.bubble_dataset_base import BubbleDatasetBase
-from bubble_control.bubble_learning.aux.img_trs import BlockDownSamplingTr
+from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
+
 
 class BubbleDrawingDataset(BubbleDatasetBase):
 
