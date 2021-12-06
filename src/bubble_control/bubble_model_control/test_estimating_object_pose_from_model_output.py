@@ -36,21 +36,21 @@ if __name__ == '__main__':
     sample = dataset[0]
 
     # Downsample
-    sample['init_imprint'] = sample['init_imprint'].cpu().detach().numpy()
+    sample['init_imprint'] = sample['init_imprint']
     sample_down = block_downsample_tr(sample)
 
     #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Query model   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    imprint_t = torch.tensor(sample_down['init_imprint']).unsqueeze(0)
-    action_t = sample_down['action'].unsqueeze(0)
+    imprint_t = torch.tensor(sample_down['init_imprint']).unsqueeze(0).to(dtype=torch.float)
+    action_t = torch.tensor(sample_down['action']).unsqueeze(0).to(dtype=torch.float)
 
     # predict next imprint
     next_imprint = model(imprint_t, action_t).squeeze()
 
-
+    next_imprint = next_imprint.cpu().detach().numpy()
     # Upsample ouptut
     sample_out = {
-        'next_imprint':next_imprint.cpu().detach().numpy(),
+        'next_imprint':next_imprint,
     }
     sample_up = block_upsample_tr(sample_out)
 
