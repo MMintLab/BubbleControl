@@ -302,9 +302,14 @@ class BubblePCReconsturctorDepth(BubblePCReconstructorBase):
         self.references['right_frame'] = self.left_parser.optical_frame['depth']
         self.last_tr = None
 
-    def get_imprint(self, view=False):
+    def _get_depth_imgs(self):
         depth_r = self.right_parser.get_image_depth()
         depth_l = self.left_parser.get_image_depth()
+        return depth_r, depth_l
+
+    def get_imprint(self, view=False):
+
+        depth_r, depth_l = self._get_depth_imgs()
         imprint_r = get_imprint_pc(self.references['right'], depth_r, threshold=self.threshold, K=self.camera_info['right']['K'])
         imprint_l = get_imprint_pc(self.references['left'], depth_l, threshold=self.threshold, K=self.camera_info['left']['K'])
         frame_r = self.right_parser.optical_frame['depth']
