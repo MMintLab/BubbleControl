@@ -122,6 +122,8 @@ class ParsedTrainer(object):
         if arg_name in self.default_args:
             default_value = self.default_args[arg_name]
             param_type = type(default_value)
+            if param_type == list and arg_name in self.default_types:
+                param_type = self.default_types[arg_name]
         elif arg_name in self.default_types:
             param_type = self.default_types[arg_name]
         else:
@@ -129,7 +131,11 @@ class ParsedTrainer(object):
         help_str = '{}'.format(arg_name)
         if extra_help is not None:
             help_str += ' {}'.format(extra_help)
-        parser.add_argument('--{}'.format(arg_name), default=default_value, type=param_type, help=help_str)
+        if type(default_value) == list:
+            nargs='+'
+        else:
+            nargs=None
+        parser.add_argument('--{}'.format(arg_name), default=default_value, type=param_type, help=help_str, nargs=nargs)
 
     def _parse_args(self):
         args = self.parser.parse_args()
