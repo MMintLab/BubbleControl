@@ -194,12 +194,12 @@ class BubblePCReconstructorBase(abc.ABC):
         return filtered_pc
 
     def estimate_pose(self, threshold, view=False, verbose=False):
-        imprint = self.get_imprint(view=view)
+        imprint, imprint_r, imprint_l = self.get_imprint(view=view, separate=True)
         if self.broadcast_imprint:
             self._broadcast_imprint(imprint)
         self.pose_estimator.threshold = threshold
         self.pose_estimator.verbose = verbose
-        estimated_pose = self.pose_estimator.estimate_pose(imprint)
+        estimated_pose = self.pose_estimator.estimate_pose(imprint, imprint_r, imprint_l)
         return estimated_pose
 
 
@@ -207,6 +207,7 @@ class BubblePCReconstructorROSBase(BubblePCReconstructorBase):
 
     def __init__(self, *args, broadcast_imprint=False, verbose=False, **kwargs):
         self.broadcast_imprint = broadcast_imprint
+        self.verbose = verbose
         self.left_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_left', verbose=self.verbose)
         self.right_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_right', verbose=self.verbose)
         self.imprint_broadcaster = rospy.Publisher('imprint_pc', PointCloud2)
@@ -243,7 +244,7 @@ class BubblePCReconsturctorTreeSearch(BubblePCReconstructorROSBase):
         self.trees['left'] = KDTree(self.references['left'][:, :3])
         self.last_tr = None
 
-    def get_imprint(self, view=False):
+    def get_imprint(self, view=False, separate=False):
         pc_r, frame_r = self.right_parser.get_point_cloud(return_ref_frame=True, ref_frame=self.references['right_frame'])
         pc_l, frame_l = self.left_parser.get_point_cloud(return_ref_frame=True, ref_frame=self.references['left_frame'])
         pc_r = self.filter_pc(pc_r)
@@ -267,6 +268,8 @@ class BubblePCReconsturctorTreeSearch(BubblePCReconstructorROSBase):
         if view:
             print('visualizing the imprint on green')
             view_pointcloud([imprint_r, imprint_l], frame=True)
+        if separate:
+            return np.concatenate([imprint_r, imprint_l], axis=0), imprint_r, imprint_l
         return np.concatenate([imprint_r, imprint_l], axis=0)
 
     def _get_far_points_indxs(self, query_pc, d_threshold, key):
@@ -308,7 +311,7 @@ class BubblePCReconsturctorDepth(BubblePCReconstructorROSBase):
         self.references['right_frame'] = self.left_parser.optical_frame['depth']
         self.last_tr = None
 
-    def get_imprint(self, view=False):
+    def get_imprint(self, view=False, separate=False):
         depth_r = self.right_parser.get_image_depth()
         depth_l = self.left_parser.get_image_depth()
         imprint_r = get_imprint_pc(self.references['right'], depth_r, threshold=self.threshold, K=self.camera_info['right']['K'])
@@ -334,4 +337,6 @@ class BubblePCReconsturctorDepth(BubblePCReconstructorROSBase):
             imprint_r[:, 4] = 1  # paint it green
             imprint_l[:, 4] = 1  # paint it green
             view_pointcloud([imprint_r, imprint_l], frame=True)
+        if separate:
+            return np.concatenate([imprint_r, imprint_l], axis=0), imprint_r, imprint_l
         return np.concatenate([imprint_r, imprint_l], axis=0)
