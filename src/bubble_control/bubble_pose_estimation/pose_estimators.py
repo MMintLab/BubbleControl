@@ -30,9 +30,13 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
         self.view = view
         self.verbose = verbose
 
-    def estimate_pose(self, target_pc, init_tr=None):
+    def estimate_pose(self, target_pc, target_pc_r, target_pc_l, init_tr=None):
         target_pc = self._filter_input_pc(target_pc)
         target_pcd = pack_o3d_pcd(target_pc)
+        target_pc_r = self._filter_input_pc(target_pc_r)
+        target_pcd_r = pack_o3d_pcd(target_pc_r)
+        target_pc_l = self._filter_input_pc(target_pc_l)
+        target_pcd_l = pack_o3d_pcd(target_pc_l)  
         if init_tr is None:
             init_tr = self._get_init_tr(target_pcd)
         if self.view:
@@ -43,7 +47,7 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
             view_pointcloud([target_pcd, model_tr_pcd], frame=True)
 
         # Estimate the transformation
-        icp_tr = self._icp(source_pcd=self.object_model, target_pcd=target_pcd, threshold=self.threshold, init_tr=init_tr)
+        icp_tr = self._icp(source_pcd=self.object_model, target_pcd=target_pcd, target_pcd_r=target_pcd_r, target_pcd_l=target_pcd_l, threshold=self.threshold, init_tr=init_tr)
 
         if self.view:
             # Visualize the estimated transofrm:
