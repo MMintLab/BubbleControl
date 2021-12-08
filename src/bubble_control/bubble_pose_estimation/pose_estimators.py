@@ -3,10 +3,12 @@ import abc
 from mmint_camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud
 import open3d as o3d
 import copy
+from mmint_camera_utils.ros_utils.publisher_wrapper import PublisherWrapper
 import tf.transformations as tr
 from scipy.spatial import KDTree
 from tqdm import tqdm
 from mmint_utils.terminal_colors import term_colors
+from std_msgs.msg import Bool
 
 
 class PCPoseEstimatorBase(abc.ABC):
@@ -15,6 +17,7 @@ class PCPoseEstimatorBase(abc.ABC):
     """
     def __init__(self):
         super().__init__()
+        self.tool_detected_publisher = PublisherWrapper(topic_name='tool_detected', msg_type=Bool)
 
     @abc.abstractmethod
     def estimate_pose(self, target_pc):
