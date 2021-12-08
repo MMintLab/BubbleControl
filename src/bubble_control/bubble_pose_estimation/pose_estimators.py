@@ -96,7 +96,7 @@ class ICP3DPoseEstimator(ICPPoseEstimator):
             init_tr = self.last_tr
         return init_tr
 
-    def _icp(self, source_pcd, target_pcd, threshold, init_tr):
+    def _icp(self, source_pcd, target_pcd, traget_pcd_r, target_pcd_l, threshold, init_tr):
         # Point-to-point:
         reg_p2p = o3d.pipelines.registration.registration_icp(source_pcd, target_pcd, threshold, init_tr,
                                                               o3d.pipelines.registration.TransformationEstimationPointToPoint(),
@@ -168,7 +168,7 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
         random_tr = tr.quaternion_matrix(tr.quaternion_about_axis(random_angle, z_axis))
         return random_tr
 
-    def _icp(self, source_pcd, target_pcd, threshold, init_tr):
+    def _icp(self, source_pcd, target_pcd, target_pcd_r, target_pcd_l, threshold, init_tr):
         """
 
         Args:
@@ -181,11 +181,27 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
         icp_tr = init_tr
         source_points = self._project_pc(np.asarray(source_pcd.points))
         target_points = self._project_pc(np.asarray(target_pcd.points))
-        if len(target_points) == 0:
+        distance_bubbles = None
+        if len(target_pcd_l.points) > 0 and len(target_pcd_r.points) > 0:
+            tree = KDTree(target_pcd_r.points)
+            corr_distances, _ = tree.query(target_pcd_l.points)
+            distance_bubbles = np.mean(corr_distances)
+
+
+        if len(target_points) < 4:
             print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
+            self.tool_detected_publisher.data = False
             if self.last_tr is not None:
                 return self.last_tr
             return init_tr
+        elif (distance_bubbles is not None and distance_bubbles < 0.01):
+            print(f"{term_colors.WARNING}Warning: No tool detected{term_colors.ENDC}")
+            self.tool_detected_publisher.data = False
+            if self.last_tr is not None:
+                return self.last_tr
+            return init_tr
+        else:
+            self.tool_detected_publisher.data = True
         for i in range(self.max_num_iterations):
             # transform model
             source_tr = source_points @ icp_tr[:3, :3].T + icp_tr[:3, 3]
