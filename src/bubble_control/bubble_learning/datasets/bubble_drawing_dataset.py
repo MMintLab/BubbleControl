@@ -161,8 +161,27 @@ class BubbleDrawingDownsampledCombinedDataset(BubbleDrawingDownsampledDataset):
 
 if __name__ == '__main__':
     data_name = '/home/mmint/Desktop/drawing_data_cartesian'
-    dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame')
+    # dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame')
+    dataset = BubbleDrawingDownsampledDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame',downsample_factor_x=7, downsample_factor_y=7, downsample_reduction='mean')
     print('Dataset Name: ', dataset.name)
     print('Dataset Length:', len(dataset))
     sample_0 = dataset[0]
     print('Sample 0:', sample_0)
+
+    # save downsampled and undownsampled images
+    import matplotlib.pyplot as plt
+    # sample_indxs = np.random.randint(0,len(dataset),5)
+    sample_indxs = [0,1,2,3,4]
+
+    for sample_indx in sample_indxs:
+        sample_i = dataset[sample_indx]
+        img_o = sample_i['init_imprint_undownsampled'].reshape(-1,sample_i['init_imprint_undownsampled'].shape[-1])
+        img_d = sample_i['init_imprint'].reshape(-1,sample_i['init_imprint'].shape[-1])
+
+        fig, axes = plt.subplots(1, 2)
+        axes[0].imshow(img_o)
+        axes[0].set_title('Original Resolution')
+        axes[1].imshow(img_d)
+        axes[1].set_title('Image Downsampled (Avg Pooling)')
+
+        plt.savefig('/home/mmint/Desktop/resolution_comparison_{}.png'.format(sample_indx))

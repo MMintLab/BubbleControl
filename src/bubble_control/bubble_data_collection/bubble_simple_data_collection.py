@@ -19,7 +19,7 @@ class BubbleSimpleDataCollection(BubbleDataCollectionBase):
 
     def collect_data(self, num_data):
         print('Recording started. Moving the robot to the grasp pose')
-        self.med.set_grasp_pose()
+        self.med.set_robot_conf('grasp_conf')
         _ = input('Press enter to open the gripper and calibrate the bubbles')
         self.med.open_gripper()
         print('Strating to collect data. Total data to be collected: {}'.format(num_data))
@@ -53,5 +53,14 @@ class BubbleSimpleDataCollection(BubbleDataCollectionBase):
         data_params['fc'] = fc
         data_params['time'] = time_i
         return data_params
+
+
+# TEST:
+if __name__ == '__main__':
+    dc = BubbleSimpleDataCollection(
+        data_path='/home/mmint/Desktop/bubble_calibration_data',
+        scene_name='gripper_fully_open'
+    )
+    dc.collect_data(num_data=5000)
 
 
