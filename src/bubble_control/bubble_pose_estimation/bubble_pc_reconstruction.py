@@ -12,8 +12,8 @@ from PIL import Image as imm
 import open3d as o3d
 from scipy.spatial import KDTree
 import copy
-import tf
 import tf.transformations as tr
+import tf2_ros as tf2
 from functools import reduce
 from sklearn.cluster import DBSCAN
 import abc
@@ -24,10 +24,11 @@ from sensor_msgs.msg import Image, CompressedImage, CameraInfo, PointCloud2, Poi
 from geometry_msgs.msg import TransformStamped, Pose
 from visualization_msgs.msg import Marker, MarkerArray
 
-from mmint_camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud
+from mmint_camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud, tr_pointcloud
 from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
 from bubble_utils.bubble_tools.bubble_pc_tools import get_imprint_pc
 from bubble_control.bubble_pose_estimation.pose_estimators import ICP3DPoseEstimator, ICP2DPoseEstimator
+
 
 
 class BubblePCReconstructorBase(abc.ABC):
@@ -342,3 +343,89 @@ class BubblePCReconsturctorDepth(BubblePCReconstructorROSBase):
             imprint_l[:, 4] = 1  # paint it green
             view_pointcloud([imprint_r, imprint_l], frame=True)
         return np.concatenate([imprint_r, imprint_l], axis=0)
+
+
+class BubblePCReconstructorOfflineDepth(BubblePCReconstructorBase):
+    def __init__(self, *args, **kwargs):
+        self.depth_r = {
+            'img': None,
+            'frame': None,
+        }
+        self.depth_l = {
+            'img': None,
+            'frame': None,
+        }
+        self.camera_info = {
+            'left': None,
+            'right': None,
+        }
+        self.buffer = tf2.BufferCore()
+
+        super().__init__(*args, **kwargs)
+
+    def reference(self):
+        pass
+
+    def add_tfs(self, tfs_df):
+        for indx, row in tfs_df.iterrows():
+            # pack the tf into a TrasformStamped message
+            q_i = [row['qx'], row['qy'], row['qz'], row['qw']]
+            t_i = [row['x'], row['y'], row['z']]
+            parent_frame_id = row['parent_frame']
+            child_frame_id = row['child_frame']
+            ts_msg_i = self._pack_transform_stamped_msg(q_i, t_i, parent_frame_id=parent_frame_id, child_frame_id=child_frame_id)
+            self.buffer.set_transform(ts_msg_i, 'default_authority')
+
+    def _tr_pc(self, pc, origin_frame, target_frame):
+        ts_msg = self.buffer.lookup_transform_core(origin_frame, target_frame, rospy.Time(0))
+        t, R = self._unpack_transform_stamped_msg(ts_msg)
+        pc_tr = tr_pointcloud(pc, R, t)
+        return pc_tr
+
+    def _unpack_transform_stamped_msg(self, ts_msg):
+        x = ts_msg.transform.translation.x
+        y = ts_msg.transform.translation.y
+        z = ts_msg.transform.translation.z
+        qx = ts_msg.transform.rotation.x
+        qy = ts_msg.transform.rotation.y
+        qz = ts_msg.transform.rotation.z
+        qw = ts_msg.transform.rotation.w
+        q = np.array([qx, qy, qz, qw])
+        t = np.array([x, y, z])
+        R = tr.quaternion_matrix(q)[:3,:3]
+        return t, R
+
+    def _pack_transform_stamped_msg(self, q, t, parent_frame_id, child_frame_id):
+        ts_msg = TransformStamped()
+        ts_msg.header.stamp = rospy.Time(0)
+        ts_msg.header.frame_id = parent_frame_id
+        ts_msg.child_frame_id = child_frame_id
+        ts_msg.transform.translation.x = t[0]
+        ts_msg.transform.translation.y = t[1]
+        ts_msg.transform.translation.z = t[2]
+        ts_msg.transform.rotation.x = q[0]
+        ts_msg.transform.rotation.y = q[1]
+        ts_msg.transform.rotation.z = q[2]
+        ts_msg.transform.rotation.w = q[3]
+        return ts_msg
+
+    def get_imprint(self, view=False):
+        # return the contact imprint
+        depth_r = self.depth_r['img']
+        depth_l = self.depth_l['img']
+        imprint_r = get_imprint_pc(self.references['right'], depth_r, threshold=self.threshold,
+                                   K=self.camera_info['right']['K'])
+        imprint_l = get_imprint_pc(self.references['left'], depth_l, threshold=self.threshold,
+                                   K=self.camera_info['left']['K'])
+        frame_r = self.depth_r['frame']
+        frame_l = self.depth_l['frame']
+
+        filtered_imprint_r = self.filter_pc(imprint_r)
+        filtered_imprint_l = self.filter_pc(imprint_l)
+
+        # trasform imprints
+        imprint_r = self._tr_pc(filtered_imprint_r, frame_r, self.reconstruction_frame)
+        imprint_l = self._tr_pc(filtered_imprint_l, frame_l, self.reconstruction_frame)
+
+        imprint = np.concatenate([imprint_r, imprint_l], axis=0)
+        return imprint
