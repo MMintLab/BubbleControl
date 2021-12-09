@@ -161,6 +161,7 @@ if __name__ == '__main__':
     object_params = reconstruction_params[object_name]
     imprint_threshold = object_params['imprint_th']['depth']
     icp_threshold = object_params['icp_th']
+    
     reconstructor = BubblePCReconstructorOfflineDepth(threshold=imprint_threshold, object_name=object_name, estimation_type='icp2d')
     # obtain camera parameters
     camera_info_r = sample['camera_info_r']
@@ -188,5 +189,4 @@ if __name__ == '__main__':
     # compute transformations from camera frames to grasp frame and transform the
     reconstructor.add_tfs(sample['all_tfs'])
     # estimate pose
-    import pdb; pdb.set_trace()
     estimated_pose = reconstructor.estimate_pose(icp_threshold)
