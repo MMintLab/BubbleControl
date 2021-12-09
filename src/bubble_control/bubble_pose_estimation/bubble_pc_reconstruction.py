@@ -195,8 +195,10 @@ class BubblePCReconstructorBase(abc.ABC):
 
     def estimate_pose(self, threshold, view=False, verbose=False):
         imprint = self.get_imprint(view=view)
-        if self.broadcast_imprint:
-            self._broadcast_imprint(imprint)
+        estimated_pose = self._estimate_pose(imprint, threshold, verbose=verbose)
+        return estimated_pose
+
+    def _estimate_pose(self, imprint, threshold, verbose=False):
         self.pose_estimator.threshold = threshold
         self.pose_estimator.verbose = verbose
         estimated_pose = self.pose_estimator.estimate_pose(imprint)
@@ -218,6 +220,11 @@ class BubblePCReconstructorROSBase(BubblePCReconstructorBase):
         xyz_points = imprint[:, :3].astype(np.float32)
         pc2_msg = pc2.create_cloud_xyz32(header, xyz_points)
         self.imprint_broadcaster.publish(pc2_msg)
+
+    def _estimate_pose(self, imprint, threshold, verbose=False):
+        if self.broadcast_imprint:
+            self._broadcast_imprint(imprint)
+        return super()._estimate_pose(imprint, threshold, verbose=verbose)
 
 
 class BubblePCReconsturctorTreeSearch(BubblePCReconstructorROSBase):
