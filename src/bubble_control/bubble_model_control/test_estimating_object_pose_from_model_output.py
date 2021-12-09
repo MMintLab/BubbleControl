@@ -65,7 +65,7 @@ class BubblePCReconstructorOfflineDepth(BubblePCReconstructorBase):
         qw = ts_msg.transform.rotation.w
         q = np.array([qx, qy, qz, qw])
         t = np.array([x, y, z])
-        R = tr.quaternion_matrix(q)
+        R = tr.quaternion_matrix(q)[:3,:3]
         return t, R
 
     def _pack_transform_stamped_msg(self, q, t, parent_frame_id, child_frame_id):
@@ -124,26 +124,27 @@ if __name__ == '__main__':
     checkpoint_path = os.path.join(version_chkp_path, checkpoints_fs[0])
 
     model = Model.load_from_checkpoint(checkpoint_path)
-    import pdb; pdb.set_trace()
 
     # load one sample:
     sample = dataset[0]
 
     # Downsample
-    sample['init_imprint'] = sample['init_imprint'].cpu().detach().numpy()
+    sample['init_imprint'] = sample['init_imprint']
     sample_down = block_downsample_tr(sample)
 
     #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Query model   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    imprint_t = torch.tensor(sample_down['init_imprint']).unsqueeze(0)
-    action_t = sample_down['action'].unsqueeze(0)
+    imprint_t = torch.tensor(sample_down['init_imprint']).unsqueeze(0).to(dtype=torch.float)
+    action_t = torch.tensor(sample_down['action']).unsqueeze(0).to(dtype=torch.float)
 
     # predict next imprint
     next_imprint = model(imprint_t, action_t).squeeze()
 
+    next_imprint = next_imprint.cpu().detach().numpy()
+    
     # Upsample ouptut
     sample_out = {
-        'next_imprint':next_imprint.cpu().detach().numpy(),
+        'next_imprint':next_imprint,
     }
     sample_up = block_upsample_tr(sample_out)
 
@@ -160,7 +161,7 @@ if __name__ == '__main__':
     object_params = reconstruction_params[object_name]
     imprint_threshold = object_params['imprint_th']['depth']
     icp_threshold = object_params['icp_th']
-
+    
     reconstructor = BubblePCReconstructorOfflineDepth(threshold=imprint_threshold, object_name=object_name, estimation_type='icp2d')
     # obtain camera parameters
     camera_info_r = sample['camera_info_r']
@@ -168,24 +169,24 @@ if __name__ == '__main__':
     all_tfs = sample['all_tfs']
 
     # obtain reference (undeformed) depths
-    ref_depth_img_r = sample['undef_depth_l']
-    ref_depth_img_l = sample['undef_depth_l']
+    ref_depth_img_r = sample['undef_depth_l'].squeeze()
+    ref_depth_img_l = sample['undef_depth_l'].squeeze()
 
     # unprocess the imprints (add padding to move them back to the original shape)
     imprint_pred_r = unprocess_bubble_img(imprint_pred_r)
     imprint_pred_l = unprocess_bubble_img(imprint_pred_l)
 
-    deformed_depth_r = ref_depth_img_r + imprint_pred_r
-    deformed_depth_l = ref_depth_img_l + imprint_pred_l
+    deformed_depth_r = ref_depth_img_r - imprint_pred_r # CAREFUL: Imprint is defined as undef_depth_img - def_depth_img
+    deformed_depth_l = ref_depth_img_l - imprint_pred_l
 
     # THIS hacks the ways to obtain data for the reconstructor
-    reconstructor.references['left'] = deformed_depth_l
-    reconstructor.references['right'] = deformed_depth_r
-    reconstructor.depth_r = deformed_depth_r
-    reconstructor.depth_l = deformed_depth_l
+    reconstructor.references['left'] = ref_depth_img_l
+    reconstructor.references['right'] = ref_depth_img_r
+    reconstructor.depth_r = {'img': deformed_depth_r, 'frame':'pico_flexx_right_optical_frame'}
+    reconstructor.depth_l = {'img': deformed_depth_l, 'frame':'pico_flexx_left_optical_frame'}
     reconstructor.camera_info['right'] = camera_info_r
     reconstructor.camera_info['left'] = camera_info_l
     # compute transformations from camera frames to grasp frame and transform the
     reconstructor.add_tfs(sample['all_tfs'])
     # estimate pose
-    estimated_pose = reconstructor.pose_estimator.estimate_pose(imprint)
+    estimated_pose = reconstructor.estimate_pose(icp_threshold)
