@@ -3,6 +3,7 @@ import numpy as np
 from collections import OrderedDict
 import gym
 import copy
+import tf.transformations as tr
 
 
 class AxisBiasedDirectionSpace(gym.spaces.Space):
@@ -21,6 +22,24 @@ class AxisBiasedDirectionSpace(gym.spaces.Space):
         else:
             direction_i = np.random.uniform(0, 2 * np.pi)  # direction as [0, 2pi)
         return direction_i
+
+    def contains(self, x):
+        return 0 <= x <= 2*np.pi
+
+class QuaternionSpace(gym.spaces.Space):
+    """
+    Saple quaternion 
+    """
+    def __init__(self, dex, seed=None):
+        super().__init__((), np.float32, seed)
+        self.dex = dex
+
+    def sample(self):
+        yaw = -np.pi/2 + np.random.uniform(-self.dex, self.dex)
+        roll = np.pi + np.random.uniform(-self.dex, self.dex)
+        pitch = np.random.uniform(-self.dex, self.dex)
+        quat = tr.quaternion_from_euler(roll, pitch, yaw, axes='sxyz')
+        return quat
 
     def contains(self, x):
         return 0 <= x <= 2*np.pi

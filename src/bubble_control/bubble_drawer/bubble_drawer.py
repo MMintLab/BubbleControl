@@ -164,15 +164,15 @@ class BubbleDrawer(BubbleMed):
         # first plan to the first corner
         pre_position = np.insert(init_point_xy, 2, pre_height)
         pre_pose = np.concatenate([pre_position, draw_quat], axis=0)
-
+        
         if self.reactive:
             # Account for the pose of the marker in-hand.
             target_pose_dict = self._get_marker_compensated_pose(desired_marker_pose=pre_pose, ref_frame=ref_frame, tf_broadcast=True)
-            self.plan_to_pose(self.arm_group, target_pose_dict['frame'], target_pose=list(target_pose_dict['pose']),
-                                  frame_id='med_base')
+            success = self.plan_to_pose(self.arm_group, target_pose_dict['frame'], target_pose=list(target_pose_dict['pose']),
+                                  frame_id='med_base').success
         else:
             #
-            self.plan_to_pose(self.arm_group, 'grasp_frame', target_pose=list(pre_pose), frame_id='med_base')
+            success = self.plan_to_pose(self.arm_group, 'grasp_frame', target_pose=list(pre_pose), frame_id='med_base').success
         # self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.075)  # Low val for safety
         rospy.sleep(.5)
         self._set_vel(0.03)  # Very Low val for precision
@@ -187,7 +187,7 @@ class BubbleDrawer(BubbleMed):
         self.force_threshold = 18  # Increase the force threshold
 
         self._set_vel(0.1)  # change speed
-        return draw_height
+        return draw_height, success
 
     def _draw_to_point(self, point_xy, draw_height, end_raise=False):
         if self.compensate_xy_point:
@@ -196,10 +196,19 @@ class BubbleDrawer(BubbleMed):
             point_xy = point_xy + tcp_gf[:2,3]
         position_i = np.insert(point_xy, 2, draw_height) # position of the poin in the world frame
 
-        plan_result = self.plan_to_position_cartesian(self.arm_group, 'grasp_frame', target_position=list(position_i),stop_condition=self._stop_signal)
+        success = self.plan_to_position_cartesian(self.arm_group, 'grasp_frame', target_position=list(position_i),stop_condition=self._stop_signal).success
         if end_raise:
             # Raise the arm when we reach the last point
             self._end_raise(point_xy)
+        return success
+
+    def _draw_to_point_rotation(self, pose, end_raise=False):
+        success = self.plan_to_pose(self.arm_group, 'grasp_frame', target_pose=list(pose),
+                                            frame_id='med_base', stop_condition=self._stop_signal).success        
+        if end_raise:
+            # Raise the arm when we reach the last point
+            self._end_raise(pose[:2])
+        return success
 
     def _end_raise(self, point_xy=None):
         if point_xy is not None:
@@ -229,8 +238,8 @@ class BubbleDrawer(BubbleMed):
             desired_marker_pos = np.insert(xy_point, 2, self.pre_height)
             desired_marker_pose = np.concatenate([desired_marker_pos, self.draw_quat])
             compensated_marker_pose = self._get_marker_compensated_pose(desired_marker_pose)
-            plan_result = self.plan_to_pose(self.arm_group, compensated_marker_pose['frame'],
-                                                target_pose=list(compensated_marker_pose['pose']), frame_id='med_base')
+            success = self.plan_to_pose(self.arm_group, compensated_marker_pose['frame'],
+                                                target_pose=list(compensated_marker_pose['pose']), frame_id='med_base').success
             # Go down again
             rospy.sleep(.5)
             self._set_vel(0.05)  # Very Low val for precision
@@ -251,7 +260,7 @@ class BubbleDrawer(BubbleMed):
             current_pose = self.get_current_pose()
             # draw_height = self.draw_height_limit
             draw_height = max(current_pose[2]-0.001, self.draw_height_limit)
-        return draw_height
+        return draw_height, success
 
     def draw_points(self, xy_points, end_raise=True, end_adjust=True, init_drawing=True):
         """
@@ -263,7 +272,7 @@ class BubbleDrawer(BubbleMed):
         """
         # TODO: Split into guarded moved motion and drawing_motion between points
         if init_drawing:
-            draw_height = self._init_drawing(init_point_xy=xy_points[0])
+            draw_height, _ = self._init_drawing(init_point_xy=xy_points[0])
         else:
             contact_pose = self.tf2_listener.get_transform('med_base', 'grasp_frame')
             draw_height = contact_pose[2, 3]
