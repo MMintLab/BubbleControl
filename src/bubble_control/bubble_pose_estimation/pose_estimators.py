@@ -3,13 +3,12 @@ import abc
 from mmint_camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud
 import open3d as o3d
 import copy
-from mmint_camera_utils.ros_utils.publisher_wrapper import PublisherWrapper
 import tf.transformations as tr
 from scipy.spatial import KDTree
 from tqdm import tqdm
 from mmint_utils.terminal_colors import term_colors
+from mmint_camera_utils.ros_utils.publisher_wrapper import PublisherWrapper
 from std_msgs.msg import Bool
-
 
 class PCPoseEstimatorBase(abc.ABC):
     """
@@ -33,13 +32,9 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
         self.view = view
         self.verbose = verbose
 
-    def estimate_pose(self, target_pc, target_pc_r, target_pc_l, init_tr=None):
+    def estimate_pose(self, target_pc, init_tr=None):
         target_pc = self._filter_input_pc(target_pc)
         target_pcd = pack_o3d_pcd(target_pc)
-        target_pc_r = self._filter_input_pc(target_pc_r)
-        target_pcd_r = pack_o3d_pcd(target_pc_r)
-        target_pc_l = self._filter_input_pc(target_pc_l)
-        target_pcd_l = pack_o3d_pcd(target_pc_l)  
         if init_tr is None:
             init_tr = self._get_init_tr(target_pcd)
         if self.view:
@@ -50,7 +45,7 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
             view_pointcloud([target_pcd, model_tr_pcd], frame=True)
 
         # Estimate the transformation
-        icp_tr = self._icp(source_pcd=self.object_model, target_pcd=target_pcd, target_pcd_r=target_pcd_r, target_pcd_l=target_pcd_l, threshold=self.threshold, init_tr=init_tr)
+        icp_tr = self._icp(source_pcd=self.object_model, target_pcd=target_pcd, threshold=self.threshold, init_tr=init_tr)
 
         if self.view:
             # Visualize the estimated transofrm:
@@ -99,7 +94,7 @@ class ICP3DPoseEstimator(ICPPoseEstimator):
             init_tr = self.last_tr
         return init_tr
 
-    def _icp(self, source_pcd, target_pcd, traget_pcd_r, target_pcd_l, threshold, init_tr):
+    def _icp(self, source_pcd, target_pcd, threshold, init_tr):
         # Point-to-point:
         reg_p2p = o3d.pipelines.registration.registration_icp(source_pcd, target_pcd, threshold, init_tr,
                                                               o3d.pipelines.registration.TransformationEstimationPointToPoint(),
@@ -171,7 +166,7 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
         random_tr = tr.quaternion_matrix(tr.quaternion_about_axis(random_angle, z_axis))
         return random_tr
 
-    def _icp(self, source_pcd, target_pcd, target_pcd_r, target_pcd_l, threshold, init_tr):
+    def _icp(self, source_pcd, target_pcd, threshold, init_tr):
         """
 
         Args:
@@ -184,21 +179,8 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
         icp_tr = init_tr
         source_points = self._project_pc(np.asarray(source_pcd.points))
         target_points = self._project_pc(np.asarray(target_pcd.points))
-        distance_bubbles = None
-        if len(target_pcd_l.points) > 0 and len(target_pcd_r.points) > 0:
-            tree = KDTree(target_pcd_r.points)
-            corr_distances, _ = tree.query(target_pcd_l.points)
-            distance_bubbles = np.mean(corr_distances)
-
-
         if len(target_points) < 4:
             print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
-            self.tool_detected_publisher.data = False
-            if self.last_tr is not None:
-                return self.last_tr
-            return init_tr
-        elif (distance_bubbles is not None and distance_bubbles < 0.01):
-            print(f"{term_colors.WARNING}Warning: No tool detected{term_colors.ENDC}")
             self.tool_detected_publisher.data = False
             if self.last_tr is not None:
                 return self.last_tr
