@@ -7,8 +7,6 @@ import tf.transformations as tr
 from scipy.spatial import KDTree
 from tqdm import tqdm
 from mmint_utils.terminal_colors import term_colors
-from mmint_camera_utils.ros_utils.publisher_wrapper import PublisherWrapper
-from std_msgs.msg import Bool
 
 class PCPoseEstimatorBase(abc.ABC):
     """
@@ -16,7 +14,6 @@ class PCPoseEstimatorBase(abc.ABC):
     """
     def __init__(self):
         super().__init__()
-        self.tool_detected_publisher = PublisherWrapper(topic_name='tool_detected', msg_type=Bool)
 
     @abc.abstractmethod
     def estimate_pose(self, target_pc):
@@ -181,12 +178,10 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
         target_points = self._project_pc(np.asarray(target_pcd.points))
         if len(target_points) < 4:
             print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
-            self.tool_detected_publisher.data = False
             if self.last_tr is not None:
                 return self.last_tr
             return init_tr
-        else:
-            self.tool_detected_publisher.data = True
+
         for i in range(self.max_num_iterations):
             # transform model
             source_tr = source_points @ icp_tr[:3, :3].T + icp_tr[:3, 3]

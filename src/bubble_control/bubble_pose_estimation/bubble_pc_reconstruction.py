@@ -203,13 +203,18 @@ class BubblePCReconstructorBase(abc.ABC):
             imprint_pcd_r = pack_o3d_pcd(imprint_r)
             imprint_pcd_l = pack_o3d_pcd(imprint_l)
             distance_bubbles = None
-            if len(imprint_pcd_l.points) > 0 and len(imprint_pcd_r.points) > 0:
+            if len(imprint_pcd_r.points) < 2 or len(imprint_pcd_l.points) < 2:
+                print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
+                self.tool_detected_publisher.data = False
+            else:
                 tree = KDTree(imprint_pcd_r.points)
                 corr_distances, _ = tree.query(imprint_pcd_l.points)
                 distance_bubbles = np.mean(corr_distances)
-            if (distance_bubbles is not None and distance_bubbles < 0.01):
-                print(f"{term_colors.WARNING}Warning: No tool detected{term_colors.ENDC}")
-                self.tool_detected_publisher.data = False
+                if (distance_bubbles is not None and distance_bubbles < 0.01):
+                    print(f"{term_colors.WARNING}Warning: No tool detected{term_colors.ENDC}")
+                    self.tool_detected_publisher.data = False
+                else:
+                    self.tool_detected_publisher.data = True
         else:
             imprint = self.get_imprint(view=view)
         estimated_pose = self._estimate_pose(imprint, threshold, verbose=verbose)
