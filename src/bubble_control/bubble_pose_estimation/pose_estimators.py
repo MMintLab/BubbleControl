@@ -8,7 +8,6 @@ from scipy.spatial import KDTree
 from tqdm import tqdm
 from mmint_utils.terminal_colors import term_colors
 
-
 class PCPoseEstimatorBase(abc.ABC):
     """
     Given an imprint of the infered object points and the model of the object, infer the object position
@@ -177,11 +176,12 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
         icp_tr = init_tr
         source_points = self._project_pc(np.asarray(source_pcd.points))
         target_points = self._project_pc(np.asarray(target_pcd.points))
-        if len(target_points) == 0:
+        if len(target_points) < 4:
             print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
             if self.last_tr is not None:
                 return self.last_tr
             return init_tr
+
         for i in range(self.max_num_iterations):
             # transform model
             source_tr = source_points @ icp_tr[:3, :3].T + icp_tr[:3, 3]
