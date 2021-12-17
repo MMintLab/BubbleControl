@@ -134,7 +134,7 @@ class BubbleDrawingDataCollectionBase(BubbleDataCollectionBase):
 
 class BubbleDrawingDataCollection(BubbleDrawingDataCollectionBase):
 
-    def __init__(self, *args, prob_axis=0.08, drawing_area_center=(0.55, 0.), drawing_area_size=(.15, .15), drawing_length_limits=(0.01, 0.15),**kwargs):
+    def __init__(self, *args, prob_axis=0.08, drawing_area_center=(0.55, 0.), drawing_area_size=(.15, .15), drawing_length_limits=(0.01, 0.15), **kwargs):
         self.prob_axis = prob_axis
         self.previous_end_point = None
         self.previous_draw_height = None

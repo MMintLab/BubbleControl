@@ -37,6 +37,7 @@ class BubbleModelMPPIController(BubbleModelController):
         self.state_size = None
         self.sample = None # Container to share sample across functions
         super().__init__(*args, **kwargs)
+        self.state_size = np.prod(self.model._get_sizes()['imprint'])
 
     def dynamics(self, state_t, action_t):
         """

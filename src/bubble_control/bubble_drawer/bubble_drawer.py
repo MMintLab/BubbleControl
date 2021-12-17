@@ -20,8 +20,9 @@ from bubble_control.bubble_contact_point_estimation.contact_point_marker_publish
 
 class BubbleDrawer(BubbleMed):
 
-    def __init__(self, *args, object_topic='estimated_object', force_threshold=5., reactive=False, adjust_lift=False, compensate_xy_point=False, impedance_mode=True, **kwargs):
+    def __init__(self, *args, object_topic='estimated_object', drawing_frame='med_base', force_threshold=5., reactive=False, adjust_lift=False, compensate_xy_point=False, impedance_mode=True, **kwargs):
         self.object_topic = object_topic
+        self.drawing_frame = drawing_frame
         self.reactive = reactive # adjust drawing at keypoints/
         self.adjust_lift = adjust_lift
         self.force_threshold = force_threshold
@@ -80,7 +81,9 @@ class BubbleDrawer(BubbleMed):
         }
         return marker_pose
 
-    def get_tool_angle_axis(self, ref_frame='med_base'):
+    def get_tool_angle_axis(self, ref_frame=None):
+        if ref_frame is None:
+            ref_frame = self.drawing_frame
         tool_frame_rf = self.tf2_listener.get_transform(parent=ref_frame, child='tool_frame')
         z_axis = np.array([0, 0, 1])
         tool_axis_tf = np.array([0,0,-1]) # Tool axis on the tool_frame
@@ -93,7 +96,9 @@ class BubbleDrawer(BubbleMed):
         # TODO: account for tool_axis parallel to z_axis
         return tool_angle, rot_axis
 
-    def get_contact_point(self, ref_frame='med_base'):
+    def get_contact_point(self, ref_frame=None):
+        if ref_frame is None:
+            ref_frame = self.drawing_frame
         contact_point_tf = self.tf2_listener.get_transform(parent=ref_frame, child='tool_contact_point')
         contact_xyz = contact_point_tf[:3,3]
         return contact_xyz
@@ -104,18 +109,18 @@ class BubbleDrawer(BubbleMed):
         # TODO: Consider entering on impedance mode
         self.force_threshold = 5.
         self.calibration_wrench = self.get_wrench()
-        self.set_xyz_cartesian(z_value=z_value, frame_id='grasp_frame', ref_frame='med_base',
+        self.set_xyz_cartesian(z_value=z_value, frame_id='grasp_frame', ref_frame=self.drawing_frame,
                                    stop_condition=self._stop_signal)
         rospy.sleep(.5)
         # Read the z value achieved
-        contact_pose = self.tf2_listener.get_transform('med_base', 'grasp_frame')
+        contact_pose = self.tf2_listener.get_transform(self.drawing_frame, 'grasp_frame')
         contact_z = contact_pose[2, 3]
         return contact_z
 
     def raise_up(self, z_value=None):
         if z_value is None:
             z_value = self.pre_height
-        self.set_xyz_cartesian(z_value=z_value, frame_id='grasp_frame', ref_frame='med_base')
+        self.set_xyz_cartesian(z_value=z_value, frame_id='grasp_frame', ref_frame=self.drawing_frame)
         self.contact_point_marker_publisher.show = False  # deactivate the force flag # TODO: Make this a function of the force
 
     def compensate_tool_position(self):
@@ -126,7 +131,9 @@ class BubbleDrawer(BubbleMed):
                                              num_steps=20, position_tol=0.001, orientation_tol=0.005) # TODO: Set as hyperparameter
         return plan
 
-    def _get_marker_compensated_pose(self, desired_marker_pose, ref_frame='med_base', tf_broadcast=False):
+    def _get_marker_compensated_pose(self, desired_marker_pose, ref_frame=None, tf_broadcast=False):
+        if ref_frame is None:
+            ref_frame = self.drawing_frame
         desired_position, desired_quat = np.split(desired_marker_pose, [3])
         T_desired = tr.quaternion_matrix(desired_quat)  # in world frame
         T_desired[:3, 3] = desired_position
@@ -159,7 +166,7 @@ class BubbleDrawer(BubbleMed):
 
         if draw_quat is None:
             draw_quat = self.draw_quat
-        ref_frame = 'med_base'
+        ref_frame = self.drawing_frame
 
         # first plan to the first corner
         pre_position = np.insert(init_point_xy, 2, pre_height)
@@ -169,10 +176,10 @@ class BubbleDrawer(BubbleMed):
             # Account for the pose of the marker in-hand.
             target_pose_dict = self._get_marker_compensated_pose(desired_marker_pose=pre_pose, ref_frame=ref_frame, tf_broadcast=True)
             self.plan_to_pose(self.arm_group, target_pose_dict['frame'], target_pose=list(target_pose_dict['pose']),
-                                  frame_id='med_base')
+                                  frame_id=self.drawing_frame)
         else:
             #
-            self.plan_to_pose(self.arm_group, 'grasp_frame', target_pose=list(pre_pose), frame_id='med_base')
+            self.plan_to_pose(self.arm_group, 'grasp_frame', target_pose=list(pre_pose), frame_id=self.drawing_frame)
         # self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.075)  # Low val for safety
         rospy.sleep(.5)
         self._set_vel(0.03)  # Very Low val for precision
@@ -206,7 +213,7 @@ class BubbleDrawer(BubbleMed):
             # set the raise on the xy
             final_position = np.insert(point_xy, 2, self.pre_height)
             final_pose = np.concatenate([final_position, self.draw_quat], axis=0)
-            self.plan_to_pose(self.arm_group, 'grasp_frame', target_pose=list(final_pose), frame_id='med_base')
+            self.plan_to_pose(self.arm_group, 'grasp_frame', target_pose=list(final_pose), frame_id=self.drawing_frame)
         else:
             # just raise up on z direction
             self.set_xyz_cartesian(z_value=self.pre_height)
@@ -230,7 +237,7 @@ class BubbleDrawer(BubbleMed):
             desired_marker_pose = np.concatenate([desired_marker_pos, self.draw_quat])
             compensated_marker_pose = self._get_marker_compensated_pose(desired_marker_pose)
             plan_result = self.plan_to_pose(self.arm_group, compensated_marker_pose['frame'],
-                                                target_pose=list(compensated_marker_pose['pose']), frame_id='med_base')
+                                                target_pose=list(compensated_marker_pose['pose']), frame_id=self.drawing_frame)
             # Go down again
             rospy.sleep(.5)
             self._set_vel(0.05)  # Very Low val for precision
@@ -265,7 +272,7 @@ class BubbleDrawer(BubbleMed):
         if init_drawing:
             draw_height = self._init_drawing(init_point_xy=xy_points[0])
         else:
-            contact_pose = self.tf2_listener.get_transform('med_base', 'grasp_frame')
+            contact_pose = self.tf2_listener.get_transform(self.drawing_frame, 'grasp_frame')
             draw_height = contact_pose[2, 3]
         rospy.sleep(.5)
         self._set_vel(0.1)
@@ -356,7 +363,7 @@ class BubbleDrawer(BubbleMed):
             pass
 
     def test_pivot_motion(self):
-        world_frame_name = 'med_base'
+        world_frame_name = self.drawing_frame
         contact_point_frame_name = 'tool_contact_point'
         tool_frame_name = 'tool_frame'
         tool_frame_desired_quat = np.array([-np.cos(np.pi/4), np.cos(np.pi/4), 0, 0]) # desired quaternion in the world frame (med_base)

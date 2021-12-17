@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     def test_cost_function(estimated_poses, states, actions):
         goal_xyz = np.zeros(3)
-        estimated_xyz = estimated_poses[:,:3]
+        estimated_xyz = estimated_poses[:, :3]
         cost = np.linalg.norm(estimated_xyz-goal_xyz, axis=1)
         return cost
     import pdb; pdb.set_trace()
