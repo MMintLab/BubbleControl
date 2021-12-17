@@ -1,11 +1,13 @@
 import gym
 import abc
+from abc import abstractmethod
 
 import numpy as np
 import rospy
 from collections import OrderedDict
 import gym
 import copy
+import tf.transformations as tr
 
 from mmint_camera_utils.recorders.data_recording_wrappers import DataSelfSavedWrapper
 from bubble_control.bubble_drawer.bubble_drawer import BubbleDrawer
@@ -13,12 +15,11 @@ from bubble_control.aux.action_sapces import ConstantSpace, AxisBiasedDirectionS
 from bubble_control.bubble_envs.base_env import BubbleBaseEnv
 
 
-
-class BubbleDrawingEnv(BubbleBaseEnv):
+class BubbleDrawingBaseEnv(BubbleBaseEnv):
 
     def __init__(self, *args, impedance_mode=False, reactive=False, force_threshold=5., prob_axis=0.08,
                  drawing_area_center=(0.55, 0.), drawing_area_size=(.15, .15), drawing_length_limits=(0.01, 0.15),
-                 grasp_width_limits=(15,25), **kwargs):
+                 grasp_width_limits=(15, 25), **kwargs):
         self.impedance_mode = impedance_mode
         self.reactive = reactive
         self.force_threshold = force_threshold
@@ -31,13 +32,14 @@ class BubbleDrawingEnv(BubbleBaseEnv):
         self.previous_draw_height = None
         self.drawing_init = False
         self.bubble_ref_obs = None
+        self.init_action = None
         self.init_action_space = self._get_init_action_space()
         super().__init__(*args, **kwargs)
         self.reset()
 
     @classmethod
     def get_name(cls):
-        return 'bubble_drawing_env'
+        return 'bubble_drawing_base_env'
 
     def reset(self):
         self.med.set_grasp_pose()
@@ -54,14 +56,13 @@ class BubbleDrawingEnv(BubbleBaseEnv):
         self.med.home_robot()
         super().reset()
 
+    @abstractmethod
     def initialize(self):
-        init_action = self.init_action_space.sample()
-        start_point_i = init_action['start_point']
-        if self.drawing_init:
-            self.med._end_raise()
-        draw_height = self.med._init_drawing(start_point_i)
-        self.previous_draw_height = copy.deepcopy(draw_height)
+        pass
 
+    @abstractmethod
+    def _get_init_action_space(self):
+        pass
 
     def _get_med(self):
         med = BubbleDrawer(object_topic='estimated_object',
@@ -71,38 +72,6 @@ class BubbleDrawingEnv(BubbleBaseEnv):
                            impedance_mode=self.impedance_mode)
         med.connect()
         return med
-
-    def _get_action_space(self):
-        action_space_dict = OrderedDict()
-        action_space_dict['direction'] = AxisBiasedDirectionSpace(prob_axis=self.prob_axis)
-        action_space_dict['length'] = gym.spaces.Box(low=self.drawing_length_limits[0], high=self.drawing_length_limits[1], shape=())
-        action_space_dict['grasp_width'] = gym.spaces.Box(low=self.grasp_width_limits[0], high=self.grasp_width_limits[1], shape=())
-
-        action_space = gym.spaces.Dict(action_space_dict)
-        return action_space
-
-    def _get_init_action_space(self):
-        drawing_area_center_point = np.asarray(self.drawing_area_center)
-        drawing_area_size = np.asarray(self.drawing_area_size)
-
-        action_space_dict = OrderedDict()
-        action_space_dict['start_point'] = gym.spaces.Box(drawing_area_center_point - drawing_area_size,
-                                          drawing_area_center_point + drawing_area_size, (2,), dtype=np.float64) # random uniform
-        action_space = gym.spaces.Dict(action_space_dict)
-        return action_space
-
-    def _check_valid_action(self, action):
-        direction_i = action['direction']
-        length_i = action['length']
-        grasp_width_i = action['grasp_width']
-        drawing_area_center_point = np.asarray(self.drawing_area_center)
-        drawing_area_size = np.asarray(self.drawing_area_size)
-        self.med.gripper.move(grasp_width_i, 10.0)
-        current_point_i = self._get_robot_plane_position()
-        end_point_i = current_point_i + length_i * np.array([np.cos(direction_i), np.sin(direction_i)])
-        # Check if the end_point will be whitin the limits:
-        valid_action = np.all(end_point_i<=drawing_area_center_point + drawing_area_size) and np.all(end_point_i >= drawing_area_center_point - drawing_area_size)
-        return valid_action
 
     def _add_bubble_reference_to_observation(self, obs):
         keys_to_include = ['color_img', 'depth_img', 'point_cloud']
@@ -126,10 +95,59 @@ class BubbleDrawingEnv(BubbleBaseEnv):
         obs = self._add_bubble_reference_to_observation(obs)
         return obs
 
+    def _get_observation_space(self):
+        return None
+
     def _get_robot_plane_position(self):
-        plane_pose = self.med.tf2_listener.get_transform(parent=self.med.drawing_frame, child='grasp_frame')
-        plane_pos_xy = plane_pose[:2,3]
+        plane_pose = self.med.get_plane_pose()
+        plane_pos_xy = plane_pose[:2]
         return plane_pos_xy
+
+
+class BubbleCartesianDrawingEnv(BubbleDrawingBaseEnv):
+
+    def initialize(self):
+        self.init_action = self.init_action_space.sample()
+        start_point_i = self.init_action['start_point']
+        if self.drawing_init:
+            self.med._end_raise()
+        draw_height = self.med._init_drawing(start_point_i)
+        self.previous_draw_height = copy.deepcopy(draw_height)
+        self.drawing_init = True
+
+    @classmethod
+    def get_name(cls):
+        return 'bubble_cartesian_drawing_env'
+
+    def _get_action_space(self):
+        action_space_dict = OrderedDict()
+        action_space_dict['direction'] = AxisBiasedDirectionSpace(prob_axis=self.prob_axis)
+        action_space_dict['length'] = gym.spaces.Box(low=self.drawing_length_limits[0], high=self.drawing_length_limits[1], shape=())
+        action_space_dict['grasp_width'] = gym.spaces.Box(low=self.grasp_width_limits[0], high=self.grasp_width_limits[1], shape=())
+
+        action_space = gym.spaces.Dict(action_space_dict)
+        return action_space
+
+    def _get_init_action_space(self):
+        drawing_area_center_point = np.asarray(self.drawing_area_center)
+        drawing_area_size = np.asarray(self.drawing_area_size)
+
+        action_space_dict = OrderedDict()
+        action_space_dict['start_point'] = gym.spaces.Box(drawing_area_center_point - drawing_area_size,
+                                          drawing_area_center_point + drawing_area_size, (2,), dtype=np.float64) # random uniform
+        action_space = gym.spaces.Dict(action_space_dict)
+        return action_space
+
+    def is_action_valid(self, action):
+        direction_i = action['direction']
+        length_i = action['length']
+        drawing_area_center_point = np.asarray(self.drawing_area_center)
+        drawing_area_size = np.asarray(self.drawing_area_size)
+        current_point_i = self._get_robot_plane_position()
+        end_point_i = current_point_i + length_i * np.array([np.cos(direction_i), np.sin(direction_i)])
+        # Check if the end_point will be whitin the limits:
+        valid_action = np.all(end_point_i<=drawing_area_center_point + drawing_area_size) and np.all(end_point_i >= drawing_area_center_point - drawing_area_size)
+        return valid_action
 
     def _do_action(self, action):
         direction_i = action['direction']
@@ -138,4 +156,106 @@ class BubbleDrawingEnv(BubbleBaseEnv):
         self.med.gripper.move(grasp_width_i, 10.0)
         current_point_i = self._get_robot_plane_position()
         end_point_i = current_point_i + length_i * np.array([np.cos(direction_i), np.sin(direction_i)])
-        self.med._draw_to_point(end_point_i, self.previous_draw_height)
+        planning_result = self.med._draw_to_point(end_point_i, self.previous_draw_height)
+        action_feedback = {
+            'planning_success': planning_result.planning_result.success,
+            'execution_success': planning_result.execution_result.success,
+        }
+        return action_feedback
+
+
+class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
+
+    def __init__(self, *args, rotation_limits=(-np.pi*5/180, np.pi*5/180), **kwargs):
+        self.rotation_limits = rotation_limits
+        super().__init__(*args, **kwargs)
+
+    def initialize(self):
+        self.med.home_robot()
+        self.init_action = self.init_action_space.sample()
+        start_point_i = self.init_action['start_point']
+        drawing_direction = self.init_action['direction']
+        if self.drawing_init:
+            self.med._end_raise()
+        # set rotation
+        # self.med.rotation_along_axis_point_angle(axis=(0,0,1), angle=drawing_direction)
+        rot_quat = tr.quaternion_about_axis(angle=drawing_direction, axis=(0,0,1))# rotation about z
+        draw_quat = tr.quaternion_multiply(rot_quat, self.med.draw_quat)
+        draw_height = self.med._init_drawing(start_point_i, draw_quat=draw_quat)
+
+        self.previous_draw_height = copy.deepcopy(draw_height)
+        self.drawing_init = True
+
+    @classmethod
+    def get_name(cls):
+        return 'bubble_one_direction_drawing_env'
+
+    def _get_action_space(self):
+        action_space_dict = OrderedDict()
+        action_space_dict['rotation'] = gym.spaces.Box(low=self.rotation_limits[0], high=self.rotation_limits[1], shape=())
+        action_space_dict['length'] = gym.spaces.Box(low=self.drawing_length_limits[0], high=self.drawing_length_limits[1], shape=())
+        action_space_dict['grasp_width'] = gym.spaces.Box(low=self.grasp_width_limits[0], high=self.grasp_width_limits[1], shape=())
+        action_space = gym.spaces.Dict(action_space_dict)
+        return action_space
+
+    def _get_init_action_space(self):
+        drawing_area_center_point = np.asarray(self.drawing_area_center)
+        drawing_area_size = np.asarray(self.drawing_area_size)
+        action_space_dict = OrderedDict()
+        action_space_dict['start_point'] = gym.spaces.Box(drawing_area_center_point - drawing_area_size,
+                                          drawing_area_center_point + drawing_area_size, (2,), dtype=np.float64) # random uniform
+        action_space_dict['direction'] = AxisBiasedDirectionSpace(prob_axis=self.prob_axis)
+        action_space = gym.spaces.Dict(action_space_dict)
+        return action_space
+
+    def is_action_valid(self, action):
+        direction_i = self.init_action['direction']
+        length_i = action['length']
+        drawing_area_center_point = np.asarray(self.drawing_area_center)
+        drawing_area_size = np.asarray(self.drawing_area_size)
+        current_point_i = self._get_robot_plane_position()
+        end_point_i = current_point_i + length_i * np.array([np.cos(direction_i), np.sin(direction_i)])
+        # Check if the end_point will be whitin the limits:
+        valid_action = np.all(end_point_i<=drawing_area_center_point + drawing_area_size) and np.all(end_point_i >= drawing_area_center_point - drawing_area_size)
+        return valid_action
+
+    def _is_done(self, observation, a):
+        # TODO: Use observation values instead of the current measures!
+        current_plane_pose = self.med.get_plane_pose()
+        draw_h_limit = self.med.draw_height_limit
+        drawing_area_center_point = np.asarray(self.drawing_area_center)
+        drawing_area_size = np.asarray(self.drawing_area_size)
+        current_h = current_plane_pose[2]
+        current_xy = current_plane_pose[:2]
+        is_lower_h = current_h < draw_h_limit
+        is_out_of_region = np.all(current_xy <= drawing_area_center_point + drawing_area_size) and np.all(current_xy >= drawing_area_center_point - drawing_area_size)
+        done = is_lower_h and is_out_of_region
+        return done
+
+    def _do_action(self, action):
+        rotation_i = action['rotation']
+        length_i = action['length']
+        direction_i = self.init_action['direction']
+        grasp_width_i = action['grasp_width']
+        self.med.gripper.move(grasp_width_i, 10.0)
+        current_plane_pose = self.med.get_plane_pose()
+
+        delta_pos_plane = length_i * np.array([np.cos(direction_i), np.sin(direction_i)])
+        delta_h = -0.003
+        delta_pos = np.append(delta_pos_plane, delta_h) # push down in the plane
+        new_pos = current_plane_pose[:3] + delta_pos
+
+        # new_pos = current_plane_pose[:3] + delta_pos
+        # rotate along the x axis of the grasp frame
+        rot_quat = tr.quaternion_about_axis(angle=rotation_i, axis=(1, 0, 0))
+        new_quat = tr.quaternion_multiply(current_plane_pose[3:], rot_quat)
+        new_pose = np.concatenate([new_pos, new_quat])
+
+        planning_result = self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(new_pose), frame_id=self.med.drawing_frame, position_tol=0.0005, orientation_tol=0.001)
+
+        # check if the planning has failed or if the execution has failed
+        action_feedback = {
+            'planning_success': planning_result.planning_result.success,
+            'execution_success': planning_result.execution_result.success,
+        }
+        return action_feedback

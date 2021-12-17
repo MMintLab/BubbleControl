@@ -65,6 +65,11 @@ class BubbleDrawer(BubbleMed):
         else:
             self.set_control_mode(ControlMode.JOINT_POSITION, vel=vel)
 
+    def get_plane_pose(self, child_frame='grasp_frame'):
+        plane_pose_matrix = self.tf2_listener.get_transform(parent=self.drawing_frame, child=child_frame)
+        plane_pose = self._matrix_to_pose(plane_pose_matrix)
+        return plane_pose
+
     def get_marker_pose(self):
         data = self.pose_listener.get(block_until_data=True)
         pose = [data.pose.position.x,
@@ -166,7 +171,9 @@ class BubbleDrawer(BubbleMed):
 
         if draw_quat is None:
             draw_quat = self.draw_quat
-        ref_frame = self.drawing_frame
+
+        if ref_frame is None:
+            ref_frame = self.drawing_frame
 
         # first plan to the first corner
         pre_position = np.insert(init_point_xy, 2, pre_height)
@@ -198,8 +205,9 @@ class BubbleDrawer(BubbleMed):
 
     def _draw_to_point(self, point_xy, draw_height, end_raise=False):
         if self.compensate_xy_point:
-            tcp_gf = self.tf_wrapper.get_transform('tool_contact_point',
-                                          'grasp_frame')  # transform from the contact point to the grasp frame
+            tcp_gf = self.tf_wrapper.get_transform(
+                'tool_contact_point',
+                'grasp_frame')  # transform from the contact point to the grasp frame
             point_xy = point_xy + tcp_gf[:2,3]
         position_i = np.insert(point_xy, 2, draw_height) # position of the poin in the world frame
 
@@ -207,6 +215,7 @@ class BubbleDrawer(BubbleMed):
         if end_raise:
             # Raise the arm when we reach the last point
             self._end_raise(point_xy)
+        return plan_result
 
     def _end_raise(self, point_xy=None):
         if point_xy is not None:
@@ -217,9 +226,6 @@ class BubbleDrawer(BubbleMed):
         else:
             # just raise up on z direction
             self.set_xyz_cartesian(z_value=self.pre_height)
-
-
-
 
     def _adjust_tool_position(self, xy_point, lift=None):
         if lift is None:

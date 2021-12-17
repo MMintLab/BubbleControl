@@ -59,7 +59,7 @@ class BaseEnv(Env):
         pass
 
     def _do_action(self, a):
-        pass
+        return {}
 
     def is_action_valid(self, a):
         # by default, all actions are valid.
@@ -86,7 +86,8 @@ class BaseEnv(Env):
     def step(self, a):
         # This is just the basic layout. It can be extended on subclasses
         info = {}
-        self._do_action(a)
+        action_feedback = self._do_action(a)
+        info.update(action_feedback)
         observation = self.get_observation()
         done = self._is_done(observation, a)
         reward = self._get_reward(a, observation)
@@ -99,9 +100,9 @@ class BaseEnv(Env):
     def _get_reward(self, a, observation):
         return 0
 
-
     def reset(self):
         self.num_steps = 0
+
 
 class MedBaseEnv(BaseEnv):
     """

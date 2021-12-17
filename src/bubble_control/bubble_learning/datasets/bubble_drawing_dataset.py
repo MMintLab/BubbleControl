@@ -52,8 +52,8 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         action = self._get_action(action_fc)
 
         # camera info
-        camera_info_r = self._load_camera_info_depth(scene_name=scene_name, camera_name='right')
-        camera_info_l = self._load_camera_info_depth(scene_name=scene_name, camera_name='left')
+        camera_info_r = self._load_camera_info_depth(scene_name=scene_name, camera_name='right', fc=undef_fc)
+        camera_info_l = self._load_camera_info_depth(scene_name=scene_name, camera_name='left', fc=undef_fc)
 
         sample_simple = {
             'init_imprint': init_imprint,
@@ -160,7 +160,8 @@ class BubbleDrawingDownsampledCombinedDataset(BubbleDrawingDownsampledDataset):
 # DEBUG:
 
 if __name__ == '__main__':
-    data_name = '/home/mmint/Desktop/drawing_data_cartesian'
+    # data_name = '/home/mmint/Desktop/drawing_data_cartesian'
+    data_name = '/home/mmint/Desktop/env_drawing_test_data'
     # dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame')
     dataset = BubbleDrawingDownsampledDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame',downsample_factor_x=7, downsample_factor_y=7, downsample_reduction='mean')
     print('Dataset Name: ', dataset.name)
