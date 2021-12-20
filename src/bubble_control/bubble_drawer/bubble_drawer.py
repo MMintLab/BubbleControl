@@ -60,8 +60,7 @@ class BubbleDrawer(BubbleMed):
 
     def _set_vel(self, vel):
         if self.impedance_mode:
-            self.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF,
-                                  vel=vel)
+            self.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF,vel=vel)
         else:
             self.set_control_mode(ControlMode.JOINT_POSITION, vel=vel)
 

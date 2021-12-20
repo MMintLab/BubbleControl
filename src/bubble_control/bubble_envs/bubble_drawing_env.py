@@ -182,7 +182,6 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         rot_quat = tr.quaternion_about_axis(angle=drawing_direction, axis=(0,0,1))# rotation about z
         draw_quat = tr.quaternion_multiply(rot_quat, self.med.draw_quat)
         draw_height = self.med._init_drawing(start_point_i, draw_quat=draw_quat)
-
         self.previous_draw_height = copy.deepcopy(draw_height)
         self.drawing_init = True
 
@@ -216,7 +215,7 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         current_point_i = self._get_robot_plane_position()
         end_point_i = current_point_i + length_i * np.array([np.cos(direction_i), np.sin(direction_i)])
         # Check if the end_point will be whitin the limits:
-        valid_action = np.all(end_point_i<=drawing_area_center_point + drawing_area_size) and np.all(end_point_i >= drawing_area_center_point - drawing_area_size)
+        valid_action = np.all(end_point_i <= drawing_area_center_point + drawing_area_size) and np.all(end_point_i >= drawing_area_center_point - drawing_area_size)
         return valid_action
 
     def _is_done(self, observation, a):
@@ -228,8 +227,13 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         current_h = current_plane_pose[2]
         current_xy = current_plane_pose[:2]
         is_lower_h = current_h < draw_h_limit
-        is_out_of_region = np.all(current_xy <= drawing_area_center_point + drawing_area_size) and np.all(current_xy >= drawing_area_center_point - drawing_area_size)
-        done = is_lower_h and is_out_of_region
+        is_out_of_region = not (np.all(current_xy <= drawing_area_center_point + drawing_area_size) and np.all(current_xy >= drawing_area_center_point - drawing_area_size))
+        done = is_lower_h or is_out_of_region
+        if self.verbose or True:
+            if is_lower_h:
+                print('reached the h limit')
+            if is_out_of_region:
+                print('reached drawing area limit')
         return done
 
     def _do_action(self, action):

@@ -187,7 +187,7 @@ class MedBaseEnv(BaseEnv):
         return plan_success, execution_success
 
     def _get_tf_frames(self):
-        tf_frames = ['grasp_frame', 'med_kuka_link_ee']
+        tf_frames = ['grasp_frame', 'med_kuka_link_ee', 'wsg50_finger_left', 'ws50_finger_right']
         return tf_frames
 
     def _get_wrench_frames(self):
