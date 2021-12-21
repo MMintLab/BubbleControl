@@ -9,10 +9,16 @@ import gym
 import copy
 import tf.transformations as tr
 
+from geometry_msgs.msg import Pose, Point, Quaternion
+
 from mmint_camera_utils.recorders.data_recording_wrappers import DataSelfSavedWrapper
 from bubble_control.bubble_drawer.bubble_drawer import BubbleDrawer
 from bubble_control.aux.action_sapces import ConstantSpace, AxisBiasedDirectionSpace
 from bubble_control.bubble_envs.base_env import BubbleBaseEnv
+from victor_hardware_interface_msgs.msg import ControlMode
+from victor_hardware_interface.victor_utils import get_cartesian_impedance_params, send_new_control_mode
+
+
 
 
 class BubbleDrawingBaseEnv(BubbleBaseEnv):
@@ -171,6 +177,7 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         super().__init__(*args, **kwargs)
 
     def initialize(self):
+        self.med.set_control_mode(ControlMode.JOINT_POSITION, vel=0.1)
         self.med.home_robot()
         self.init_action = self.init_action_space.sample()
         start_point_i = self.init_action['start_point']
@@ -182,6 +189,11 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         rot_quat = tr.quaternion_about_axis(angle=drawing_direction, axis=(0,0,1))# rotation about z
         draw_quat = tr.quaternion_multiply(rot_quat, self.med.draw_quat)
         draw_height = self.med._init_drawing(start_point_i, draw_quat=draw_quat)
+        # SET Cartesian Impedance
+        cartesian_impedance_params = get_cartesian_impedance_params(velocity=0.25*40) # we multiply by 40 because in get_control_mode they do the same...
+        cartesian_impedance_params.cartesian_impedance_params.cartesian_stiffness.z = 2000.0 # by default is 5000
+        send_new_control_mode(arm='med', msg=cartesian_impedance_params)
+        # self.med.set_control_mode(control_mode=ControlMode.CARTESIAN_IMPEDANCE, vel=0.25)
         self.previous_draw_height = copy.deepcopy(draw_height)
         self.drawing_init = True
 
@@ -254,12 +266,37 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         rot_quat = tr.quaternion_about_axis(angle=rotation_i, axis=(1, 0, 0))
         new_quat = tr.quaternion_multiply(current_plane_pose[3:], rot_quat)
         new_pose = np.concatenate([new_pos, new_quat])
+        reached = self.delta_cartesian_move(dx=delta_pos[0], dy=delta_pos[1], target_z=new_pos[2], quat=new_quat)
 
-        planning_result = self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(new_pose), frame_id=self.med.drawing_frame, position_tol=0.0005, orientation_tol=0.001)
+        # planning_result = self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(new_pose), frame_id=self.med.drawing_frame, position_tol=0.0005, orientation_tol=0.001)
 
         # check if the planning has failed or if the execution has failed
         action_feedback = {
-            'planning_success': planning_result.planning_result.success,
-            'execution_success': planning_result.execution_result.success,
+            # 'planning_success': planning_result.planning_result.success,
+            # 'execution_success': planning_result.execution_result.success,
         }
         return action_feedback
+
+    def delta_cartesian_move(self, dx, dy, target_z=None, quat=None, frame_id='grasp_frame'):
+        arm_id = 0
+        target_orientation = None
+        cartesian_motion_frame_id = 'med_kuka_link_ee'
+        if quat is not None:
+            # Find the transformation to the med_kuka_link_ee --- Cartesian Impedance mode sets the pose with respect to the med_kuka_link_ee frame
+            ee_pose_gf = self.med.get_current_pose(frame_id,
+                                                   ref_frame=cartesian_motion_frame_id)  # IMPEDANCE ORIENTATION IN MED_KUKA_LINK_EE FRAME!
+            # desired_quat = tr.quaternion_multiply(ee_pose_gf[3:], quat)
+            desired_quat = tr.quaternion_multiply(quat, tr.quaternion_inverse(ee_pose_gf[3:]))
+            target_orientation = Quaternion()
+            target_orientation.x = desired_quat[0]
+            target_orientation.y = desired_quat[1]
+            target_orientation.z = desired_quat[2]
+            target_orientation.w = desired_quat[3]
+
+        if target_z is not None:
+            wf_pose_gf = self.med.get_current_pose(frame_id, ref_frame=self.med.cartesian.sensor_frames[arm_id])
+            wf_pose_ee = self.med.get_current_pose(cartesian_motion_frame_id, ref_frame=self.med.cartesian.sensor_frames[arm_id])
+            delta_z = wf_pose_ee[2] - wf_pose_gf[2]
+            target_z = target_z + delta_z
+        reached = self.med.move_delta_cartesian_impedance(arm=arm_id, dx=dx, dy=dy, target_z=target_z, target_orientation=target_orientation)
+        return reached
