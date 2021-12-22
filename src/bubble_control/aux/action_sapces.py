@@ -11,6 +11,11 @@ class AxisBiasedDirectionSpace(gym.spaces.Space):
     On prob_axis, the sample will be along one of the cartesian axis directions, i.e. [0, pi/2, pi, 3pi/2]
     """
     def __init__(self, prob_axis, seed=None):
+        """
+        Args:
+            prob_axis: probability of sampling a direction along the axis
+            seed:
+        """
         self.prob_axis = prob_axis
         super().__init__((), np.float32, seed)
 

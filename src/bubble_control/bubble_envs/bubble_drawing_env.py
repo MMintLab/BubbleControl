@@ -172,8 +172,11 @@ class BubbleCartesianDrawingEnv(BubbleDrawingBaseEnv):
 
 class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
 
-    def __init__(self, *args, rotation_limits=(-np.pi*5/180, np.pi*5/180), **kwargs):
+    def __init__(self, *args, rotation_limits=(-np.pi*5/180, np.pi*5/180), z_stiffness=2000, drawing_vel=0.25, **kwargs):
         self.rotation_limits = rotation_limits
+        self.z_stiffness = z_stiffness
+        self.drawing_vel = drawing_vel
+        self.delta_h = 0.003
         super().__init__(*args, **kwargs)
 
     def initialize(self):
@@ -190,8 +193,8 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         draw_quat = tr.quaternion_multiply(rot_quat, self.med.draw_quat)
         draw_height = self.med._init_drawing(start_point_i, draw_quat=draw_quat)
         # SET Cartesian Impedance
-        cartesian_impedance_params = get_cartesian_impedance_params(velocity=0.25*40) # we multiply by 40 because in get_control_mode they do the same...
-        cartesian_impedance_params.cartesian_impedance_params.cartesian_stiffness.z = 2000.0 # by default is 5000
+        cartesian_impedance_params = get_cartesian_impedance_params(velocity=self.drawing_vel*40) # we multiply by 40 because in get_control_mode they do the same...
+        cartesian_impedance_params.cartesian_impedance_params.cartesian_stiffness.z = self.z_stiffness # by default is 5000
         send_new_control_mode(arm='med', msg=cartesian_impedance_params)
         # self.med.set_control_mode(control_mode=ControlMode.CARTESIAN_IMPEDANCE, vel=0.25)
         self.previous_draw_height = copy.deepcopy(draw_height)
@@ -257,7 +260,7 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         current_plane_pose = self.med.get_plane_pose()
 
         delta_pos_plane = length_i * np.array([np.cos(direction_i), np.sin(direction_i)])
-        delta_h = -0.003
+        delta_h = -self.delta_h
         delta_pos = np.append(delta_pos_plane, delta_h) # push down in the plane
         new_pos = current_plane_pose[:3] + delta_pos
 
@@ -272,12 +275,13 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
 
         # check if the planning has failed or if the execution has failed
         action_feedback = {
+            'reached' : reached,
             # 'planning_success': planning_result.planning_result.success,
             # 'execution_success': planning_result.execution_result.success,
         }
         return action_feedback
 
-    def delta_cartesian_move(self, dx, dy, target_z=None, quat=None, frame_id='grasp_frame'):
+    def delta_cartesian_move(self, dx, dy, target_z=None, quat=None, frame_id='grasp_frame', compensated=False):
         arm_id = 0
         target_orientation = None
         cartesian_motion_frame_id = 'med_kuka_link_ee'
@@ -293,10 +297,29 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
             target_orientation.z = desired_quat[2]
             target_orientation.w = desired_quat[3]
 
+        wf_pose_gf = self.med.get_current_pose(frame_id, ref_frame=self.med.cartesian.sensor_frames[arm_id])
+        wf_pose_ee = self.med.get_current_pose(cartesian_motion_frame_id,
+                                               ref_frame=self.med.cartesian.sensor_frames[arm_id])
+        ee_pose_gf = self.med.get_current_pose(ref_frame=cartesian_motion_frame_id,
+                                               frame_id=frame_id)  # this should be constant
+
+        # compute the delta values compensating for the change of orientation
+        wf_pose_gf_desired = wf_pose_gf.copy()
+        wf_pose_gf_desired[:2] = wf_pose_gf_desired[:2] + np.array([dx, dy])
+        if quat is not None:
+            wf_pose_gf_desired[3:] = desired_quat
+        wf_pose_ee_desired = self.med._matrix_to_pose(
+            self.med._pose_to_matrix(wf_pose_gf_desired) @ np.linalg.inv(self.med._pose_to_matrix(ee_pose_gf)))
+        wf_pose_ee_delta = wf_pose_ee_desired - wf_pose_ee
+        dxdy = wf_pose_ee_delta[:2]
+
+        if compensated:
+            dx_desired, dy_desired = dxdy # use the rotation compensated values
+        else:
+            dx_desired, dy_desired = dx, dy # use the raw values
         if target_z is not None:
-            wf_pose_gf = self.med.get_current_pose(frame_id, ref_frame=self.med.cartesian.sensor_frames[arm_id])
-            wf_pose_ee = self.med.get_current_pose(cartesian_motion_frame_id, ref_frame=self.med.cartesian.sensor_frames[arm_id])
+            # delta_z = wf_pose_ee_desired[2] = wf_pose_gf_desired[2]
             delta_z = wf_pose_ee[2] - wf_pose_gf[2]
             target_z = target_z + delta_z
-        reached = self.med.move_delta_cartesian_impedance(arm=arm_id, dx=dx, dy=dy, target_z=target_z, target_orientation=target_orientation)
+        reached = self.med.move_delta_cartesian_impedance(arm=arm_id, dx=dx_desired, dy=dy_desired, target_z=target_z, target_orientation=target_orientation) # positions with respect the ee_link
         return reached
