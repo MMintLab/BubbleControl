@@ -146,7 +146,7 @@ class MedBaseEnv(BaseEnv):
         except (rospy.exceptions.ROSInitException, rospy.exceptions.ROSException):
             pass
 
-    def _plan_to_pose(self, pose, frame_id='med_base', supervision=False):
+    def _plan_to_pose(self, pose, frame_id='med_base', supervision=False, stop_condition = None):
         plan_success = False
         execution_success = False
         plan_found = False
@@ -154,7 +154,7 @@ class MedBaseEnv(BaseEnv):
             if supervision:
                 self.med.set_execute(False)
             plan_result = self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(pose),
-                                                frame_id=frame_id)
+                                                frame_id=frame_id, stop_condition=stop_condition)
             plan_success = plan_result.success
             execution_success = plan_result.execution_result.success
             if not plan_success:
