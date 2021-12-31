@@ -213,7 +213,7 @@ class ToolContactPointEstimator(object):
     def reorient_in_drawing_direction(self, desired_direction):
         contact_point = self.get_contact_point()
         grasp_frame_tf = self.tf2_listener.get_transform(parent='med_base', child='grasp_frame')
-        current_direction = grasp_frame_tf[:3,:3] @ np.array([0, 0, 1])[:2]
+        current_direction = (grasp_frame_tf[:3,:3] @ np.array([0, 0, 1]))[:2]
         angle = np.arccos(np.dot(current_direction, desired_direction))
         if np.cross(current_direction, desired_direction)[2] < 0:
             angle *= -1
