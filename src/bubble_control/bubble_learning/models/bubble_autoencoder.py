@@ -19,6 +19,7 @@ class BubbleAutoEncoderModel(BubbleDynamicsResidualModel):
         self.reconstruct_key = reconstruct_key
         super().__init__(*args, **kwargs)
         self.batch_norm = nn.BatchNorm2d(2)
+        self.save_hyperparameters() # Important! Every model extension must add this line!
 
     @classmethod
     def get_name(cls):

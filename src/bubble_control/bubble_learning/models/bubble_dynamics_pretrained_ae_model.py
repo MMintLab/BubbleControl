@@ -44,7 +44,7 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
 
         self.mse_loss = nn.MSELoss()
 
-        self.save_hyperparameters()
+        self.save_hyperparameters() # Important! Every model extension must add this line!
 
     @classmethod
     def get_name(cls):

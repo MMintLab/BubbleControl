@@ -19,7 +19,7 @@ from sklearn.cluster import DBSCAN
 import abc
 
 import sensor_msgs.point_cloud2 as pc2
-from std_msgs.msg import String, Header
+from std_msgs.msg import String, Header, Bool
 from sensor_msgs.msg import Image, CompressedImage, CameraInfo, PointCloud2, PointField
 from geometry_msgs.msg import TransformStamped, Pose
 from visualization_msgs.msg import Marker, MarkerArray
@@ -28,6 +28,9 @@ from mmint_camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud, 
 from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
 from bubble_utils.bubble_tools.bubble_pc_tools import get_imprint_pc
 from bubble_control.bubble_pose_estimation.pose_estimators import ICP3DPoseEstimator, ICP2DPoseEstimator
+from mmint_camera_utils.ros_utils.publisher_wrapper import PublisherWrapper
+from mmint_utils.terminal_colors import term_colors
+
 
 
 
@@ -50,6 +53,7 @@ class BubblePCReconstructorBase(abc.ABC):
         self.height = 0.12
         self.object_model = self._get_object_model()
         self.pose_estimator = self._get_pose_estimator()
+        self.tool_detected_publisher = PublisherWrapper(topic_name='tool_detected', msg_type=Bool)
         self.last_tr = None
 
     @abc.abstractmethod
@@ -194,9 +198,29 @@ class BubblePCReconstructorBase(abc.ABC):
         filtered_pc = pc[good_indxs]
         return filtered_pc
 
-    def estimate_pose(self, threshold, view=False, verbose=False):
-        imprint = self.get_imprint(view=view)
+    def estimate_pose(self, threshold, view=False, verbose=False, tool_detection=True):
+        if tool_detection:
+            imprint, imprint_r, imprint_l = self.get_imprint(view=view, separate=True)
+            imprint_pcd_r = pack_o3d_pcd(imprint_r)
+            imprint_pcd_l = pack_o3d_pcd(imprint_l)
+            distance_bubbles = None
+            if len(imprint_pcd_r.points) < 2 or len(imprint_pcd_l.points) < 2:
+                print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
+                self.tool_detected_publisher.data = False
+            else:
+                tree = KDTree(imprint_pcd_r.points)
+                corr_distances, _ = tree.query(imprint_pcd_l.points)
+                distance_bubbles = np.mean(corr_distances)
+                if (distance_bubbles is not None and distance_bubbles < 0.01):
+                    print(f"{term_colors.WARNING}Warning: No tool detected{term_colors.ENDC}")
+                    self.tool_detected_publisher.data = False
+                else:
+                    self.tool_detected_publisher.data = True
+        else:
+            imprint = self.get_imprint(view=view)
         estimated_pose = self._estimate_pose(imprint, threshold, verbose=verbose)
+        if self.broadcast_imprint:
+            self._broadcast_imprint(imprint)
         return estimated_pose
 
     def _estimate_pose(self, imprint, threshold, verbose=False):
@@ -210,6 +234,7 @@ class BubblePCReconstructorROSBase(BubblePCReconstructorBase):
 
     def __init__(self, *args, broadcast_imprint=False, verbose=False, **kwargs):
         self.broadcast_imprint = broadcast_imprint
+        self.verbose = verbose
         self.left_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_left', verbose=self.verbose)
         self.right_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_right', verbose=self.verbose)
         self.imprint_broadcaster = rospy.Publisher('imprint_pc', PointCloud2)
@@ -251,7 +276,7 @@ class BubblePCReconsturctorTreeSearch(BubblePCReconstructorROSBase):
         self.trees['left'] = KDTree(self.references['left'][:, :3])
         self.last_tr = None
 
-    def get_imprint(self, view=False):
+    def get_imprint(self, view=False, separate=False):
         pc_r, frame_r = self.right_parser.get_point_cloud(return_ref_frame=True, ref_frame=self.references['right_frame'])
         pc_l, frame_l = self.left_parser.get_point_cloud(return_ref_frame=True, ref_frame=self.references['left_frame'])
         pc_r = self.filter_pc(pc_r)
@@ -275,7 +300,10 @@ class BubblePCReconsturctorTreeSearch(BubblePCReconstructorROSBase):
         if view:
             print('visualizing the imprint on green')
             view_pointcloud([imprint_r, imprint_l], frame=True)
-        return np.concatenate([imprint_r, imprint_l], axis=0)
+        imprint = np.concatenate([imprint_r, imprint_l], axis=0)
+        if separate:
+            return imprint, imprint_r, imprint_l
+        return imprint
 
     def _get_far_points_indxs(self, query_pc, d_threshold, key):
         """
