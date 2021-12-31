@@ -81,7 +81,13 @@ if __name__ == '__main__':
         estimated_xyz = estimated_poses[:,:3]
         cost = np.linalg.norm(estimated_xyz-goal_xyz, axis=1)
         return cost
+
+    num_samples = 100
+    horizon = 10
+    controller = BubbleModelMPPIController(model, ope, test_cost_function, num_samples=num_samples, horizon=horizon)
+    import time
+    start_time = time.time()
+    action = controller.control(sample)
+    print('Time for {} samples, {} horizon: {}'.format(num_samples, horizon, time.time() - start_time))
     import pdb; pdb.set_trace()
-    controller = BubbleModelMPPIController(model, ope, test_cost_function)
-
-
+    print('done')

@@ -62,6 +62,10 @@ class ModelOutputObjectPoseEstimation(object):
         self.reconstructor.add_tfs(all_tfs)
         # estimate pose
         estimated_pose = self.reconstructor.estimate_pose(self.icp_threshold)
+        # transform it to pos, quat instead of matrix
+        estimated_pos = estimated_pose[:3,3]
+        estimated_quat = tr.quaternion_from_matrix(estimated_pose)
+        estimated_pose = np.concatenate([estimated_pos, estimated_quat])
         return estimated_pose
 
 
