@@ -12,6 +12,8 @@ from torch.utils.data import random_split
 from bubble_utils.bubble_datasets.bubble_dataset_base import DatasetBase, BubbleDatasetBase
 from bubble_utils.bubble_datasets.dataset_transformed import transform_dataset
 from bubble_control.bubble_learning.aux.dataframe_tr import SplitDataFramesTr
+from bubble_control.bubble_learning.aux.remove_nontensor_elements_tr import RemoveNonTensorElementsTr
+
 
 class ParsedTrainer(object):
     """
@@ -166,10 +168,11 @@ class ParsedTrainer(object):
         for k, v in dataset_args.items():
             print('\t{}: {}'.format(k, v))
         dataset = Dataset(**dataset_args)
-        # transform dataset to remove all dataframes
-        split_dataframe_tr = SplitDataFramesTr()
-        dataset = transform_dataset(dataset, transforms=(split_dataframe_tr))
-        import pdb; pdb.set_trace()
+        # transform dataset to convert all dataframes
+        # split_dataframe_tr = SplitDataFramesTr() # transformation to convert dataframes into columns and values
+        remove_nontensor_elements_tr = RemoveNonTensorElementsTr()
+        trs = (remove_nontensor_elements_tr,)
+        dataset = transform_dataset(dataset, transforms=trs)
         return dataset
 
     def _get_train_val_data(self):
@@ -177,7 +180,6 @@ class ParsedTrainer(object):
         val_size = len(self.dataset) - train_size
         train_data, val_data = random_split(self.dataset, [train_size, val_size],
                                             generator=torch.Generator().manual_seed(self.args['seed']))
-        import pdb; pdb.set_trace()
         return train_data, val_data
 
     def _get_loaders(self):
