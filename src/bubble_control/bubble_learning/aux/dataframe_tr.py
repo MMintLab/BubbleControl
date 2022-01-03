@@ -9,7 +9,7 @@ class SplitDataFramesTr(object):
     def __call__(self, sample):
         if self.keys_to_tr is None:
             # transform all the DataFrames
-            all_keys = sample.keys()
+            all_keys = list(sample.keys())
             for key in all_keys:
                 v = sample[key]
                 if type(v) is DataFrame:
@@ -45,7 +45,7 @@ class SplitDataFramesTr(object):
         v = sample[key]
         if type(v) is DataFrame:
             sample['{}_columns'.format(key)] = v.columns.values
-            sample['{}_data'.format(key)] = v.data.values
+            sample['{}_data'.format(key)] = v.values
             # remove old key-value pair
             sample.pop(key)
         return sample

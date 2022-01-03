@@ -169,6 +169,7 @@ class ParsedTrainer(object):
         # transform dataset to remove all dataframes
         split_dataframe_tr = SplitDataFramesTr()
         dataset = transform_dataset(dataset, transforms=(split_dataframe_tr))
+        import pdb; pdb.set_trace()
         return dataset
 
     def _get_train_val_data(self):
@@ -176,6 +177,7 @@ class ParsedTrainer(object):
         val_size = len(self.dataset) - train_size
         train_data, val_data = random_split(self.dataset, [train_size, val_size],
                                             generator=torch.Generator().manual_seed(self.args['seed']))
+        import pdb; pdb.set_trace()
         return train_data, val_data
 
     def _get_loaders(self):
