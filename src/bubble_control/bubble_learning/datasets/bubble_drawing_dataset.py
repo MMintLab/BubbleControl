@@ -81,11 +81,9 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         dl_line = self.dl.iloc[fc]
         action_column_names = ['rotation', 'length', 'grasp_width']
         action_i = dl_line[action_column_names].values.astype(np.float64)
-        import pdb; pdb.set_trace()
         # direction = dl_line['direction']
         # length = dl_line['length']
         # action_i = length * np.array([np.cos(direction), np.sin(direction)])
-
         return action_i
 
     def _compute_delta_sample(self, sample):
