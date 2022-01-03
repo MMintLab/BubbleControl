@@ -10,6 +10,8 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import random_split
 
 from bubble_utils.bubble_datasets.bubble_dataset_base import DatasetBase, BubbleDatasetBase
+from bubble_utils.bubble_datasets.dataset_transformed import transform_dataset
+from bubble_control.bubble_learning.aux.dataframe_tr import SplitDataFramesTr
 
 class ParsedTrainer(object):
     """
@@ -164,6 +166,9 @@ class ParsedTrainer(object):
         for k, v in dataset_args.items():
             print('\t{}: {}'.format(k, v))
         dataset = Dataset(**dataset_args)
+        # transform dataset to remove all dataframes
+        split_dataframe_tr = SplitDataFramesTr()
+        dataset = transform_dataset(dataset, transforms=(split_dataframe_tr))
         return dataset
 
     def _get_train_val_data(self):
