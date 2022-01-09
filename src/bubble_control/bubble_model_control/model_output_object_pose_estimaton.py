@@ -2,8 +2,10 @@ import numpy as np
 import os
 import sys
 import torch
+import pytorch3d.transforms as batched_trs
 import rospy
 import tf2_ros as tf
+from abc import abstractmethod
 import tf.transformations as tr
 from geometry_msgs.msg import TransformStamped
 
@@ -15,9 +17,14 @@ from bubble_control.aux.load_confs import load_bubble_reconstruction_params
 from bubble_control.bubble_pose_estimation.bubble_pc_reconstruction import BubblePCReconstructorOfflineDepth
 from bubble_utils.bubble_tools.bubble_img_tools import unprocess_bubble_img
 
+from bubble_control.bubble_pose_estimation.batched_pytorch_icp import icp_2d_masked, pc_batched_tr
 
-class ModelOutputObjectPoseEstimation(object):
+from mmint_camera_utils.camera_utils import project_depth_image
+from mmint_camera_utils.point_cloud_utils import project_pc, get_projection_tr
+from bubble_utils.bubble_tools.bubble_pc_tools import get_imprint_mask
 
+
+class ModelOutputObjectPoseEstimationBase(object):
     def __init__(self, object_name='marker'):
         self.object_name = object_name
         self.reconstruction_params = load_bubble_reconstruction_params()
@@ -25,6 +32,105 @@ class ModelOutputObjectPoseEstimation(object):
         self.imprint_threshold = self.object_params['imprint_th']['depth']
         self.icp_threshold = self.object_params['icp_th']
 
+    @abstractmethod
+    def estimate_pose(self, sample):
+        # Return estimated object pose [x, y, z, qx, qy, qz, qw]
+        pass
+
+
+class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
+    """ Work with pytorch tensors"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def estimate_pose(self, batched_sample):
+        """
+        Estimate the object pose from the imprints using icp 2D. We compute it in parallel on batched operations
+        :param sample: The sample is expected to be batched, i.e. all values (batch_size, original_size_1, ..., original_size_n)
+        :return:
+        """
+        all_tfs = batched_sample['all_tfs']
+
+        # Get imprints from sample
+        predicted_imprint = batched_sample['next_imprint']
+        imprint_pred_r, imprint_pred_l = predicted_imprint
+
+        # unprocess the imprints (add padding to move them back to the original shape)
+        imprint_pred_r = unprocess_bubble_img(imprint_pred_r) # ref frame:  -- (N, w, h)
+        imprint_pred_l = unprocess_bubble_img(imprint_pred_l) # ref frame:  -- (N, w, h)
+        imprint_frame_r = 'pico_flexx_right_optical_frame'
+        imprint_frame_l = 'pico_flexx_left_optical_frame'
+
+        depth_ref_r = batched_sample['undef_depth_r'].squeeze() # (N, w, h)
+        depth_ref_l = batched_sample['undef_depth_l'].squeeze() # (N, w, h)
+        depth_def_r = depth_ref_r - imprint_pred_r  # CAREFUL: Imprint is defined as undef_depth_img - def_depth_img
+        depth_def_l = depth_ref_l - imprint_pred_l  # CAREFUL: Imprint is defined as undef_depth_img - def_depth_img
+
+        # Project imprints to get point coordinates
+        Ks_r = batched_sample['camera_info_r']['K']
+        Ks_l = batched_sample['camera_info_l']['K']
+        pc_r = project_depth_image(depth_def_r, Ks_r)# (N, w, h, n_coords) -- n_coords=3
+        pc_l = project_depth_image(depth_def_l, Ks_l)# (N, w, h, n_coords) -- n_coords=3
+
+        # Compute mask -- filter out points
+        imprint_threshold = None
+        mask_r = get_imprint_mask(depth_ref_r, depth_def_r, imprint_threshold)
+        mask_l = get_imprint_mask(depth_ref_l, depth_def_l, imprint_threshold)
+
+        # Convert imprint point coordinates to grasp frame
+        gf_X_ifr = self._get_transformation_matrix(all_tfs, 'grasp_frame', imprint_frame_r)
+        gf_X_ifl = self._get_transformation_matrix(all_tfs, 'grasp_frame', imprint_frame_l)
+        pc_r_gf = pc_batched_tr(pc_r, gf_X_ifr[:3, :3], gf_X_ifr[:3, 3])
+        pc_l_gf = pc_batched_tr(pc_l, gf_X_ifl[:3, :3], gf_X_ifl[:3, 3])
+        pc_gf = torch.stack([pc_r_gf, pc_l_gf], dim=1) # (N, n_impr, w, h, n_coords)
+
+        # Load object model model
+        # TODO: Save and load object models from self.object_name
+        model_pc = None
+
+        # Project points to 2d
+        projection_axis = (1, 0, 0)
+        projection_tr = get_projection_tr(projection_axis) # (4,4)
+        pc_gf_projected = project_pc(pc_gf, projection_axis) # (N, n_impr, w, h, n_coords)
+        pc_gf_2d = pc_gf_projected[..., :2] # only 2d coordinates
+        pc_model_projected = project_pc(model_pc, projection_axis)
+
+        # Apply ICP 2d
+        max_num_iterations = 20
+        pc_scene = pc_gf_2d # pc_scene: (N, n_impr, w, h, n_coords)
+        pc_scene_mask = torch.stack([mask_r, mask_l], dim=1)[..., :2] # (N, n_impr, w, h, n_coords)
+        pc_model = pc_model_projected # pc_model: (N, n_model_points, n_coords)
+        Rs, ts = icp_2d_masked(pc_model, pc_scene, pc_scene_mask, num_iter=30)
+
+        # Obtain object pose in grasp frame
+        projected_ic_tr = torch.zeros_like(ts.shape[:-1], 4, 4)
+        projected_ic_tr[..., :2, :2] = Rs
+        projected_ic_tr[..., :2,  3] = ts
+        unproject_tr = tr.inverse_matrix(projection_tr)
+        gf_X_objpose = unproject_tr @ projected_ic_tr @ projection_tr
+
+        # Compute object pose in world frame
+        wf_X_gf = self._get_transformation_matrix(all_tfs, 'med_base', 'grasp_frame')
+        wf_X_objpose = wf_X_gf @ gf_X_objpose
+
+        # convert it to pose format [xs, ys, zs, qxs, qyx, qzs, qws]
+        estimated_pos = wf_X_objpose[..., :3, 3]
+        estimated_quat = batched_trs.matrix_to_quaternion(wf_X_objpose[..., :3, :3])
+        estimated_poses = np.concatenate([estimated_pos, estimated_quat])
+        return estimated_poses
+
+    def _get_transformation_matrix(self, all_tfs, source_frame, target_frame):
+        w_X_sf = all_tfs[source_frame]
+        w_X_tf = all_tfs[target_frame]
+        sf_X_w = torch.linalg.inv(w_X_sf)
+        sf_X_tf = sf_X_w @ w_X_tf
+        return sf_X_tf
+
+
+class ModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.reconstructor = self._get_reconstructor()
 
     def _get_reconstructor(self):
@@ -38,7 +144,7 @@ class ModelOutputObjectPoseEstimation(object):
         camera_info_l = sample['camera_info_l']
         all_tfs = sample['all_tfs']
         # obtain reference (undeformed) depths
-        ref_depth_img_r = sample['undef_depth_l'].squeeze()
+        ref_depth_img_r = sample['undef_depth_r'].squeeze()
         ref_depth_img_l = sample['undef_depth_l'].squeeze()
 
         predicted_imprint = sample['next_imprint']

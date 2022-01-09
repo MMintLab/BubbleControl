@@ -65,7 +65,6 @@ if __name__ == '__main__':
     sample_out = copy.deepcopy(sample)
     sample_out['next_imprint'] = next_imprint
 
-
     #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Object Pose Estimation   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     # estimate the contact imprint for each bubble (right and left)
@@ -74,7 +73,6 @@ if __name__ == '__main__':
 
     # estimate pose
     estimated_pose = ope.estimate_pose(sample_out)
-
 
     #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   TEST Control   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

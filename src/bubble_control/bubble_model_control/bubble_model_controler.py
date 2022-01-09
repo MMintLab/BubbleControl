@@ -79,10 +79,11 @@ class BubbleModelMPPIController(BubbleModelController):
         for i, state_i in enumerate(states):
             state_sample_i = self._pack_state_to_sample(state_i, self.sample)
             estimated_pose_i = self.object_pose_estimator.estimate_pose(state_sample_i)
+            # TODO: Add the action pose correction -- consider adding the simulation in the environment.
             estimated_poses.append(estimated_pose_i)
         estimated_poses = np.array(estimated_poses)
         costs = self.cost_function(estimated_poses, states, actions)
-        costs_t = torch.tensor(costs).reshape(-1,1)
+        costs_t = torch.tensor(costs).reshape(-1, 1)
 
         costs_t = costs_t.flatten() # This fixes the error on mppi _compute_rollout_costs, although the documentation says that cost should be a (K,1)
         return costs_t

@@ -67,6 +67,7 @@ class BubblePCReconstructorBase(abc.ABC):
         pass
 
     def _get_object_model(self):
+        # TODO: Load object models from saved files
         cylinder_mesh = o3d.geometry.TriangleMesh.create_cylinder(radius=self.radius*0.5, height=self.height*0.1, split=50)
         cylinder_pcd = o3d.geometry.PointCloud()
         cylinder_pcd.points = cylinder_mesh.vertices
