@@ -31,14 +31,16 @@ def load_model_version(Model, data_name, load_version):
 
 
 if __name__ == '__main__':
-
-    data_name = '/home/mik/Desktop/drawing_data_cartesian'
+    
+    rospy.init_node('drawin_model_mmpi_test')
+    
+    data_name = '/home/mik/Desktop/drawing_data_one_direction'
     dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame')
     Model = BubbleDynamicsPretrainedAEModel
 
-    load_version = 11
+    load_version = 0
 
-    block_downsample_tr = BlockDownSamplingTr(factor_x=7, factor_y=7, reduction='max', keys_to_tr=['init_imprint'])
+    block_downsample_tr = BlockDownSamplingTr(factor_x=7, factor_y=7, reduction='mean', keys_to_tr=['init_imprint'])
 
     # load model:
     model = load_model_version(Model, data_name, load_version)

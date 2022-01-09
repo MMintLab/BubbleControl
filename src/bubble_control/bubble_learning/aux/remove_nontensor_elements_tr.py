@@ -8,7 +8,7 @@ class RemoveNonTensorElementsTr(object):
         all_types = [type(v) for v in sample.values()]
         for i, type_i in enumerate(all_types):
             key_i = all_keys[i]
-            if type_i in [torch.Tensor]:
+            if not type_i in [torch.Tensor]:
                 sample.pop(key_i)
         return sample
 
