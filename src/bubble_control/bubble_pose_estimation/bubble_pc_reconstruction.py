@@ -62,7 +62,7 @@ class BubblePCReconstructorBase(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_imprint(self, view=False):
+    def get_imprint(self, view=False, separate=False):
         # return the contact imprint
         pass
 
@@ -344,7 +344,7 @@ class BubblePCReconsturctorDepth(BubblePCReconstructorROSBase):
         self.references['right_frame'] = self.left_parser.optical_frame['depth']
         self.last_tr = None
 
-    def get_imprint(self, view=False):
+    def get_imprint(self, view=False, separate=False):
         depth_r = self.right_parser.get_image_depth()
         depth_l = self.left_parser.get_image_depth()
         imprint_r = get_imprint_pc(self.references['right'], depth_r, threshold=self.threshold, K=self.camera_info['right']['K'])
@@ -370,7 +370,10 @@ class BubblePCReconsturctorDepth(BubblePCReconstructorROSBase):
             imprint_r[:, 4] = 1  # paint it green
             imprint_l[:, 4] = 1  # paint it green
             view_pointcloud([imprint_r, imprint_l], frame=True)
-        return np.concatenate([imprint_r, imprint_l], axis=0)
+        imprint = np.concatenate([imprint_r, imprint_l], axis=0)
+        if separate:
+            return imprint, imprint_r, imprint_l
+        return imprint
 
 
 class BubblePCReconstructorOfflineDepth(BubblePCReconstructorBase):
@@ -437,7 +440,7 @@ class BubblePCReconstructorOfflineDepth(BubblePCReconstructorBase):
         ts_msg.transform.rotation.w = q[3]
         return ts_msg
 
-    def get_imprint(self, view=False):
+    def get_imprint(self, view=False, separate=False):
         # return the contact imprint
         depth_r = self.depth_r['img']
         depth_l = self.depth_l['img']
@@ -456,4 +459,6 @@ class BubblePCReconstructorOfflineDepth(BubblePCReconstructorBase):
         imprint_l = self._tr_pc(filtered_imprint_l, frame_l, self.reconstruction_frame)
 
         imprint = np.concatenate([imprint_r, imprint_l], axis=0)
+        if separate:
+            return imprint, imprint_r, imprint_l
         return imprint
