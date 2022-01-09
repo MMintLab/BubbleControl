@@ -30,8 +30,7 @@ from bubble_utils.bubble_tools.bubble_pc_tools import get_imprint_pc
 from bubble_control.bubble_pose_estimation.pose_estimators import ICP3DPoseEstimator, ICP2DPoseEstimator
 from mmint_camera_utils.ros_utils.publisher_wrapper import PublisherWrapper
 from mmint_utils.terminal_colors import term_colors
-
-
+from bubble_control.aux.load_confs import load_object_models
 
 
 class BubblePCReconstructorBase(abc.ABC):
@@ -67,105 +66,8 @@ class BubblePCReconstructorBase(abc.ABC):
         pass
 
     def _get_object_model(self):
-        # TODO: Load object models from saved files
-        cylinder_mesh = o3d.geometry.TriangleMesh.create_cylinder(radius=self.radius*0.5, height=self.height*0.1, split=50)
-        cylinder_pcd = o3d.geometry.PointCloud()
-        cylinder_pcd.points = cylinder_mesh.vertices
-        cylinder_pcd.paint_uniform_color([0, 0, 0])
-
-        # object model simplified by 2 planes
-        grid_y, grid_z = np.meshgrid(np.linspace(-self.radius*0.5, self.radius*0.5,10), np.linspace(-self.height*0.1, self.height*0.1, 30))
-        points_y = grid_y.flatten()
-        points_z = grid_z.flatten()
-        plane_base = np.stack([np.zeros_like(points_y), points_y, points_z], axis=1)
-        plane_base = np.concatenate([plane_base, np.zeros_like(plane_base)], axis=1)
-        plane_1 = plane_base.copy()
-        plane_2 = plane_base.copy()
-        plane_1[:,0] = self.radius*1.2
-        plane_2[:,0] = -self.radius*1.2
-        planes_pc = np.concatenate([plane_1, plane_2], axis=0)
-        planes_pcd = pack_o3d_pcd(planes_pc)
-
-        # PEN ---- object model simplified by 2 planes
-        grid_y, grid_z = np.meshgrid(np.linspace(-0.0025, 0.0025, 30),
-                                     np.linspace(-self.height * 0.1, self.height * 0.1, 50))
-        points_y = grid_y.flatten()
-        points_z = grid_z.flatten()
-        plane_base = np.stack([np.zeros_like(points_y), points_y, points_z], axis=1)
-        plane_base = np.concatenate([plane_base, np.zeros_like(plane_base)], axis=1)
-        plane_1 = plane_base.copy()
-        plane_2 = plane_base.copy()
-        plane_1[:, 0] = 0.006
-        plane_2[:, 0] = -0.006
-        pen_pc = np.concatenate([plane_1, plane_2], axis=0)
-        pen_pcd = pack_o3d_pcd(pen_pc)
-
-        # SPATULA ---- spatula simplified by 2 planes
-        grid_y, grid_z = np.meshgrid(np.linspace(-0.0025, 0.0025, 50),
-                                     np.linspace(-0.01, 0.01, 50))
-        points_y = grid_y.flatten()
-        points_z = grid_z.flatten()
-        plane_base = np.stack([np.zeros_like(points_y), points_y, points_z], axis=1)
-        plane_base = np.concatenate([plane_base, np.zeros_like(plane_base)], axis=1)
-        plane_1 = plane_base.copy()
-        plane_2 = plane_base.copy()
-        plane_1[:, 0] = 0.009
-        plane_2[:, 0] = -0.009
-        spatula_pl_pc = np.concatenate([plane_1, plane_2], axis=0)
-        spatula_pl_pcd = pack_o3d_pcd(spatula_pl_pc)
-
-        # MARKER ---- object model simplified by 2 planes
-        grid_y, grid_z = np.meshgrid(np.linspace(-0.0025, 0.0025, 30),
-                                     np.linspace(-self.height * 0.1, self.height * 0.1, 50))
-        points_y = grid_y.flatten()
-        points_z = grid_z.flatten()
-        plane_base = np.stack([np.zeros_like(points_y), points_y, points_z], axis=1)
-        plane_base = np.concatenate([plane_base, np.zeros_like(plane_base)], axis=1)
-        plane_1 = plane_base.copy()
-        plane_2 = plane_base.copy()
-        plane_1[:, 0] = 0.01
-        plane_2[:, 0] = -0.01
-        marker_pc = np.concatenate([plane_1, plane_2], axis=0)
-        marker_pcd = pack_o3d_pcd(marker_pc)
-
-        # ALLEN ---- object model simplified by 2 planes
-        grid_y, grid_z = np.meshgrid(np.linspace(-0.0025, 0.0025, 30),
-                                     np.linspace(-self.height * 0.1, self.height * 0.1, 50))
-        points_y = grid_y.flatten()
-        points_z = grid_z.flatten()
-        plane_base = np.stack([np.zeros_like(points_y), points_y, points_z], axis=1)
-        plane_base = np.concatenate([plane_base, np.zeros_like(plane_base)], axis=1)
-        plane_1 = plane_base.copy()
-        plane_2 = plane_base.copy()
-        plane_1[:, 0] = 0.003
-        plane_2[:, 0] = -0.003
-        allen_pc = np.concatenate([plane_1, plane_2], axis=0)
-        allen_pcd = pack_o3d_pcd(allen_pc)
-
-        # PINGPONG PADDLE ---- object model simplified by 2 planes
-        grid_y, grid_z = np.meshgrid(np.linspace(-0.01, 0.01, 30),
-                                     np.linspace(-self.height * 0.1, self.height * 0.1, 50))
-        points_y = grid_y.flatten()
-        points_z = grid_z.flatten()
-        plane_base = np.stack([np.zeros_like(points_y), points_y, points_z], axis=1)
-        plane_base = np.concatenate([plane_base, np.zeros_like(plane_base)], axis=1)
-        plane_1 = plane_base.copy()
-        plane_2 = plane_base.copy()
-        plane_1[:, 0] = 0.011
-        plane_2[:, 0] = -0.011
-        paddle_pc = np.concatenate([plane_1, plane_2], axis=0)
-        paddle_pcd = pack_o3d_pcd(paddle_pc)
-
-        # object_model = cylinder_pcd
-        # object_model = planes_pcd
-        # object_model = pen_pcd
-        # object_model = spatula_pl_pcd
-        # object_model = marker_pcd
-        # object_model = allen_pcd
-        # object_model = paddle_pcd
-        # TODO: Add rest
-        models = {'allen': allen_pcd, 'marker': marker_pcd, 'pen': pen_pcd}
-        object_model = models[self.object_name]
+        object_models = load_object_models()
+        object_model = object_models[self.object_name]
         return object_model
 
     def _get_pose_estimator(self):

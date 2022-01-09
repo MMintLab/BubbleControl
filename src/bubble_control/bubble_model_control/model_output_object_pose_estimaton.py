@@ -13,12 +13,11 @@ from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import Bubbl
 from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
 from bubble_control.bubble_learning.aux.img_trs.block_upsampling_tr import BlockUpSamplingTr
 from bubble_control.bubble_learning.models.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel
-from bubble_control.aux.load_confs import load_bubble_reconstruction_params
+from bubble_control.aux.load_confs import load_bubble_reconstruction_params, load_object_models
 from bubble_control.bubble_pose_estimation.bubble_pc_reconstruction import BubblePCReconstructorOfflineDepth
 from bubble_utils.bubble_tools.bubble_img_tools import unprocess_bubble_img
 
 from bubble_control.bubble_pose_estimation.batched_pytorch_icp import icp_2d_masked, pc_batched_tr
-
 from mmint_camera_utils.camera_utils import project_depth_image
 from mmint_camera_utils.point_cloud_utils import project_pc, get_projection_tr
 from bubble_utils.bubble_tools.bubble_pc_tools import get_imprint_mask
@@ -73,7 +72,7 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         pc_l = project_depth_image(depth_def_l, Ks_l)# (N, w, h, n_coords) -- n_coords=3
 
         # Compute mask -- filter out points
-        imprint_threshold = None
+        imprint_threshold = self.imprint_threshold
         mask_r = get_imprint_mask(depth_ref_r, depth_def_r, imprint_threshold)
         mask_l = get_imprint_mask(depth_ref_l, depth_def_l, imprint_threshold)
 
@@ -85,8 +84,8 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         pc_gf = torch.stack([pc_r_gf, pc_l_gf], dim=1) # (N, n_impr, w, h, n_coords)
 
         # Load object model model
-        # TODO: Save and load object models from self.object_name
-        model_pc = None
+        model_pcs = load_object_models()
+        model_pc = model_pcs[self.object_name]
 
         # Project points to 2d
         projection_axis = (1, 0, 0)
