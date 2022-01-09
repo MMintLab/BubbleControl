@@ -219,8 +219,6 @@ class BubblePCReconstructorBase(abc.ABC):
         else:
             imprint = self.get_imprint(view=view)
         estimated_pose = self._estimate_pose(imprint, threshold, verbose=verbose)
-        if self.broadcast_imprint:
-            self._broadcast_imprint(imprint)
         return estimated_pose
 
     def _estimate_pose(self, imprint, threshold, verbose=False):
