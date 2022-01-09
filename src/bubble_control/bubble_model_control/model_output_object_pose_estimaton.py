@@ -115,7 +115,8 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
 
         # convert it to pose format [xs, ys, zs, qxs, qyx, qzs, qws]
         estimated_pos = wf_X_objpose[..., :3, 3]
-        estimated_quat = batched_trs.matrix_to_quaternion(wf_X_objpose[..., :3, :3])
+        _estimated_quat = batched_trs.matrix_to_quaternion(wf_X_objpose[..., :3, :3]) # (qw,qx,qy,qz)
+        estimated_quat = torch.index_select(_estimated_quat, dim=1, index=torch.LongTensor([1, 2, 3, 0]))# (qx,qy,qz,qw)
         estimated_poses = np.concatenate([estimated_pos, estimated_quat])
         return estimated_poses
 
