@@ -56,7 +56,7 @@ if __name__ == '__main__':
 
     imprint_t = torch.tensor(sample_down['init_imprint']).unsqueeze(0).to(dtype=torch.float)
     action_t = torch.tensor(sample_down['action']).unsqueeze(0).to(dtype=torch.float)
-
+    
     # predict next imprint
     next_imprint = model(imprint_t, action_t).squeeze()
 

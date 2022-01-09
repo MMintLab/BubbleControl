@@ -37,12 +37,13 @@ class BubbleModelMPPIController(BubbleModelController):
         self.state_size = None # To be filled with sample information or model information
         self.sample = None # Container to share sample across functions
         super().__init__(*args, **kwargs)
-        self.state_size = np.prod(self.model._get_sizes()['imprint'])
+        self.state_size = np.prod(self.model._get_sizes()['imprint']) # TODO: Make more general
 
     def _init_params(self):
+        # TODO: Make more general
         self.original_state_shape = self.model.input_sizes['init_imprint']
         self.state_size = np.prod(self.original_state_shape)
-        self.noise_sigma = torch.tensor(np.diag([np.pi/2,.05]), device=self.model.device, dtype=torch.float)
+        self.noise_sigma = torch.tensor(np.diag([np.pi/2,.05, 0.05]), device=self.model.device, dtype=torch.float)
 
     def dynamics(self, state_t, action_t):
         """
@@ -55,7 +56,6 @@ class BubbleModelMPPIController(BubbleModelController):
         # TODO: Query model
         state = self._unpack_state_tensor(state_t)
         action = self._unpack_action_tensor(action_t)
-
         next_state = self.model(state, action)
 
         next_state_t = self._pack_state_to_tensor(next_state)
@@ -125,8 +125,8 @@ class BubbleModelMPPIController(BubbleModelController):
 
     def _get_controller(self):
         self._init_params()
-        u_min = torch.zeros((2,)) # TODO: Set
-        u_max = torch.tensor([2*np.pi, .15]) # TODO: Set
+        u_min = torch.zeros((3,)) # TODO: Set from action space
+        u_max = torch.tensor([2*np.pi, .15, .15]) # TODO: Set from action space
         lambda_ = 1.0 # TODO: Set
         device = self.model.device
         
