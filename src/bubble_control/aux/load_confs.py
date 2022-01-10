@@ -30,7 +30,7 @@ def load_plane_params():
 def load_object_models():
     bubble_icp_models_path = os.path.join(package_path, 'config', 'object_models.npy')
     with open(bubble_icp_models_path, 'rb') as f:
-        object_models = np.load(f)
+        object_models = np.load(f, allow_pickle=True).item()
 
     # pack object models as pcd
     for k, ar_i in object_models.items():
