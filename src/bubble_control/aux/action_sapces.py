@@ -40,7 +40,7 @@ class FinalPivotingPoseSpace(gym.spaces.Space):
         self.current_pose = current_pose
         self.delta_y_limits = delta_y_limits
         self.delta_z_limits = delta_z_limits
-        self.roll_limits = delta_roll_limits
+        self.delta_roll_limits = delta_roll_limits
         self.med = med
 
     def sample(self):
