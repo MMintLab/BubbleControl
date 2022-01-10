@@ -3,6 +3,7 @@ import numpy as np
 from collections import OrderedDict
 import gym
 import copy
+import tf.transformations as tr
 
 
 class AxisBiasedDirectionSpace(gym.spaces.Space):
@@ -75,7 +76,8 @@ class InitialPivotingPoseSpace(gym.spaces.Space):
                                              np.array([self.init_x_limits[1], self.init_y_limits[1], self.init_z_limits[1]]))
         roll = np.random.uniform(self.roll_limits[0],self.roll_limits[1])
         initial_orientation = np.array([roll, 0, np.pi])
-        initial_pose_wf = np.concatenate([initial_position, initial_orientation])                                            
+        initial_quaternion = tr.quaternion_from_euler(initial_orientation[0], initial_orientation[1], initial_orientation[2], 'sxyz')
+        initial_pose_wf = np.concatenate([initial_position, initial_quaternion])                                            
         return initial_pose_wf
 
     def contains(self, pose):
