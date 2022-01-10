@@ -210,14 +210,24 @@ class ToolContactPointEstimator(object):
         self.raise_up()
         rospy.sleep(2.0)
 
-    def reorient_in_drawing_direction(self, desired_direction):
-        contact_point = self.get_contact_point()
+    def reorient_in_drawing_direction(self, desired_direction, num_steps=1, backwards=False):
+        if np.linalg.norm(desired_direction) != 0:
+            desired_direction = desired_direction/np.linalg.norm(desired_direction)
+        desired_direction = np.append(desired_direction,0)
         grasp_frame_tf = self.tf2_listener.get_transform(parent='med_base', child='grasp_frame')
-        current_direction = (grasp_frame_tf[:3,:3] @ np.array([0, 0, 1]))[:2]
+        current_direction = -(grasp_frame_tf[:3,:3] @ np.array([0, 1, 0]))[:2]
+        current_direction = np.append(current_direction,0)
+        if np.linalg.norm(current_direction) != 0:
+            current_direction = current_direction/np.linalg.norm(current_direction)        
+        contact_point = self.get_contact_point()
         angle = np.arccos(np.dot(current_direction, desired_direction))
         if np.cross(current_direction, desired_direction)[2] < 0:
             angle *= -1
-        self.med.rotation_along_axis_point_angle(axis=np.array([0, 0, 1]), angle=angle, point=contact_point, frame_id='grasp_frame')
+        if backwards:
+            # If the new drawing direction is far apart we will draw backwards
+            if np.abs(angle) > np.pi/2:
+                angle = -np.sign(angle)*(np.pi - np.abs(angle))
+        self.med.rotation_along_axis_point_angle(axis=np.array([0, 0, 1]), angle=angle, point=contact_point, frame_id='grasp_frame', num_steps=num_steps)
 
     def close(self):
         self.contact_point_marker_publisher.finish()
