@@ -167,7 +167,7 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         costs = self.cost_function(estimated_poses, states, actions)
         costs_t = torch.tensor(costs).reshape(-1, 1)
 
-        costs_t = costs_t.flatten() # This fixes the error on mppi _compute_rollout_costs, although the documentation says that cost should be a (K,1)
+        costs_t = costs_t.flatten() # This fixes the error on mppi compute_rollout_costs, although the documentation says that cost should be a (K,1)
         return costs_t
 
     def _pack_state_to_sample(self, state, sample_ref):
