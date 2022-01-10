@@ -95,11 +95,11 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         pc_model_projected = project_pc(model_pc, projection_axis)
 
         # Apply ICP 2d
-        max_num_iterations = 20
+        num_iterations = 20
         pc_scene = pc_gf_2d # pc_scene: (N, n_impr, w, h, n_coords)
         pc_scene_mask = torch.stack([mask_r, mask_l], dim=1)[..., :2] # (N, n_impr, w, h, n_coords)
         pc_model = pc_model_projected # pc_model: (N, n_model_points, n_coords)
-        Rs, ts = icp_2d_masked(pc_model, pc_scene, pc_scene_mask, num_iter=30)
+        Rs, ts = icp_2d_masked(pc_model, pc_scene, pc_scene_mask, num_iter=num_iterations)
 
         # Obtain object pose in grasp frame
         projected_ic_tr = torch.zeros_like(ts.shape[:-1], 4, 4)

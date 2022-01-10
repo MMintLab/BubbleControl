@@ -248,8 +248,8 @@ class BubblePCReconsturctorDepth(BubblePCReconstructorROSBase):
     def get_imprint(self, view=False, separate=False):
         depth_r = self.right_parser.get_image_depth()
         depth_l = self.left_parser.get_image_depth()
-        imprint_r = get_imprint_pc(self.references['right'], depth_r, threshold=self.threshold, K=self.camera_info['right']['K'])
-        imprint_l = get_imprint_pc(self.references['left'], depth_l, threshold=self.threshold, K=self.camera_info['left']['K'])
+        imprint_r = get_imprint_pc(self.references['right'].squeeze(-1), depth_r.squeeze(-1), threshold=self.threshold, K=self.camera_info['right']['K'])
+        imprint_l = get_imprint_pc(self.references['left'].squeeze(-1), depth_l.squeeze(-1), threshold=self.threshold, K=self.camera_info['left']['K'])
         frame_r = self.right_parser.optical_frame['depth']
         frame_l = self.left_parser.optical_frame['depth']
 
@@ -345,9 +345,9 @@ class BubblePCReconstructorOfflineDepth(BubblePCReconstructorBase):
         # return the contact imprint
         depth_r = self.depth_r['img']
         depth_l = self.depth_l['img']
-        imprint_r = get_imprint_pc(self.references['right'], depth_r, threshold=self.threshold,
+        imprint_r = get_imprint_pc(self.references['right'].squeeze(-1), depth_r.squeeze(-1), threshold=self.threshold,
                                    K=self.camera_info['right']['K'])
-        imprint_l = get_imprint_pc(self.references['left'], depth_l, threshold=self.threshold,
+        imprint_l = get_imprint_pc(self.references['left'].squeeze(-1), depth_l.squeeze(-1), threshold=self.threshold,
                                    K=self.camera_info['left']['K'])
         frame_r = self.depth_r['frame']
         frame_l = self.depth_l['frame']
