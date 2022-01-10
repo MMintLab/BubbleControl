@@ -24,25 +24,38 @@ from bubble_utils.bubble_tools.bubble_pc_tools import get_imprint_mask
 
 
 class ModelOutputObjectPoseEstimationBase(object):
-    def __init__(self, object_name='marker'):
+    def __init__(self, object_name='marker', factor_x=1, factor_y=1, method='bilinear'):
         self.object_name = object_name
         self.reconstruction_params = load_bubble_reconstruction_params()
         self.object_params = self.reconstruction_params[self.object_name]
         self.imprint_threshold = self.object_params['imprint_th']['depth']
         self.icp_threshold = self.object_params['icp_th']
+        self.block_upsample_tr = BlockUpSamplingTr(factor_x=factor_x, factor_y=factor_y, method=method,
+                                                   keys_to_tr=['next_imprint'])
+
+    def estimate_pose(self, sample):
+        # upsample the imprints
+        sample_up = self._upsample_sample(sample)
+        return self._estimate_pose(sample_up)
 
     @abstractmethod
-    def estimate_pose(self, sample):
+    def _estimate_pose(self, sample):
         # Return estimated object pose [x, y, z, qx, qy, qz, qw]
         pass
+
+    def _upsample_sample(self, sample):
+        # Upsample ouptut
+        sample_up = self.block_upsample_tr(sample)
+        return sample_up
 
 
 class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
     """ Work with pytorch tensors"""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.model_pcs = load_object_models()
 
-    def estimate_pose(self, batched_sample):
+    def _estimate_pose(self, batched_sample):
         """
         Estimate the object pose from the imprints using icp 2D. We compute it in parallel on batched operations
         :param sample: The sample is expected to be batched, i.e. all values (batch_size, original_size_1, ..., original_size_n)
@@ -84,8 +97,7 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         pc_gf = torch.stack([pc_r_gf, pc_l_gf], dim=1) # (N, n_impr, w, h, n_coords)
 
         # Load object model model
-        model_pcs = load_object_models()
-        model_pc = model_pcs[self.object_name]
+        model_pc = self.model_pcs[self.object_name]
 
         # Project points to 2d
         projection_axis = (1, 0, 0)
@@ -139,7 +151,7 @@ class ModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
                                                           estimation_type='icp2d')
         return reconstructor
 
-    def estimate_pose(self, sample):
+    def _estimate_pose(self, sample):
         camera_info_r = sample['camera_info_r']
         camera_info_l = sample['camera_info_l']
         all_tfs = sample['all_tfs']
@@ -175,21 +187,4 @@ class ModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
         return estimated_pose
 
 
-class ModelDownsampledOutputObjectPoseEstimation(ModelOutputObjectPoseEstimation):
-    """
-    Add the upsamplnig of the imprint to the esitimate pose query
-    """
 
-    def __init__(self, *args, factor_x=7, factor_y=7, method='bilinear', **kwargs):
-        self.block_upsample_tr = BlockUpSamplingTr(factor_x=factor_x, factor_y=factor_y, method=method, keys_to_tr=['next_imprint'])
-        super().__init__(*args, **kwargs)
-
-    def estimate_pose(self, sample):
-        # upsample the imprints
-        sample_up = self._upsample_sample(sample)
-        return super().estimate_pose(sample_up)
-
-    def _upsample_sample(self, sample):
-        # Upsample ouptut
-        sample_up = self.block_upsample_tr(sample)
-        return sample_up

@@ -29,7 +29,7 @@ class BubbleModelController(abc.ABC):
 
 class BubbleModelMPPIController(BubbleModelController):
 
-    def __init__(self, *args, num_samples=100, horizon=3,**kwargs):
+    def __init__(self, *args, num_samples=100, horizon=3, **kwargs):
         self.num_samples = num_samples
         self.horizon = horizon
         self.original_state_shape = None
@@ -69,7 +69,6 @@ class BubbleModelMPPIController(BubbleModelController):
         :param action: (K, action_size) tensor
         :return: cost: (K, 1) tensor
         """
-        # TODO: compute cost (use self.cost_function and object_pose estimator)
         costs_t = torch.zeros((len(state_t), 1))
 
         states = self._unpack_state_tensor(state_t)
@@ -77,9 +76,9 @@ class BubbleModelMPPIController(BubbleModelController):
 
         estimated_poses = []
         for i, state_i in enumerate(states):
+            # TODO: Add the action pose correction -- consider adding the simulation in the environment.
             state_sample_i = self._pack_state_to_sample(state_i, self.sample)
             estimated_pose_i = self.object_pose_estimator.estimate_pose(state_sample_i)
-            # TODO: Add the action pose correction -- consider adding the simulation in the environment.
             estimated_poses.append(estimated_pose_i)
         estimated_poses = np.array(estimated_poses)
         costs = self.cost_function(estimated_poses, states, actions)
@@ -144,7 +143,55 @@ class BubbleModelMPPIController(BubbleModelController):
         return action
 
 
+class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
+    """
+    The object_pose_estimator admits batched samples
+    """
+    def compute_cost(self, state_t, action_t):
+        """
+        Compute the dynamics
+        :param state: (K, state_size) tensor
+        :param action: (K, action_size) tensor
+        :return: cost: (K, 1) tensor
+        """
+        costs_t = torch.zeros((len(state_t), 1))
 
+        states = self._unpack_state_tensor(state_t)
+        actions = self._unpack_action_tensor(action_t)
 
+        state_samples = self._pack_state_to_sample(states, self.sample)
+        state_samples = self._action_correction(state_samples, actions)
+        estimated_poses = self.object_pose_estimator.estimate_pose(state_samples)
 
+        estimated_poses = estimated_poses.cpu().detach().numpy()
+        costs = self.cost_function(estimated_poses, states, actions)
+        costs_t = torch.tensor(costs).reshape(-1, 1)
+
+        costs_t = costs_t.flatten() # This fixes the error on mppi _compute_rollout_costs, although the documentation says that cost should be a (K,1)
+        return costs_t
+
+    def _pack_state_to_sample(self, state, sample_ref):
+        sample = copy.deepcopy(sample_ref)
+        batch_size = state.shape[0]
+        import pdb; pdb.set_trace()
+        sample['next_imprint'] = state
+        # TODO: convert samples to tensors
+        # TODO: repeat the batch size (at least for camera_info_{r,l}['K'], undef_depth_{r,l}, all_tfs
+        return sample
+
+    def _convert_all_tfs_to_tensors(self, all_tfs):
+        """
+        :param all_tfs: DataFrame
+        :return:
+        """
+        # TODO: Transform a DF into a dictionary of homogeneous transformations matrices (4x4)
+        coverted_all_tfs = None
+        import pdb; pdb.set_trace()
+        return coverted_all_tfs
+
+    def _action_correction(self, state_samples, actions):
+        state_samples_corrected = state_samples
+        # TODO: modify the tfs
+        import pdb; pdb.set_trace()
+        return state_samples_corrected
 
