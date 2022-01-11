@@ -45,17 +45,28 @@ class BlockUpSamplingTr(abc.ABC):
 
     def _tr(self, x):
         # ---- repeat upsampling ----
+        is_tensor = type(x) is torch.Tensor
         if self.method == 'repeat':
-            x_upsampled = x.repeat(self.factor_x, axis=-2).repeat(self.factor_y, axis=-1)
+            if is_tensor:
+                x_upsampled = x.repeat_interleave(self.factor_x, dim=-2).repeat_interleave(self.factor_y, dim=-1)
+            else:
+                # numpy case
+                x_upsampled = x.repeat(self.factor_x, axis=-2).repeat(self.factor_y, axis=-1)
         elif self.method in ['bilinear', 'bicubic']:
             # ---- interpolation upsampling -- (TODO)
             # Use pytorch interpolate for batched interpolation
             size_x = x.shape[-2]
             size_y = x.shape[-1]
-            x_t = torch.tensor(x).reshape(-1,1,size_x, x.shape[-1]) # add num channels (expected (batch, num_channels, depth, height))
+            if is_tensor:
+                x_t = x
+            else:
+                x_t = torch.tensor(x)
+            x_t = x_t.reshape(-1, 1, size_x, x.shape[-1]) # add num channels (expected (batch, num_channels, depth, height))
             new_size = (size_x*self.factor_x, size_y*self.factor_y)
             x_upsampled_t = F.interpolate(x_t, size=new_size, mode=self.method, align_corners=True)
-            x_upsampled = x_upsampled_t.reshape(*x.shape[:-2], *new_size).cpu().detach().numpy()
+            x_upsampled = x_upsampled_t.reshape(*x.shape[:-2], *new_size)
+            if not is_tensor:
+                x_upsampled = x_upsampled.cpu().detach().numpy() # convert it back to numpy
         else:
             raise NotImplemented('method {} not available yet. Available methods: {}'.format(self.metod, ['repeat']))
         return x_upsampled

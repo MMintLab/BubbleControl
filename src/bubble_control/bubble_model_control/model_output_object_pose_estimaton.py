@@ -44,7 +44,7 @@ class ModelOutputObjectPoseEstimationBase(object):
         pass
 
     def _upsample_sample(self, sample):
-        # Upsample ouptut
+        # Upsample output
         sample_up = self.block_upsample_tr(sample)
         return sample_up
 
