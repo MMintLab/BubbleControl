@@ -170,6 +170,10 @@ class ModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
         deformed_depth_l = ref_depth_img_l - imprint_pred_l
 
         # THIS hacks the ways to obtain data for the reconstructor
+        ref_depth_img_l = np.expand_dims(ref_depth_img_l, -1)
+        ref_depth_img_r = np.expand_dims(ref_depth_img_r, -1)
+        deformed_depth_r = np.expand_dims(deformed_depth_r, -1)
+        deformed_depth_l = np.expand_dims(deformed_depth_l, -1)
         self.reconstructor.references['left'] = ref_depth_img_l
         self.reconstructor.references['right'] = ref_depth_img_r
         self.reconstructor.depth_r = {'img': deformed_depth_r, 'frame': 'pico_flexx_right_optical_frame'}
