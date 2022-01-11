@@ -12,8 +12,9 @@ def icp_2d_masked(pc_model, pc_scene, pc_scene_mask, num_iter=30):
 
     N, n_impr, w, h, n_coords = pc_scene.shape
     pc_scene_r = reshape_pc(pc_scene)
-    pc_scene_mask_extended = pc_scene_mask.unsqueeze(-1).repeat_interleave(n_coords, dim=-1)  # (N, n_scene_points, n_coords)
-    pc_scene_mask_r = reshape_pc(pc_scene_mask_extended)
+    if len(pc_scene_mask.shape) == len(pc_scene_mask.shape)-1:
+        pc_scene_mask = pc_scene_mask.unsqueeze(-1).repeat_interleave(n_coords, dim=-1)  # (N, n_scene_points, n_coords)
+    pc_scene_mask_r = reshape_pc(pc_scene_mask)
 
     R_init = torch.eye(n_coords).unsqueeze(0).repeat_interleave(N, dim=0)  # (N, num_dims, num_dims)--- init all R as identyty
     t_init = masked_tensor_mean(pc_scene_r.transpose(1, 2), pc_scene_mask_r.transpose(1, 2),
