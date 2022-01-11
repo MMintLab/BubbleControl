@@ -2,6 +2,7 @@ import abc
 import torch
 import numpy as np
 import copy
+import tf.transformations as tr
 from pytorch_mppi import mppi
 
 
@@ -174,6 +175,8 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         sample = copy.deepcopy(sample_ref)
         batch_size = state.shape[0]
         batch_size = state.shape[0]
+        # convert all_tfs to tensors
+        sample['all_tfs'] = self._convert_all_tfs_to_tensors(sample['all_tfs'])
         # convert samples to tensors
         batched_sample = batched_tensor_sample(sample, batch_size=batch_size, device=state.device)
         # and repeat the batch size (at least for camera_info_{r,l}['K'], undef_depth_{r,l}, all_tfs
@@ -186,9 +189,18 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         :return:
         """
         # TODO: Transform a DF into a dictionary of homogeneous transformations matrices (4x4)
-        coverted_all_tfs = None
+        converted_all_tfs = {}
+        parent_frame = all_tfs['parent_frame'][0] # Assume that are all teh same
+        child_frames = all_tfs['child_frame']
+        converted_all_tfs[parent_frame] = np.eye(4) # Transformation to itself is the identity
+        all_poses = all_tfs[['x','y','z','qx','qy','qz','qw']]
+        for i, child_frame_i in enumerate(child_frames):
+            pose_i = all_poses.iloc[i]
+            X_i = tr.quaternion_matrix(pose_i[3:])
+            X_i[:3,3] = pose_i[:3]
+            converted_all_tfs[child_frame_i] = X_i
         import pdb; pdb.set_trace()
-        return coverted_all_tfs
+        return converted_all_tfs
 
     def _action_correction(self, state_samples, actions):
         state_samples_corrected = state_samples
