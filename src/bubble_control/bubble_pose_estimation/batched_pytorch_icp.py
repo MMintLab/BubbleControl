@@ -12,10 +12,10 @@ def icp_2d_masked(pc_model, pc_scene, pc_scene_mask, num_iter=30):
 
     N, n_impr, w, h, n_coords = pc_scene.shape
     pc_scene_r = reshape_pc(pc_scene)
-    pc_scene_mask_extended = pc_scene_mask.unsqueeze(-1).repeat(1, 1, 1, 1, n_coords)  # (N, n_scene_points, n_coords)
+    pc_scene_mask_extended = pc_scene_mask.unsqueeze(-1).repeat_interleave(n_coords, dim=-1)  # (N, n_scene_points, n_coords)
     pc_scene_mask_r = reshape_pc(pc_scene_mask_extended)
 
-    R_init = torch.eye(n_coords).unsqueeze(0).repeat(N, 1, 1)  # (N, num_dims, num_dims)--- init all R as identyty
+    R_init = torch.eye(n_coords).unsqueeze(0).repeat_interleave(N, dim=0)  # (N, num_dims, num_dims)--- init all R as identyty
     t_init = masked_tensor_mean(pc_scene_r.transpose(1, 2), pc_scene_mask_r.transpose(1, 2),
                                 start_dim=-1)  # mean of the scene
 
@@ -31,7 +31,7 @@ def icp_2d_masked(pc_model, pc_scene, pc_scene_mask, num_iter=30):
 def icp_2d_maksed_step(pc_model, pc_scene, pc_scene_mask, R_init, t_init):
     # pc_model, shape (N, n_model_points, n_coords)
     # pc_scene, shape (N, n_scene_points, n_coords)
-    # pc_scene_mask, shape (N, n_scene_points, n_coords) * n_coords is just repeated
+    # pc_scene_mask, shape (N, n_scene_points, n_coords) *** Here n_coords dimension is just repeated
     # t_init: (N, n_coords)
     # R_init: (N, n_coords, n_coords)
     # -------------------
@@ -87,15 +87,15 @@ def estimate_correspondences_batched(a1, a2, a2_mask):
     # Compute distances
     N1, n_1_points, n_coords_1 = a1.shape
     N2, n_2_points, n_coords_2 = a2.shape
-    a12 = a1.unsqueeze(1).repeat(1, n_2_points, 1, 1)
-    a21 = a2.unsqueeze(2).repeat(1, 1, n_1_points, 1)
+    a12 = a1.unsqueeze(1).repeat_interleave(n_2_points, dim=1)
+    a21 = a2.unsqueeze(2).repeat_interleave(n_1_points, dim=2)
     dists = torch.sqrt(torch.sum((a12 - a21) ** 2, dim=-1))
 
     # Get clossest point indxs
     corr_indxs = torch.argmin(dists, axis=-1)  # get a1 index that minimizes distance to a2
 
     # Apply correspondences
-    batch_idxs = torch.arange(0, 3).unsqueeze(-1).repeat(1, n_2_points)
+    batch_idxs = torch.arange(0, 3).unsqueeze(-1).repeat_interleave(n_2_points, dim=-1)
     a_1corr = a1[batch_idxs, corr_indxs, :]
     return a_1corr
 
