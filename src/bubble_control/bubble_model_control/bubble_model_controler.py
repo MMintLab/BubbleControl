@@ -167,17 +167,18 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         costs = self.cost_function(estimated_poses, states, actions)
         costs_t = torch.tensor(costs).reshape(-1, 1)
 
-        costs_t = costs_t.flatten() # This fixes the error on mppi compute_rollout_costs, although the documentation says that cost should be a (K,1)
+        costs_t = costs_t.flatten() # This fixes the error on mppi _compute_rollout_costs, although the documentation says that cost should be a (K,1)
         return costs_t
 
     def _pack_state_to_sample(self, state, sample_ref):
         sample = copy.deepcopy(sample_ref)
         batch_size = state.shape[0]
-        import pdb; pdb.set_trace()
-        sample['next_imprint'] = state
-        # TODO: convert samples to tensors
-        # TODO: repeat the batch size (at least for camera_info_{r,l}['K'], undef_depth_{r,l}, all_tfs
-        return sample
+        batch_size = state.shape[0]
+        # convert samples to tensors
+        batched_sample = batched_tensor_sample(sample, batch_size=batch_size, device=state.device)
+        # and repeat the batch size (at least for camera_info_{r,l}['K'], undef_depth_{r,l}, all_tfs
+        batched_sample['next_imprint'] = state
+        return batched_sample
 
     def _convert_all_tfs_to_tensors(self, all_tfs):
         """
@@ -195,3 +196,29 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         import pdb; pdb.set_trace()
         return state_samples_corrected
 
+def batched_tensor_sample(sample, batch_size=None, device=None):
+    # sample is a dictionary of
+    if device is None:
+        device = torch.device('cpu')
+    batched_sample = {}
+    for k_i, v_i in sample.items():
+        if type(v_i) is dict:
+            batched_sample_i = batched_tensor_sample(v_i, batch_size=batch_size, device=device)
+            batched_sample[k_i] = batched_sample_i
+        elif type(v_i) is np.ndarray:
+            batched_sample_i = torch.tensor(v_i).to(device)
+            if batch_size is not None:
+                batched_sample_i = batched_sample_i.unsqueeze(0).repeat_interleave(batch_size, dim=0)
+            batched_sample[k_i] = batched_sample_i
+        elif type(v_i) in [int, float]:
+            batched_sample_i = torch.tensor([v_i]).to(device)
+            if batch_size is not None:
+                batched_sample_i = batched_sample_i.unsqueeze(0).repeat_interleave(batch_size, dim=0)
+            batched_sample[k_i] = batched_sample_i
+        elif type(v_i) is torch.Tensor:
+            if batch_size is not None:
+                batched_sample_i = batched_sample_i.unsqueeze(0).repeat_interleave(batch_size, dim=0)
+            batched_sample[k_i] = batched_sample_i.to(device)
+        else:
+            batched_sample[k_i] = v_i
+    return batched_sample
