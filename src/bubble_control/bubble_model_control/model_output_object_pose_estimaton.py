@@ -65,11 +65,12 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
 
         # Get imprints from sample
         predicted_imprint = batched_sample['next_imprint']
-        imprint_pred_r, imprint_pred_l = predicted_imprint
+        imprint_pred_r = predicted_imprint[:,0]
+        imprint_pred_l = predicted_imprint[:,1]
 
         # unprocess the imprints (add padding to move them back to the original shape)
-        imprint_pred_r = unprocess_bubble_img(imprint_pred_r) # ref frame:  -- (N, w, h)
-        imprint_pred_l = unprocess_bubble_img(imprint_pred_l) # ref frame:  -- (N, w, h)
+        imprint_pred_r = unprocess_bubble_img(imprint_pred_r.unsqueeze(-1)).squeeze(-1) # ref frame:  -- (N, w, h)
+        imprint_pred_l = unprocess_bubble_img(imprint_pred_l.unsqueeze(-1)).squeeze(-1) # ref frame:  -- (N, w, h)
         imprint_frame_r = 'pico_flexx_right_optical_frame'
         imprint_frame_l = 'pico_flexx_left_optical_frame'
 
@@ -88,47 +89,68 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         imprint_threshold = self.imprint_threshold
         mask_r = get_imprint_mask(depth_ref_r, depth_def_r, imprint_threshold)
         mask_l = get_imprint_mask(depth_ref_l, depth_def_l, imprint_threshold)
-
+        mask_r = torch.tensor(mask_r).to(predicted_imprint)
+        mask_l = torch.tensor(mask_l).to(predicted_imprint)
+        
         # Convert imprint point coordinates to grasp frame
         gf_X_ifr = self._get_transformation_matrix(all_tfs, 'grasp_frame', imprint_frame_r)
         gf_X_ifl = self._get_transformation_matrix(all_tfs, 'grasp_frame', imprint_frame_l)
-        pc_r_gf = pc_batched_tr(pc_r, gf_X_ifr[:3, :3], gf_X_ifr[:3, 3])
-        pc_l_gf = pc_batched_tr(pc_l, gf_X_ifl[:3, :3], gf_X_ifl[:3, 3])
+        pc_shape = pc_r.shape
+        pc_r_gf = pc_batched_tr(pc_r.view((pc_shape[0],-1,pc_shape[-1])), gf_X_ifr[..., :3, :3], gf_X_ifr[..., :3, 3]).view(pc_shape)
+        pc_l_gf = pc_batched_tr(pc_l.view((pc_shape[0],-1,pc_shape[-1])), gf_X_ifl[..., :3, :3], gf_X_ifl[..., :3, 3]).view(pc_shape)
         pc_gf = torch.stack([pc_r_gf, pc_l_gf], dim=1) # (N, n_impr, w, h, n_coords)
 
         # Load object model model
-        model_pc = self.model_pcs[self.object_name]
+        model_pc = np.asarray(self.model_pcs[self.object_name].points)
+        model_pc = torch.tensor(model_pc).to(predicted_imprint.device)
 
         # Project points to 2d
         projection_axis = (1, 0, 0)
-        projection_tr = get_projection_tr(projection_axis) # (4,4)
+        projection_tr = torch.tensor(get_projection_tr(projection_axis)) # (4,4)
         pc_gf_projected = project_pc(pc_gf, projection_axis) # (N, n_impr, w, h, n_coords)
         pc_gf_2d = pc_gf_projected[..., :2] # only 2d coordinates
-        pc_model_projected = project_pc(model_pc, projection_axis)
+        pc_model_projected = project_pc(model_pc, projection_axis).unsqueeze(0).repeat_interleave(pc_gf.shape[0],dim=0)
 
         # Apply ICP 2d
         num_iterations = 20
         pc_scene = pc_gf_2d # pc_scene: (N, n_impr, w, h, n_coords)
-        pc_scene_mask = torch.stack([mask_r, mask_l], dim=1)[..., :2] # (N, n_impr, w, h, n_coords)
-        pc_model = pc_model_projected # pc_model: (N, n_model_points, n_coords)
-        Rs, ts = icp_2d_masked(pc_model, pc_scene, pc_scene_mask, num_iter=num_iterations)
+        pc_scene_mask = torch.stack([mask_r, mask_l], dim=1) # (N, n_impr, w, h)
+        pc_scene_mask = pc_scene_mask.unsqueeze(-1).repeat_interleave(2, dim=-1) # (N, n_impr, w, h, n_coords)
+        pc_model_projected_2d = pc_model_projected[...,:2] # pc_model: (N, n_model_points, n_coords)
+        
+        # Apply ICP:
+        device = torch.device('cuda')
+        # TODO: Improve this filtering fuctions:
+        pc_model_projected_2d = pc_model_projected_2d[:,:100,:] # TODO: Find a better way to downsample the model
+        pc_scene = pc_scene[:, :, ::2, ::2, :]
+        pc_scene_mask = pc_scene_mask[:, :, ::2, ::2, :]
 
+        pc_model_projected_2d = pc_model_projected_2d.type(torch.float).to(device)
+        pc_scene = pc_scene.type(torch.float).to(device)
+        pc_scene_mask = pc_scene_mask.to(device)
+        
+        # TODO: Convert from float32 to float64
+        Rs, ts = icp_2d_masked(pc_model_projected_2d, pc_scene, pc_scene_mask, num_iter=num_iterations)
+        Rs = Rs.to(torch.device('cpu'))
+        ts = ts.to(torch.device('cpu'))
+        
         # Obtain object pose in grasp frame
-        projected_ic_tr = torch.zeros_like(ts.shape[:-1], 4, 4)
+        projected_ic_tr = torch.zeros(ts.shape[:-1]+(4, 4))
         projected_ic_tr[..., :2, :2] = Rs
         projected_ic_tr[..., :2,  3] = ts
-        unproject_tr = tr.inverse_matrix(projection_tr)
-        gf_X_objpose = unproject_tr @ projected_ic_tr @ projection_tr
+        projection_tr = projection_tr.type(torch.float)
+        unproject_tr = torch.linalg.inv(projection_tr)
+        gf_X_objpose = torch.einsum('ji,kil->kjl', unproject_tr, torch.einsum('kij,jl->kil', projected_ic_tr, projection_tr))
 
         # Compute object pose in world frame
-        wf_X_gf = self._get_transformation_matrix(all_tfs, 'med_base', 'grasp_frame')
+        wf_X_gf = self._get_transformation_matrix(all_tfs, 'med_base', 'grasp_frame').type(gf_X_objpose.dtype)
         wf_X_objpose = wf_X_gf @ gf_X_objpose
 
         # convert it to pose format [xs, ys, zs, qxs, qyx, qzs, qws]
         estimated_pos = wf_X_objpose[..., :3, 3]
         _estimated_quat = batched_trs.matrix_to_quaternion(wf_X_objpose[..., :3, :3]) # (qw,qx,qy,qz)
         estimated_quat = torch.index_select(_estimated_quat, dim=1, index=torch.LongTensor([1, 2, 3, 0]))# (qx,qy,qz,qw)
-        estimated_poses = np.concatenate([estimated_pos, estimated_quat])
+        estimated_poses = torch.cat([estimated_pos, estimated_quat], dim=-1)
         return estimated_poses
 
     def _get_transformation_matrix(self, all_tfs, source_frame, target_frame):
@@ -163,8 +185,8 @@ class ModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
         imprint_pred_r, imprint_pred_l = predicted_imprint
 
         # unprocess the imprints (add padding to move them back to the original shape)
-        imprint_pred_r = unprocess_bubble_img(imprint_pred_r)
-        imprint_pred_l = unprocess_bubble_img(imprint_pred_l)
+        imprint_pred_r = unprocess_bubble_img(np.expand_dims(imprint_pred_r,-1)).squeeze(-1)
+        imprint_pred_l = unprocess_bubble_img(np.expand_dims(imprint_pred_l,-1)).squeeze(-1)
 
         deformed_depth_r = ref_depth_img_r - imprint_pred_r  # CAREFUL: Imprint is defined as undef_depth_img - def_depth_img
         deformed_depth_l = ref_depth_img_l - imprint_pred_l

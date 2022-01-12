@@ -83,8 +83,8 @@ if __name__ == '__main__':
         cost = np.linalg.norm(estimated_xyz-goal_xyz, axis=1)
         return cost
 
-    num_samples = 100
-    horizon = 10
+    num_samples = 150
+    horizon = 3
 
     # -- no batch
     # controller = BubbleModelMPPIController(model, ope, test_cost_function, num_samples=num_samples, horizon=horizon)
