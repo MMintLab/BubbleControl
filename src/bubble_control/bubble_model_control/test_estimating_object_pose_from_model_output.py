@@ -13,8 +13,8 @@ from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import Blo
 from bubble_control.bubble_learning.aux.img_trs.block_upsampling_tr import BlockUpSamplingTr
 from bubble_control.bubble_learning.models.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel
 
-from bubble_control.bubble_model_control.model_output_object_pose_estimaton import ModelOutputObjectPoseEstimation, ModelDownsampledOutputObjectPoseEstimation
-from bubble_control.bubble_model_control.bubble_model_controler import BubbleModelMPPIController
+from bubble_control.bubble_model_control.model_output_object_pose_estimaton import ModelOutputObjectPoseEstimation, BatchedModelOutputObjectPoseEstimation
+from bubble_control.bubble_model_control.bubble_model_controler import BubbleModelMPPIController, BubbleModelMPPIBatchedController
 
 
 
@@ -69,7 +69,8 @@ if __name__ == '__main__':
 
     # estimate the contact imprint for each bubble (right and left)
     object_name = 'marker'
-    ope = ModelDownsampledOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear')
+    ope = ModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear')
+    # ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear')
 
     # estimate pose
     estimated_pose = ope.estimate_pose(sample_out)
@@ -82,9 +83,15 @@ if __name__ == '__main__':
         cost = np.linalg.norm(estimated_xyz-goal_xyz, axis=1)
         return cost
 
-    num_samples = 100
-    horizon = 10
-    controller = BubbleModelMPPIController(model, ope, test_cost_function, num_samples=num_samples, horizon=horizon)
+    num_samples = 150
+    horizon = 3
+
+    # -- no batch
+    # controller = BubbleModelMPPIController(model, ope, test_cost_function, num_samples=num_samples, horizon=horizon)
+    # -- batched
+    ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear')
+    controller = BubbleModelMPPIBatchedController(model, ope, test_cost_function, num_samples=num_samples, horizon=horizon)
+
     import time
     start_time = time.time()
     action = controller.control(sample)
