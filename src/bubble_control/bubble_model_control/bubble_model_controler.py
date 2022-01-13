@@ -109,10 +109,10 @@ class BubbleModelMPPIController(object):
         self.original_state_shape = self.model.input_sizes['init_imprint']
         self.state_size = np.prod(self.original_state_shape)
         if self.noise_sigma is None:
-            self.noise_sigma = 0.01 * (self.u_max - self.u_min)
+            self.noise_sigma = 0.01 * torch.diag(self.u_max - self.u_min)
         else:
             # convert it to a tensor
-            self.noise_sigma = torch.tensor(self.noise_sigma, device=self.device, dtype=torch.float)
+            self.noise_sigma = torch.diag(torch.tensor(self.noise_sigma, device=self.device, dtype=torch.float))
 
     def _pack_state_to_tensor(self, state):
         """

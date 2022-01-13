@@ -51,7 +51,10 @@ class ModelOutputObjectPoseEstimationBase(object):
 
 class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
     """ Work with pytorch tensors"""
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, device=None, **kwargs):
+        if device is None:
+            device = torch.device('cpu')
+        self.device = device
         super().__init__(*args, **kwargs)
         self.model_pcs = load_object_models()
 
@@ -119,11 +122,11 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         pc_model_projected_2d = pc_model_projected[...,:2] # pc_model: (N, n_model_points, n_coords)
         
         # Apply ICP:
-        device = torch.device('cuda')
+        device = self.device
         # TODO: Improve this filtering fuctions:
         pc_model_projected_2d = pc_model_projected_2d[:,:100,:] # TODO: Find a better way to downsample the model
-        pc_scene = pc_scene[:, :, ::2, ::2, :]
-        pc_scene_mask = pc_scene_mask[:, :, ::2, ::2, :]
+        pc_scene = pc_scene[:, :, ::5, ::5, :]
+        pc_scene_mask = pc_scene_mask[:, :, ::5, ::5, :]
 
         pc_model_projected_2d = pc_model_projected_2d.type(torch.float).to(device)
         pc_scene = pc_scene.type(torch.float).to(device)

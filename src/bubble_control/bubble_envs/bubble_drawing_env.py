@@ -178,21 +178,26 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         super().__init__(*args, **kwargs)
 
     def initialize(self):
+        self.init_action = self.init_action_space.sample()
+        self.do_init_action(self.init_action)
+
+    def do_init_action(self, init_action):
+        self.init_action = init_action
+        start_point_i = init_action['start_point']
+        drawing_direction = init_action['direction']
         self.med.set_control_mode(ControlMode.JOINT_POSITION, vel=0.1)
         self.med.home_robot()
-        self.init_action = self.init_action_space.sample()
-        start_point_i = self.init_action['start_point']
-        drawing_direction = self.init_action['direction']
         if self.drawing_init:
             self.med._end_raise()
         # set rotation
         # self.med.rotation_along_axis_point_angle(axis=(0,0,1), angle=drawing_direction)
-        rot_quat = tr.quaternion_about_axis(angle=drawing_direction, axis=(0,0,1))# rotation about z
+        rot_quat = tr.quaternion_about_axis(angle=drawing_direction, axis=(0, 0, 1))  # rotation about z
         draw_quat = tr.quaternion_multiply(rot_quat, self.med.draw_quat)
         draw_height = self.med._init_drawing(start_point_i, draw_quat=draw_quat)
         # SET Cartesian Impedance
-        cartesian_impedance_params = get_cartesian_impedance_params(velocity=self.drawing_vel*40) # we multiply by 40 because in get_control_mode they do the same...
-        cartesian_impedance_params.cartesian_impedance_params.cartesian_stiffness.z = self.z_stiffness # by default is 5000
+        cartesian_impedance_params = get_cartesian_impedance_params(
+            velocity=self.drawing_vel * 40)  # we multiply by 40 because in get_control_mode they do the same...
+        cartesian_impedance_params.cartesian_impedance_params.cartesian_stiffness.z = self.z_stiffness  # by default is 5000
         send_new_control_mode(arm='med', msg=cartesian_impedance_params)
         # self.med.set_control_mode(control_mode=ControlMode.CARTESIAN_IMPEDANCE, vel=0.25)
         self.previous_draw_height = copy.deepcopy(draw_height)
