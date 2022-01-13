@@ -19,8 +19,6 @@ from victor_hardware_interface_msgs.msg import ControlMode
 from victor_hardware_interface.victor_utils import get_cartesian_impedance_params, send_new_control_mode
 
 
-
-
 class BubbleDrawingBaseEnv(BubbleBaseEnv):
 
     def __init__(self, *args, impedance_mode=False, reactive=False, force_threshold=5., prob_axis=0.08,

@@ -29,39 +29,43 @@ class BubbleModelController(abc.ABC):
         pass
 
 
-class BubbleModelMPPIController(BubbleModelController):
+class BubbleModelMPPIController(object):
+    # THis used to inherit from BubbleModelController. In the future abstract out again the general controller stuff.
 
-    def __init__(self, *args, num_samples=100, horizon=3, **kwargs):
+    def __init__(self, model, env, object_pose_estimator, cost_function, num_samples=100, horizon=3, lambda_=1., noise_sigma=None):
+        self.model = model
+        self.env = env
+        self.object_pose_estimator = object_pose_estimator
+        self.cost_function = cost_function
         self.num_samples = num_samples
         self.horizon = horizon
         self.original_state_shape = None
-        self.noise_sigma = None
+        self.noise_sigma = noise_sigma
         self.state_size = None # To be filled with sample information or model information
+        self.lambda_ = lambda_
+        self.device = self.model.device
+        self.u_min, self.u_max = self._get_action_space_limits()
+
         self.sample = None # Container to share sample across functions
-        super().__init__(*args, **kwargs)
         self.state_size = np.prod(self.model._get_sizes()['imprint']) # TODO: Make more general
 
-    def _init_params(self):
-        # TODO: Make more general
-        self.original_state_shape = self.model.input_sizes['init_imprint']
-        self.state_size = np.prod(self.original_state_shape)
-        self.noise_sigma = torch.tensor(np.diag([np.pi/2,.05, 0.05]), device=self.model.device, dtype=torch.float)
+        self.controller = self._get_controller()
+
+    def control(self, state_sample):
+        action = self._query_controller(state_sample)
+        return action
 
     def dynamics(self, state_t, action_t):
         """
-        Compute the dynamics
+        Compute the dynamics by querying the model
         :param state_t: (K, state_size) tensor
         :param action_t: (K, action_size) tensor
         :return: next_state: (K, state_size) tensor
         """
-
-        # TODO: Query model
         state = self._unpack_state_tensor(state_t)
         action = self._unpack_action_tensor(action_t)
         next_state = self.model(state, action)
-
         next_state_t = self._pack_state_to_tensor(next_state)
-
         return next_state_t
 
     def compute_cost(self, state_t, action_t):
@@ -71,8 +75,6 @@ class BubbleModelMPPIController(BubbleModelController):
         :param action: (K, action_size) tensor
         :return: cost: (K, 1) tensor
         """
-        costs_t = torch.zeros((len(state_t), 1))
-
         states = self._unpack_state_tensor(state_t)
         actions = self._unpack_action_tensor(action_t)
 
@@ -88,6 +90,29 @@ class BubbleModelMPPIController(BubbleModelController):
 
         costs_t = costs_t.flatten() # This fixes the error on mppi _compute_rollout_costs, although the documentation says that cost should be a (K,1)
         return costs_t
+
+    def _get_action_space_limits(self):
+        # Process the action space to get the u_min and u_max
+        low_limits = []
+        high_limits = []
+        for action_k, action_s in self.env.action_space.items():
+            low_limits.append(action_s.low.flatten())
+            high_limits.append(action_s.high.flatten())
+        u_min = np.concatenate(low_limits)
+        u_max = np.concatenate(high_limits)
+        u_min = torch.tensor(u_min, device=self.device, dtype=torch.float)
+        u_max = torch.tensor(u_max, device=self.device, dtype=torch.float)
+        return u_min, u_max
+
+    def _init_params(self):
+        # TODO: Make more general
+        self.original_state_shape = self.model.input_sizes['init_imprint']
+        self.state_size = np.prod(self.original_state_shape)
+        if self.noise_sigma is None:
+            self.noise_sigma = 0.01 * (self.u_max - self.u_min)
+        else:
+            # convert it to a tensor
+            self.noise_sigma = torch.tensor(self.noise_sigma, device=self.device, dtype=torch.float)
 
     def _pack_state_to_tensor(self, state):
         """
@@ -127,14 +152,9 @@ class BubbleModelMPPIController(BubbleModelController):
 
     def _get_controller(self):
         self._init_params()
-        u_min = torch.zeros((3,)) # TODO: Set from action space
-        u_max = torch.tensor([2*np.pi, .15, .15]) # TODO: Set from action space
-        lambda_ = 1.0 # TODO: Set
-        device = self.model.device
-        
         controller = mppi.MPPI(self.dynamics, self.compute_cost, self.state_size, self.noise_sigma,
-                               lambda_=lambda_, device=device,
-                               num_samples=self.num_samples, horizon=self.horizon, u_min=u_min, u_max=u_max)
+                               lambda_=self.lambda_, device=self.model.device,
+                               num_samples=self.num_samples, horizon=self.horizon, u_min=self.u_min, u_max=self.u_max)
         return controller
 
     def _query_controller(self, state_sample):
@@ -243,7 +263,7 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         y_dir_wf_perp = torch.einsum('ki,ki->k',y_dir_wf, z_axis).unsqueeze(-1).repeat_interleave(3,dim=-1)*z_axis
         drawing_dir_wf = y_dir_wf - y_dir_wf_perp
         drawing_dir_wf = drawing_dir_wf / torch.linalg.norm(drawing_dir_wf, dim=1).unsqueeze(-1).repeat_interleave(3,dim=-1) # normalize
-        drawing_dir_gf = torch.einsum('kij,kj->ki',torch.linalg.inv(wf_X_gf[...,:3,:3]),drawing_dir_wf)
+        drawing_dir_gf = torch.einsum('kij,kj->ki',torch.linalg.inv(wf_X_gf[..., :3, :3]), drawing_dir_wf)
         trans_gf = lengths.unsqueeze(-1).repeat_interleave(3,dim=-1)*drawing_dir_gf
         X_gf_trans = torch.eye(4).unsqueeze(0).repeat_interleave(actions.shape[0], dim=0).type(torch.double).type(torch.double)
         X_gf_trans[...,:3,3] = trans_gf
