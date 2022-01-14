@@ -7,6 +7,7 @@ import rospy
 import tf2_ros as tf
 import tf.transformations as tr
 from geometry_msgs.msg import TransformStamped
+import pytorch3d.transforms as batched_tr
 
 from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
 from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
@@ -17,6 +18,7 @@ from bubble_control.bubble_model_control.model_output_object_pose_estimaton impo
 from bubble_control.bubble_model_control.bubble_model_controler import BubbleModelMPPIController, BubbleModelMPPIBatchedController
 from bubble_control.bubble_envs.bubble_drawing_env import BubbleOneDirectionDrawingEnv
 from bubble_utils.bubble_tools.bubble_img_tools import process_bubble_img, unprocess_bubble_img
+from bubble_control.bubble_learning.aux.pose_loss import PoseLoss
 
 
 def load_model_version(Model, data_name, load_version):
@@ -31,11 +33,6 @@ def load_model_version(Model, data_name, load_version):
     return model
 
 
-def test_cost_function(estimated_poses, states, actions):
-    goal_xyz = np.zeros(3)
-    estimated_xyz = estimated_poses[:, :3]
-    cost = np.linalg.norm(estimated_xyz-goal_xyz, axis=1)
-    return cost
 
 
 def format_observation_sample(obs_sample):
@@ -121,7 +118,29 @@ if __name__ == '__main__':
                              grasp_width_limits=(15,25))
 
     ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear', device=torch.device('cuda'))
-    controller = BubbleModelMPPIBatchedController(model, env, ope, test_cost_function, num_samples=num_samples, lambda_=1., horizon=horizon, noise_sigma=None)
+
+    # pose_loss = PoseLoss()
+
+
+    def test_cost_function(estimated_poses, states, actions):
+        # Only position ----------------------------------------
+        # goal_xyz = np.zeros(3)
+        # estimated_xyz = estimated_poses[:, :3]
+        # cost = np.linalg.norm(estimated_xyz-goal_xyz, axis=1)
+
+        # Only orientation, using model points ------------
+        # tool axis is x, so we want tool frame x axis to be aligned with the world z axis
+        estimated_q = estimated_poses[:, 3:]
+        estimated_R = batched_tr.quaternion_to_matrix(estimated_q)
+        x_axis = torch.tensor([1.,0,0]).unsqueeze(0).repeat_interleave(estimated_R.shape[0], dim=0).float()
+        z_axis = torch.tensor([0., 0, 1]).unsqueeze(0).repeat_interleave(estimated_R.shape[0], dim=0).float()
+        tool_x_axis_wf = torch.einsum('kij,kj->ki', estimated_R, x_axis)
+
+        cost = torch.abs(torch.einsum('ki,ki->k', z_axis, tool_x_axis_wf))
+
+        return cost
+
+    controller = BubbleModelMPPIBatchedController(model, env, ope, test_cost_function, num_samples=num_samples, lambda_=1., horizon=horizon, noise_sigma=None, _noise_sigma_value=3.0)
 
     #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Control   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     init_action = {
@@ -140,6 +159,8 @@ if __name__ == '__main__':
         for i, (k, v) in enumerate(action.items()):
             action[k] = action_raw[i]
         obs_sample_raw, reward, done, info = env.step(action)
+        if done:
+            break
 
 
 

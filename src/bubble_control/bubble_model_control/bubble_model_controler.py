@@ -32,7 +32,7 @@ class BubbleModelController(abc.ABC):
 class BubbleModelMPPIController(object):
     # THis used to inherit from BubbleModelController. In the future abstract out again the general controller stuff.
 
-    def __init__(self, model, env, object_pose_estimator, cost_function, num_samples=100, horizon=3, lambda_=1., noise_sigma=None):
+    def __init__(self, model, env, object_pose_estimator, cost_function, num_samples=100, horizon=3, lambda_=0.01, noise_sigma=None, _noise_sigma_value=0.2):
         self.model = model
         self.env = env
         self.object_pose_estimator = object_pose_estimator
@@ -41,6 +41,7 @@ class BubbleModelMPPIController(object):
         self.horizon = horizon
         self.original_state_shape = None
         self.noise_sigma = noise_sigma
+        self._noise_sigma_value = _noise_sigma_value
         self.state_size = None # To be filled with sample information or model information
         self.lambda_ = lambda_
         self.device = self.model.device
@@ -109,7 +110,7 @@ class BubbleModelMPPIController(object):
         self.original_state_shape = self.model.input_sizes['init_imprint']
         self.state_size = np.prod(self.original_state_shape)
         if self.noise_sigma is None:
-            self.noise_sigma = 0.01 * torch.diag(self.u_max - self.u_min)
+            self.noise_sigma = self._noise_sigma_value * torch.diag(self.u_max - self.u_min)
         else:
             # convert it to a tensor
             self.noise_sigma = torch.diag(torch.tensor(self.noise_sigma, device=self.device, dtype=torch.float))
@@ -184,7 +185,6 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         state_samples = self._pack_state_to_sample(states, self.sample)
         state_samples = self._action_correction(state_samples, actions)
         estimated_poses = self.object_pose_estimator.estimate_pose(state_samples)
-        estimated_poses = estimated_poses.cpu().detach().numpy()
         costs = self.cost_function(estimated_poses, states, actions)
         costs_t = torch.tensor(costs).reshape(-1, 1)
 
