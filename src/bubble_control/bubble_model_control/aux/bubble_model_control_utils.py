@@ -3,7 +3,6 @@ import torch
 import numpy as np
 import copy
 import tf.transformations as tr
-from pytorch_mppi import mppi
 import pytorch3d.transforms as batched_trs
 
 

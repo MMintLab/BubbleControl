@@ -3,7 +3,6 @@ import torch
 import numpy as np
 import copy
 import tf.transformations as tr
-from pytorch_mppi import mppi
 import pytorch3d.transforms as batched_trs
 
 from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample, get_transformation_matrix, tr_frame, convert_all_tfs_to_tensors

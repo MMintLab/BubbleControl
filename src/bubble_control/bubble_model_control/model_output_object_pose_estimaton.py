@@ -194,6 +194,7 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
             imprint_threshold = self.imprint_threshold
             pc_scene_mask = get_imprint_mask(depth_ref, depth_def, imprint_threshold)
         elif self.imprint_selection == 'percentile':
+            # select the points with larger deformation. In total will select top self.imprint_percentile*100%
             delta_depth = einops.rearrange(depth_ref - depth_def, 'N n w h -> N (n w h)')
             num_points = np.prod(depth_def.shape[1:])
             k = int(np.floor(self.imprint_percentile * num_points))
@@ -201,10 +202,12 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
             pc_scene_mask = torch.zeros_like(delta_depth)
             pc_scene_mask = pc_scene_mask.scatter(1, top_k_indxs, torch.ones_like(top_k_vals))
             pc_scene_mask = pc_scene_mask.reshape(depth_ref.shape)
+            # TODO: Add some check in case that there is no points deformed. Check it by a mimimum deform threshold. Retrun a mask of zeros in that case.
         else:
             return NotImplementedError('Imprint selection method {} not implemented yet.'.format(self.imprint_selection))
 
         return pc_scene_mask
+
 
 class ModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
 

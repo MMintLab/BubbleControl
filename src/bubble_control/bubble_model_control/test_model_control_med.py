@@ -21,18 +21,9 @@ from bubble_utils.bubble_tools.bubble_img_tools import process_bubble_img, unpro
 from bubble_control.bubble_learning.aux.pose_loss import PoseLoss
 
 from bubble_control.bubble_model_control.drawing_action_models import drawing_action_model_one_dir
+from bubble_control.bubble_learning.aux.load_model import load_model_version
 
 
-def load_model_version(Model, data_name, load_version):
-    model_name = Model.get_name()
-    version_chkp_path = os.path.join(data_name, 'tb_logs', '{}'.format(model_name),
-                                     'version_{}'.format(load_version), 'checkpoints')
-    checkpoints_fs = [f for f in os.listdir(version_chkp_path) if
-                      os.path.isfile(os.path.join(version_chkp_path, f))]
-    checkpoint_path = os.path.join(version_chkp_path, checkpoints_fs[0])
-
-    model = Model.load_from_checkpoint(checkpoint_path, dataset_params={'data_name': data_name})
-    return model
 
 
 def format_observation_sample(obs_sample):
@@ -115,9 +106,10 @@ if __name__ == '__main__':
                              drawing_area_size=(0.15, 0.3),
                              drawing_length_limits=(0.01, 0.02),
                              wrap_data=False,
-                             grasp_width_limits=(15,25))
+                             grasp_width_limits=(15, 25))
 
-    ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear', device=torch.device('cuda'))
+    # ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear', device=torch.device('cuda'), imprint_selection='threshold') #thresholded imprint esimation
+    ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear', device=torch.device('cuda'), imprint_selection='percentile', imprint_percentile=0.05) #percentile
 
     # pose_loss = PoseLoss()
 
