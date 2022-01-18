@@ -238,7 +238,7 @@ class BubbleFullDynamicsPretrainedAEModel(BubbleDynamicsPretrainedAEModel):
         imprint_t = batch['init_imprint']
         wrench_t = batch['init_wrench']
         pos_t = batch['init_pos']
-        ori_t = batch['ini_quat']
+        ori_t = batch['init_quat']
         imprint_next = batch['final_imprint']
         wrench_next = batch['final_wrench']
         pos_next = batch['final_pos']
