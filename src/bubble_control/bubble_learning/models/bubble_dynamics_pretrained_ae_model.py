@@ -187,7 +187,7 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
         return loss
 
 
-class BubbleFullDynamicsPretrainedAEModel(pl.LightningModule):
+class BubbleFullDynamicsPretrainedAEModel(BubbleDynamicsPretrainedAEModel):
 
     @classmethod
     def get_name(cls):
