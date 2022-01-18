@@ -3,7 +3,33 @@ import numpy as np
 from tqdm import tqdm
 
 
+
+
 def icp_2d_masked(pc_model, pc_scene, pc_scene_mask, num_iter=30):
+    # ICP 2D:
+    # pc_scene: (N, n_points, n_coords)
+    # pc_scene_mask: (N, n_points, n_coords)
+    # pc_model: (N, n_model_points, n_coords)
+
+    N, n_points, n_coords = pc_scene.shape
+    if len(pc_scene_mask.shape) == len(pc_scene_mask.shape)-1:
+        pc_scene_mask = pc_scene_mask.unsqueeze(-1).repeat_interleave(n_coords, dim=-1)  # (N, n_scene_points, n_coords)
+
+    R_init = torch.eye(n_coords).unsqueeze(0).repeat_interleave(N, dim=0).type(pc_scene.dtype).to(pc_scene.device)  # (N, num_dims, num_dims)--- init all R as identyty
+    t_init = masked_tensor_mean(pc_scene.transpose(1, 2), pc_scene_mask.transpose(1, 2),
+                                start_dim=-1)  # mean of the scene
+
+    R, t = R_init, t_init
+    for i in tqdm(range(num_iter)):
+        R, t = icp_2d_maksed_step(pc_model, pc_scene, pc_scene_mask, R_init, t_init)
+        R_init = R
+        t_init = t
+    # R: (N, n_coords, n_coords)
+    # t: (N, n_coords)
+    return R, t
+
+
+def icp_2d_masked_imprints(pc_model, pc_scene, pc_scene_mask, num_iter=30):
     # ICP 2D:
     # pc_scene: (N, n_impr, w, h, n_coords)
     # pc_scene_mask: (N, n_impr, w, h, n_coords)
@@ -12,18 +38,8 @@ def icp_2d_masked(pc_model, pc_scene, pc_scene_mask, num_iter=30):
 
     N, n_impr, w, h, n_coords = pc_scene.shape
     pc_scene_r = reshape_pc(pc_scene)
-    if len(pc_scene_mask.shape) == len(pc_scene_mask.shape)-1:
-        pc_scene_mask = pc_scene_mask.unsqueeze(-1).repeat_interleave(n_coords, dim=-1)  # (N, n_scene_points, n_coords)
     pc_scene_mask_r = reshape_pc(pc_scene_mask)
-
-    R_init = torch.eye(n_coords).unsqueeze(0).repeat_interleave(N, dim=0).type(pc_scene.dtype).to(pc_scene.device)  # (N, num_dims, num_dims)--- init all R as identyty
-    t_init = masked_tensor_mean(pc_scene_r.transpose(1, 2), pc_scene_mask_r.transpose(1, 2),
-                                start_dim=-1)  # mean of the scene
-
-    for i in tqdm(range(num_iter)):
-        R, t = icp_2d_maksed_step(pc_model, pc_scene_r, pc_scene_mask_r, R_init, t_init)
-        R_init = R
-        t_init = t
+    R, t = icp_2d_masked(pc_model, pc_scene_r, pc_scene_mask_r, num_iter=num_iter)
     # R: (N, n_coords, n_coords)
     # t: (N, n_coords)
     return R, t
@@ -49,7 +65,7 @@ def icp_2d_maksed_step(pc_model, pc_scene, pc_scene_mask, R_init, t_init):
     return R_star, t_star
 
 
-def masked_tensor_mean(xs, masks,start_dim=-2):
+def masked_tensor_mean(xs, masks, start_dim=-2):
     # masked mean along the last start_dim dims
     masks_f = masks.flatten(start_dim=start_dim)
     xs_f = xs.flatten(start_dim=start_dim)

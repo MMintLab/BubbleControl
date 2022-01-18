@@ -3,6 +3,7 @@ import os
 import sys
 import torch
 import pytorch3d.transforms as batched_trs
+import einops
 import rospy
 import tf2_ros as tf
 from abc import abstractmethod
@@ -51,7 +52,9 @@ class ModelOutputObjectPoseEstimationBase(object):
 
 class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
     """ Work with pytorch tensors"""
-    def __init__(self, *args, device=None, **kwargs):
+    def __init__(self, *args, device=None, imprint_selection='threshold', imprint_percentile=0.1, **kwargs):
+        self.imprint_selection = imprint_selection
+        self.imprint_percentile = imprint_percentile
         if device is None:
             device = torch.device('cpu')
         self.device = device
@@ -68,8 +71,8 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
 
         # Get imprints from sample
         predicted_imprint = batched_sample['next_imprint']
-        imprint_pred_r = predicted_imprint[:,0]
-        imprint_pred_l = predicted_imprint[:,1]
+        imprint_pred_r = predicted_imprint[:, 0]
+        imprint_pred_l = predicted_imprint[:, 1]
 
         # unprocess the imprints (add padding to move them back to the original shape)
         imprint_pred_r = unprocess_bubble_img(imprint_pred_r.unsqueeze(-1)).squeeze(-1) # ref frame:  -- (N, w, h)
@@ -87,13 +90,6 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         Ks_l = batched_sample['camera_info_l']['K']
         pc_r = project_depth_image(depth_def_r, Ks_r)# (N, w, h, n_coords) -- n_coords=3
         pc_l = project_depth_image(depth_def_l, Ks_l)# (N, w, h, n_coords) -- n_coords=3
-
-        # Compute mask -- filter out points
-        imprint_threshold = self.imprint_threshold
-        mask_r = get_imprint_mask(depth_ref_r, depth_def_r, imprint_threshold)
-        mask_l = get_imprint_mask(depth_ref_l, depth_def_l, imprint_threshold)
-        mask_r = torch.tensor(mask_r).to(predicted_imprint)
-        mask_l = torch.tensor(mask_l).to(predicted_imprint)
         
         # Convert imprint point coordinates to grasp frame
         gf_X_ifr = self._get_transformation_matrix(all_tfs, 'grasp_frame', imprint_frame_r)
@@ -117,18 +113,20 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         # Apply ICP 2d
         num_iterations = 20
         pc_scene = pc_gf_2d # pc_scene: (N, n_impr, w, h, n_coords)
-        pc_scene_mask = torch.stack([mask_r, mask_l], dim=1) # (N, n_impr, w, h)
+        # Compute mask -- filter out points
+        depth_ref = torch.stack([depth_ref_r, depth_ref_l], dim=1) # (N, n_impr, w, h)
+        depth_def = torch.stack([depth_def_r, depth_def_l], dim=1) # (N, n_impr, w, h)
+        pc_scene_mask = self._get_pc_mask(depth_def, depth_ref)
         pc_scene_mask = pc_scene_mask.unsqueeze(-1).repeat_interleave(2, dim=-1) # (N, n_impr, w, h, n_coords)
         pc_model_projected_2d = pc_model_projected[..., :2] # pc_model: (N, n_model_points, n_coords)
         
         # Apply ICP:
         device = self.device
         # TODO: Improve this filtering fuctions: ======================================================================
-        pc_model_projected_2d = pc_model_projected_2d[:, ::20, :] # TODO: Find a better way to downsample the model
-        pc_scene = pc_scene[:, :, ::5, ::5, :]
-        pc_scene_mask = pc_scene_mask[:, :, ::5, ::5, :]
+        pc_model_projected_2d = self._filter_model_pc(pc_model_projected_2d)
+        pc_scene, pc_scene_mask = self._filter_scene_pc(pc_scene, pc_scene_mask)
         # END TODO: ===================================================================================================
-        print(torch.sum(pc_scene_mask.reshape(pc_scene_mask.shape[0],-1),dim=1))
+        print(torch.sum(pc_scene_mask.reshape(pc_scene_mask.shape[0], -1),dim=1))
         pc_model_projected_2d = pc_model_projected_2d.type(torch.float).to(device) # This call takes almost 2 sec
         pc_scene = pc_scene.type(torch.float).to(device)
         pc_scene_mask = pc_scene_mask.to(device)
@@ -164,6 +162,49 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         sf_X_tf = sf_X_w @ w_X_tf
         return sf_X_tf
 
+    def _filter_model_pc(self, model_pc):
+        # model_pc (N, num_model_points, space_dim)
+        model_pc = model_pc[:, ::20, :] # TODO: Find a better way to downsample the model
+        return model_pc
+
+    def _filter_scene_pc(self, pc_scene, pc_scene_mask):
+        if self.imprint_selection == 'threshold':
+            pc_scene = pc_scene[:, :, ::5, ::5, :]
+            pc_scene_mask = pc_scene_mask[:, :, ::5, ::5, :]
+            pc_scene = einops.rearrange(pc_scene, 'N i w h c -> N (i w h) c')
+            pc_scene_mask = einops.rearrange(pc_scene_mask, 'N i w h c -> N (i w h) c')
+        elif self.imprint_selection == 'percentile':
+            original_shape = pc_scene.shape
+            # when filtering using the percentile, since we select a constant number of points per imprint pair, we can filter out the points not belonging to the, since all batches will have the same number of poiints
+            pc_scene = einops.rearrange(pc_scene, 'N i w h c -> N (i w h) c')
+            pc_scene_mask = einops.rearrange(pc_scene_mask, 'N i w h c -> N (i w h) c').to(torch.bool)
+            # select the masked points
+            pc_scene = torch.masked_select(pc_scene, pc_scene_mask).reshape(original_shape[0], -1, original_shape[-1])  # (N, num_points, c)
+            pc_scene_mask = torch.masked_select(pc_scene_mask, pc_scene_mask).reshape(original_shape[0], -1, original_shape[-1])  # (N, num_points, c)
+        else:
+            return NotImplementedError(
+                'Imprint selection method {} not implemented yet.'.format(self.imprint_selection))
+
+        return pc_scene, pc_scene_mask
+
+    def _get_pc_mask(self, depth_def, depth_ref):
+        # depth_def: (N, n_impr, w, h)
+        # depth_ref: (N, n_impr, w, h)
+        if self.imprint_selection == 'threshold':
+            imprint_threshold = self.imprint_threshold
+            pc_scene_mask = get_imprint_mask(depth_ref, depth_def, imprint_threshold)
+        elif self.imprint_selection == 'percentile':
+            delta_depth = einops.rearrange(depth_ref - depth_def, 'N n w h -> N (n w h)')
+            num_points = np.prod(depth_def.shape[1:])
+            k = int(np.floor(self.imprint_percentile * num_points))
+            top_k_vals, top_k_indxs = torch.topk(delta_depth, k, dim=1)
+            pc_scene_mask = torch.zeros_like(delta_depth)
+            pc_scene_mask = pc_scene_mask.scatter(1, top_k_indxs, torch.ones_like(top_k_vals))
+            pc_scene_mask = pc_scene_mask.reshape(depth_ref.shape)
+        else:
+            return NotImplementedError('Imprint selection method {} not implemented yet.'.format(self.imprint_selection))
+
+        return pc_scene_mask
 
 class ModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
 
