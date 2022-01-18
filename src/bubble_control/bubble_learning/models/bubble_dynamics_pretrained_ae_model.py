@@ -214,7 +214,7 @@ class BubbleFullDynamicsPretrainedAEModel(BubbleDynamicsPretrainedAEModel):
         dyn_input = torch.cat([state_dyn_input, action], dim=-1)
         state_dyn_delta = self.dyn_model(dyn_input)
         state_dyn_output = state_dyn_input + state_dyn_delta
-        imprint_output_emb, wrench_next, pos_next, ori_next = torch.split(state_dyn_output, [sizes['imprint'], sizes['wrench'], sizes['position'], sizes['orientation']], dim=-1)
+        imprint_output_emb, wrench_next, pos_next, ori_next = torch.split(state_dyn_output, (sizes['imprint'], sizes['wrench'], sizes['position'], sizes['orientation']), dim=-1)
 
         # Decode imprint
         if self.load_norm:
