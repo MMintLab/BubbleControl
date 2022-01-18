@@ -108,7 +108,7 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         projection_tr = torch.tensor(get_projection_tr(projection_axis)) # (4,4)
         pc_gf_projected = project_pc(pc_gf, projection_axis) # (N, n_impr, w, h, n_coords)
         pc_gf_2d = pc_gf_projected[..., :2] # only 2d coordinates
-        pc_model_projected = project_pc(model_pc, projection_axis).unsqueeze(0).repeat_interleave(pc_gf.shape[0],dim=0)
+        pc_model_projected = project_pc(model_pc, projection_axis).unsqueeze(0).repeat_interleave(pc_gf.shape[0], dim=0)
 
         # Apply ICP 2d
         num_iterations = 20
@@ -122,11 +122,9 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         
         # Apply ICP:
         device = self.device
-        # TODO: Improve this filtering fuctions: ======================================================================
         pc_model_projected_2d = self._filter_model_pc(pc_model_projected_2d)
         pc_scene, pc_scene_mask = self._filter_scene_pc(pc_scene, pc_scene_mask)
-        # END TODO: ===================================================================================================
-        print(torch.sum(pc_scene_mask.reshape(pc_scene_mask.shape[0], -1),dim=1))
+        print(torch.sum(pc_scene_mask.reshape(pc_scene_mask.shape[0], -1), dim=1))
         pc_model_projected_2d = pc_model_projected_2d.type(torch.float).to(device) # This call takes almost 2 sec
         pc_scene = pc_scene.type(torch.float).to(device)
         pc_scene_mask = pc_scene_mask.to(device)
@@ -233,8 +231,8 @@ class ModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
         imprint_pred_r, imprint_pred_l = predicted_imprint
 
         # unprocess the imprints (add padding to move them back to the original shape)
-        imprint_pred_r = unprocess_bubble_img(np.expand_dims(imprint_pred_r,-1)).squeeze(-1)
-        imprint_pred_l = unprocess_bubble_img(np.expand_dims(imprint_pred_l,-1)).squeeze(-1)
+        imprint_pred_r = unprocess_bubble_img(np.expand_dims(imprint_pred_r, -1)).squeeze(-1)
+        imprint_pred_l = unprocess_bubble_img(np.expand_dims(imprint_pred_l, -1)).squeeze(-1)
 
         deformed_depth_r = ref_depth_img_r - imprint_pred_r  # CAREFUL: Imprint is defined as undef_depth_img - def_depth_img
         deformed_depth_l = ref_depth_img_l - imprint_pred_l
