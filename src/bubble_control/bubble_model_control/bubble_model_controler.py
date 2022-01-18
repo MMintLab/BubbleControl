@@ -6,6 +6,7 @@ import tf.transformations as tr
 from pytorch_mppi import mppi
 import pytorch3d.transforms as batched_trs
 
+from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample, get_transformation_matrix, tr_frame, convert_all_tfs_to_tensors
 
 class BubbleModelController(abc.ABC):
 
@@ -32,11 +33,12 @@ class BubbleModelController(abc.ABC):
 class BubbleModelMPPIController(object):
     # THis used to inherit from BubbleModelController. In the future abstract out again the general controller stuff.
 
-    def __init__(self, model, env, object_pose_estimator, cost_function, num_samples=100, horizon=3, lambda_=0.01, noise_sigma=None, _noise_sigma_value=0.2):
+    def __init__(self, model, env, object_pose_estimator, cost_function, action_model, num_samples=100, horizon=3, lambda_=0.01, noise_sigma=None, _noise_sigma_value=0.2):
         self.model = model
         self.env = env
         self.object_pose_estimator = object_pose_estimator
         self.cost_function = cost_function
+        self.action_model = action_model
         self.num_samples = num_samples
         self.horizon = horizon
         self.original_state_shape = None
@@ -168,6 +170,11 @@ class BubbleModelMPPIController(object):
         action = self.controller.command(state_t)
         return action
 
+    def _action_correction(self, state_samples, actions):
+        # actions: tensor of shape (N, action_dim)
+        state_samples_corrected = self.action_model(state_samples, actions)
+        return state_samples_corrected
+
 
 class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
     """
@@ -211,123 +218,9 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         :param all_tfs: DataFrame
         :return:
         """
-        # TODO: Transform a DF into a dictionary of homogeneous transformations matrices (4x4)
-        converted_all_tfs = {}
-        parent_frame = all_tfs['parent_frame'][0] # Assume that are all teh same
-        child_frames = all_tfs['child_frame']
-        converted_all_tfs[parent_frame] = np.eye(4) # Transformation to itself is the identity
-        all_poses = all_tfs[['x', 'y', 'z', 'qx', 'qy', 'qz', 'qw']]
-        for i, child_frame_i in enumerate(child_frames):
-            pose_i = all_poses.iloc[i]
-            X_i = tr.quaternion_matrix(pose_i[3:])
-            X_i[:3,3] = pose_i[:3]
-            converted_all_tfs[child_frame_i] = X_i
+        converted_all_tfs = convert_all_tfs_to_tensors((all_tfs))
         return converted_all_tfs
 
-    def _action_correction(self, state_samples, actions):
-        # actions: tensor of shape (N, action_dim)
-        state_samples_corrected = state_samples
-        # TODO: This is especific for each environment --> TODO: Do it more general
-        action_names = ['rotation', 'length', 'grasp_width']
-        rotations = actions[..., 0]
-        lengths = actions[..., 1]
-        grasp_widths = actions[..., 2]*0.001 # the action grasp width is in mm
-        # Rotation is a rotation about the x axis of the grasp_frame
-        # Length is a translation motion of length 'length' of the grasp_frame on the xy med_base plane along the intersection with teh yz grasp frame plane 
-        # grasp_width is the width of the  
-        all_tfs = state_samples_corrected['all_tfs'] # Tfs from world frame ('med_base') to the each of teh frame names
-        frame_names = all_tfs.keys()
-
-        rigid_ee_frames = ['grasp_frame', 'med_kuka_link_ee', 'wsg50_finger_left', 'pico_flexx_left_link', 'pico_flexx_left_optical_frame', 'pico_flexx_right_link', 'pico_flexx_right_optical_frame']
-        wf_X_gf = all_tfs['grasp_frame']
-        # Move Gripper: 
-        # (move wsg_50_finger_{right,left} along x direction)
-        gf_X_fl = get_transformation_matrix(all_tfs, 'grasp_frame', 'wsg50_finger_left')
-        gf_X_fr = get_transformation_matrix(all_tfs, 'grasp_frame', 'wsg50_finger_right')
-        X_finger_left = torch.eye(4).unsqueeze(0).repeat_interleave(actions.shape[0], dim=0).type(torch.double)
-        X_finger_right = torch.eye(4).unsqueeze(0).repeat_interleave(actions.shape[0], dim=0).type(torch.double)
-        current_half_width_l = -gf_X_fl[..., 0, 3] - 0.009
-        current_half_width_r = gf_X_fr[..., 0, 3] - 0.009
-        X_finger_left[..., 0, 3] = -(0.5*grasp_widths - current_half_width_l).type(torch.double)
-        X_finger_right[..., 0, 3] = -(0.5*grasp_widths - current_half_width_r).type(torch.double)
-        all_tfs = tr_frame(all_tfs, 'wsg50_finger_left', X_finger_left, ['pico_flexx_left_link', 'pico_flexx_left_optical_frame'])
-        all_tfs = tr_frame(all_tfs, 'wsg50_finger_right', X_finger_right, ['pico_flexx_right_link', 'pico_flexx_right_optical_frame'])
-        # Move Grasp frame on the plane amount 'length; and rotate the Grasp frame along x direction a 'rotation'  amount
-        rot_axis = torch.tensor([1, 0, 0]).unsqueeze(0).repeat_interleave(actions.shape[0], dim=0).type(torch.double)
-        angle_axis = rotations.unsqueeze(-1).repeat_interleave(3, dim=-1) * rot_axis
-        X_gf_rot = torch.eye(4).unsqueeze(0).repeat_interleave(actions.shape[0], dim=0).type(torch.double)
-        X_gf_rot[..., :3, :3] = batched_trs.axis_angle_to_matrix(angle_axis)# rotation along x axis
-        # compute translation
-        z_axis = torch.tensor([0, 0, 1]).unsqueeze(0).repeat_interleave(actions.shape[0], dim=0).type(torch.double)
-        y_dir_gf = torch.tensor([0, -1, 0]).unsqueeze(0).repeat_interleave(actions.shape[0], dim=0).type(torch.double)
-        y_dir_wf = torch.einsum('kij,kj->ki', wf_X_gf[..., :3, :3],  y_dir_gf)
-        y_dir_wf_perp = torch.einsum('ki,ki->k', y_dir_wf, z_axis).unsqueeze(-1).repeat_interleave(3, dim=-1)*z_axis
-        drawing_dir_wf = y_dir_wf - y_dir_wf_perp
-        drawing_dir_wf = drawing_dir_wf / torch.linalg.norm(drawing_dir_wf, dim=1).unsqueeze(-1).repeat_interleave(3, dim=-1) # normalize
-        drawing_dir_gf = torch.einsum('kij,kj->ki', torch.linalg.inv(wf_X_gf[..., :3, :3]), drawing_dir_wf)
-        trans_gf = lengths.unsqueeze(-1).repeat_interleave(3,dim=-1)*drawing_dir_gf
-        X_gf_trans = torch.eye(4).unsqueeze(0).repeat_interleave(actions.shape[0], dim=0).type(torch.double).type(torch.double)
-        X_gf_trans[..., :3, 3] = trans_gf
-        all_tfs = tr_frame(all_tfs, 'grasp_frame', X_gf_trans, rigid_ee_frames)
-        all_tfs = tr_frame(all_tfs, 'grasp_frame', X_gf_rot, rigid_ee_frames)
-        state_samples_corrected['all_tfs'] = all_tfs
-
-        return state_samples_corrected
-
-def tr_frame(all_tfs, frame_name, X, fixed_frame_names):
-    # Apply tf to the frame_name and modify all other tf for the fixed frames to that tf frame
-    # all_tfs: dict of tfs
-    # frame_name: str for the frame to apply X
-    # X (aka fn_X_fn_new) trasformation to be applied along frame_name
-    # fixed_frame_names: list of strs containing the names of the frames that we also need to transform because they are rigid to the frame_name frame.
-    new_tfs = {}
-    w_X_fn = all_tfs[frame_name]
-    w_X_fn_new = w_X_fn @ X
-    new_tfs[frame_name] = w_X_fn_new
-    # Apply the new transformation to all fixed frames
-    for ff_i in fixed_frame_names:
-        if ff_i == frame_name:
-            continue
-        w_X_ffi = all_tfs[ff_i]
-        fn_X_ffi = get_transformation_matrix(all_tfs, source_frame=frame_name, target_frame=ff_i)
-        w_X_ffi_new = w_X_fn_new @ fn_X_ffi
-        new_tfs[ff_i] = w_X_ffi_new
-    all_tfs.update(new_tfs)
-    return all_tfs
 
 
-def get_transformation_matrix(all_tfs, source_frame, target_frame):
-    w_X_sf = all_tfs[source_frame]
-    w_X_tf = all_tfs[target_frame]
-    sf_X_w = torch.linalg.inv(w_X_sf)
-    sf_X_tf = sf_X_w @ w_X_tf
-    return sf_X_tf
 
-
-def batched_tensor_sample(sample, batch_size=None, device=None):
-    # sample is a dictionary of
-    if device is None:
-        device = torch.device('cpu')
-    batched_sample = {}
-    for k_i, v_i in sample.items():
-        if type(v_i) is dict:
-            batched_sample_i = batched_tensor_sample(v_i, batch_size=batch_size, device=device)
-            batched_sample[k_i] = batched_sample_i
-        elif type(v_i) is np.ndarray:
-            batched_sample_i = torch.tensor(v_i).to(device)
-            if batch_size is not None:
-                batched_sample_i = batched_sample_i.unsqueeze(0).repeat_interleave(batch_size, dim=0)
-            batched_sample[k_i] = batched_sample_i
-        elif type(v_i) in [int, float]:
-            batched_sample_i = torch.tensor([v_i]).to(device)
-            if batch_size is not None:
-                batched_sample_i = batched_sample_i.unsqueeze(0).repeat_interleave(batch_size, dim=0)
-            batched_sample[k_i] = batched_sample_i
-        elif type(v_i) is torch.Tensor:
-            batched_sample_i = v_i.to(device)
-            if batch_size is not None:
-                batched_sample_i = batched_sample_i.unsqueeze(0).repeat_interleave(batch_size, dim=0)
-            batched_sample[k_i] = batched_sample_i.to(device)
-        else:
-            batched_sample[k_i] = v_i
-    return batched_sample

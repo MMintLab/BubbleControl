@@ -20,6 +20,8 @@ from bubble_control.bubble_envs.bubble_drawing_env import BubbleOneDirectionDraw
 from bubble_utils.bubble_tools.bubble_img_tools import process_bubble_img, unprocess_bubble_img
 from bubble_control.bubble_learning.aux.pose_loss import PoseLoss
 
+from bubble_control.bubble_model_control.drawing_action_models import drawing_action_model_one_dir
+
 
 def load_model_version(Model, data_name, load_version):
     model_name = Model.get_name()
@@ -31,8 +33,6 @@ def load_model_version(Model, data_name, load_version):
 
     model = Model.load_from_checkpoint(checkpoint_path, dataset_params={'data_name': data_name})
     return model
-
-
 
 
 def format_observation_sample(obs_sample):
@@ -143,7 +143,7 @@ if __name__ == '__main__':
         cost = ori_cost + 10*is_nan_action + 10 * is_nan_pose
         return cost
 
-    controller = BubbleModelMPPIBatchedController(model, env, ope, test_cost_function, num_samples=num_samples, horizon=horizon, noise_sigma=None, _noise_sigma_value=1.)
+    controller = BubbleModelMPPIBatchedController(model, env, ope, test_cost_function, action_model=drawing_action_model_one_dir, num_samples=num_samples, horizon=horizon, noise_sigma=None, _noise_sigma_value=1.)
 
     #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Control   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     init_action = {

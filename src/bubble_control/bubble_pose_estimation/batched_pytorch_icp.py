@@ -3,8 +3,6 @@ import numpy as np
 from tqdm import tqdm
 
 
-
-
 def icp_2d_masked(pc_model, pc_scene, pc_scene_mask, num_iter=30):
     # ICP 2D:
     # pc_scene: (N, n_points, n_coords)
