@@ -123,20 +123,19 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         
         # Apply ICP:
         device = self.device
-        # TODO: Improve this filtering fuctions:
-        pc_model_projected_2d = pc_model_projected_2d[:, :100, :] # TODO: Find a better way to downsample the model
+        # TODO: Improve this filtering fuctions: ======================================================================
+        pc_model_projected_2d = pc_model_projected_2d[:, ::20, :] # TODO: Find a better way to downsample the model
         pc_scene = pc_scene[:, :, ::5, ::5, :]
         pc_scene_mask = pc_scene_mask[:, :, ::5, ::5, :]
-
+        # END TODO: ===================================================================================================
+        print(torch.sum(pc_scene_mask.reshape(pc_scene_mask.shape[0],-1),dim=1))
         pc_model_projected_2d = pc_model_projected_2d.type(torch.float).to(device) # This call takes almost 2 sec
         pc_scene = pc_scene.type(torch.float).to(device)
         pc_scene_mask = pc_scene_mask.to(device)
         
-        # TODO: Convert from float32 to float64
         Rs, ts = icp_2d_masked(pc_model_projected_2d, pc_scene, pc_scene_mask, num_iter=num_iterations)
         Rs = Rs.cpu()
         ts = ts.cpu()
-
         # Obtain object pose in grasp frame
         projected_ic_tr = torch.zeros(ts.shape[:-1]+(4, 4))
         projected_ic_tr[..., :2, :2] = Rs

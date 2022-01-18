@@ -40,6 +40,7 @@ class BubbleModelMPPIController(object):
         self.num_samples = num_samples
         self.horizon = horizon
         self.original_state_shape = None
+        self.noise_mu = None
         self.noise_sigma = noise_sigma
         self._noise_sigma_value = _noise_sigma_value
         self.state_size = None # To be filled with sample information or model information
@@ -112,8 +113,10 @@ class BubbleModelMPPIController(object):
         if self.noise_sigma is None:
             self.noise_sigma = self._noise_sigma_value * torch.diag(self.u_max - self.u_min)
         else:
-            # convert it to a tensor
+            # convert it to a square tensor
             self.noise_sigma = torch.diag(torch.tensor(self.noise_sigma, device=self.device, dtype=torch.float))
+        if self.noise_mu is None:
+            self.noise_mu = 0.5 * (self.u_max + self.u_min)
 
     def _pack_state_to_tensor(self, state):
         """
@@ -155,7 +158,7 @@ class BubbleModelMPPIController(object):
         self._init_params()
         controller = mppi.MPPI(self.dynamics, self.compute_cost, self.state_size, self.noise_sigma,
                                lambda_=self.lambda_, device=self.model.device,
-                               num_samples=self.num_samples, horizon=self.horizon, u_min=self.u_min, u_max=self.u_max)
+                               num_samples=self.num_samples, horizon=self.horizon, u_min=self.u_min, u_max=self.u_max, u_init=self.noise_mu)
         return controller
 
     def _query_controller(self, state_sample):

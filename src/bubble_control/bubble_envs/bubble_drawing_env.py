@@ -187,6 +187,7 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         drawing_direction = init_action['direction']
         self.med.set_control_mode(ControlMode.JOINT_POSITION, vel=0.1)
         self.med.home_robot()
+        self.med.gripper.move(15.0, speed=10.0) # TODO: Check if this is good
         if self.drawing_init:
             self.med._end_raise()
         # set rotation
@@ -259,7 +260,7 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         length_i = action['length']
         direction_i = self.init_action['direction']
         grasp_width_i = action['grasp_width']
-        self.med.gripper.move(grasp_width_i, 10.0)
+        self.med.gripper.move(grasp_width_i, speed=10.0)
         current_plane_pose = self.med.get_plane_pose()
 
         delta_pos_plane = length_i * np.array([np.cos(direction_i), np.sin(direction_i)])

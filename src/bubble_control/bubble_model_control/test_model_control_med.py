@@ -130,16 +130,20 @@ if __name__ == '__main__':
 
         # Only orientation, using model points ------------
         # tool axis is z, so we want tool frame z axis to be aligned with the world z axis
+        estimated_pos = estimated_poses[:, :3] # (x, y, z)
         estimated_q = estimated_poses[:, 3:] # (qx,qy,qz,qw)
         estimated_qwxyz = torch.index_select(estimated_q, dim=-1, index=torch.LongTensor([3, 0, 1, 2]))# (qw, qx,qy,qz)
         estimated_R = batched_tr.quaternion_to_matrix(estimated_qwxyz) # careful! batched_tr quat is [qw,qx,qy,qz], we work as [qx,qy,qz,qw]
         z_axis = torch.tensor([0., 0, 1.]).unsqueeze(0).repeat_interleave(estimated_R.shape[0], dim=0).float()
         tool_z_axis_wf = torch.einsum('kij,kj->ki', estimated_R, z_axis)
-        cost = torch.abs(torch.einsum('ki,ki->k', z_axis, tool_z_axis_wf))
-
+        ori_cost = 1-torch.abs(torch.einsum('ki,ki->k', z_axis, tool_z_axis_wf)) # TO MINIMIZE (perfect case tool axis parallel to z axis, aka dot(z_axis, tool_z_axis)=1)
+        ori_cost = torch.nan_to_num(ori_cost, nan=10.0)
+        is_nan_action = torch.any(torch.isnan(actions), dim=1)
+        is_nan_pose = torch.any(torch.isnan(estimated_pos), dim=1)
+        cost = ori_cost + 10*is_nan_action + 10 * is_nan_pose
         return cost
 
-    controller = BubbleModelMPPIBatchedController(model, env, ope, test_cost_function, num_samples=num_samples, horizon=horizon, noise_sigma=None, _noise_sigma_value=3.0)
+    controller = BubbleModelMPPIBatchedController(model, env, ope, test_cost_function, num_samples=num_samples, horizon=horizon, noise_sigma=None, _noise_sigma_value=1.)
 
     #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Control   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     init_action = {
@@ -155,10 +159,14 @@ if __name__ == '__main__':
         obs_sample = format_observation_sample(obs_sample_raw)
         obs_sample = block_downsample_tr(obs_sample)
 
-        action_raw = controller.control(obs_sample)
-
+        action_raw = controller.control(obs_sample).detach().cpu().numpy()
+        print(action_raw)
+        if np.isnan(action_raw).any():
+            print('Nan Value --- {}'.format(action_raw))
+            break
         for i, (k, v) in enumerate(action.items()):
             action[k] = action_raw[i]
+        print('Action:', action)
         obs_sample_raw, reward, done, info = env.step(action)
         if done:
             break
