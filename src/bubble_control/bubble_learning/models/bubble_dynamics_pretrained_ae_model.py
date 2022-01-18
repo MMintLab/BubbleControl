@@ -188,6 +188,85 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
 
 
 
+class BubbleFullDynamicsPretrainedAEModel(pl.LightningModule):
+
+    def _get_dyn_model(self):
+        sizes = self._get_sizes()
+        action_size = sizes['action']
+        dyn_input_size = self.img_embedding_size + action_size + sizes['wrench'] + sizes['position'] + sizes['orientation']
+        dyn_output_size = self.img_embedding_size + sizes['wrench'] + sizes['position'] + sizes['orientation']
+        dyn_model_sizes = [dyn_input_size] + [self.fc_h_dim]*self.num_fcs + [dyn_output_size]
+        dyn_model = FCModule(sizes=dyn_model_sizes, skip_layers=self.skip_layers, activation=self.activation)
+        return dyn_model
+
+    def query(self, imprint, wrench, pos, ori, action):
+        sizes = self._get_sizes()
+        # Encode imprint
+        if self.load_norm:
+            imprint_input_emb = self.autoencoder.img_encoder(imprint)
+        else:
+            imprint_input_emb = self.autoencoder.encode(imprint)
+
+        dyn_input = torch.cat([imprint_input_emb, wrench, pos, ori, action], dim=-1)
+        dyn_output_delta = self.dyn_model(dyn_input)
+        dyn_output = dyn_input + dyn_output_delta
+        imprint_output_emb, wrench_next, pos_next, ori_next = torch.split(dyn_output, [sizes['imprint'], sizes['wrench'], sizes['position'], sizes['orientation']], dim=-1)
+
+        # Decode imprint
+        if self.load_norm:
+            imprint_next = self.autoencoder.img_decoder(imprint_output_emb)
+        else:
+            imprint_next = self.autoencoder.decode(imprint_output_emb)
 
 
+        return imprint_next, wrench_next, pos_next, ori_next
+
+    def forward(self, imprint, wrench, pos, ori, action):
+        if self.load_norm:
+            # apply the normalization to the imprint input, and then to the output, because the model has been trained on the normalized space.
+            imprint_t = self.autoencoder._norm_imprint(imprint)
+            imprint_next, wrench_next, pos_next, ori_next = self.query(imprint_t, imprint, wrench, pos, ori, action)
+            imprint_next = self.autoencoder._denorm_imprint(imprint_next)
+        else:
+            imprint_next, wrench_next, pos_next, ori_next = self.query(imprint, action)
+        return imprint_next, wrench_next, pos_next, ori_next
+
+    def _step(self, batch, batch_idx, phase='train'):
+        imprint_t = batch['init_imprint']
+        wrench_t = batch['init_wrench']
+        pos_t = batch['init_pos']
+        ori_t = batch['ini_quat']
+        imprint_next = batch['final_imprint']
+        wrench_next = batch['final_wrench']
+        pos_next = batch['final_pos']
+        ori_next = batch['final_quat']
+        if self.load_norm:
+            # normalize the tensors
+            imprint_t = self.autoencoder._norm_imprint(imprint_t)
+            imprint_next = self.autoencoder._norm_imprint(imprint_next)
+        action = batch['action']
+
+        imprint_next_rec, wrench_next_rec, pos_next_rec, ori_next_rec = self.query(imprint_t, wrench_t, pos_t, ori_t, action)
+
+        loss = self._compute_loss(imprint_next_rec, wrench_next_rec, pos_next_rec, ori_next_rec, imprint_next, wrench_next, pos_next, ori_next)
+
+        self.log('{}_batch'.format(phase), batch_idx)
+        self.log('{}_loss'.format(phase), loss)
+
+        predicted_grid = self._get_image_grid(imprint_next_rec*torch.max(imprint_next_rec)/torch.max(imprint_next)) # trasform so they are in the same range
+        gth_grid = self._get_image_grid(imprint_next)
+        if batch_idx == 0:
+            if self.current_epoch == 0:
+                self.logger.experiment.add_image('init_imprint_{}'.format(phase), self._get_image_grid(imprint_t), self.global_step)
+                self.logger.experiment.add_image('next_imprint_gt_{}'.format(phase), gth_grid, self.global_step)
+            self.logger.experiment.add_image('next_imprint_predicted_{}'.format(phase), predicted_grid, self.global_step)
+        return loss
+
+    def _compute_loss(self, imprint_rec, wrench_rec, pos_rec, ori_rec, imprint_gth, wrench_gth, pos_gth, ori_gth):
+        imprint_reconstruction_loss = self.mse_loss(imprint_rec, imprint_gth)
+        wrench_reconstruction_loss = self.mse_loss(wrench_rec, wrench_gth)
+        pos_reconstruction_loss = self.mse_loss(pos_rec, pos_gth)
+        ori_reconstruction_loss = self.mse_loss(ori_rec, ori_gth)
+        loss = imprint_reconstruction_loss + 0.01 * (wrench_reconstruction_loss + pos_reconstruction_loss + ori_reconstruction_loss)
+        return loss
 
