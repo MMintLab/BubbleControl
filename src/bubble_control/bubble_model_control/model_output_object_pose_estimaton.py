@@ -99,8 +99,8 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         gf_X_ifr = self._get_transformation_matrix(all_tfs, 'grasp_frame', imprint_frame_r)
         gf_X_ifl = self._get_transformation_matrix(all_tfs, 'grasp_frame', imprint_frame_l)
         pc_shape = pc_r.shape
-        pc_r_gf = pc_batched_tr(pc_r.view((pc_shape[0],-1,pc_shape[-1])), gf_X_ifr[..., :3, :3], gf_X_ifr[..., :3, 3]).view(pc_shape)
-        pc_l_gf = pc_batched_tr(pc_l.view((pc_shape[0],-1,pc_shape[-1])), gf_X_ifl[..., :3, :3], gf_X_ifl[..., :3, 3]).view(pc_shape)
+        pc_r_gf = pc_batched_tr(pc_r.view((pc_shape[0], -1, pc_shape[-1])), gf_X_ifr[..., :3, :3], gf_X_ifr[..., :3, 3]).view(pc_shape)
+        pc_l_gf = pc_batched_tr(pc_l.view((pc_shape[0], -1, pc_shape[-1])), gf_X_ifl[..., :3, :3], gf_X_ifl[..., :3, 3]).view(pc_shape)
         pc_gf = torch.stack([pc_r_gf, pc_l_gf], dim=1) # (N, n_impr, w, h, n_coords)
 
         # Load object model model
@@ -119,28 +119,30 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         pc_scene = pc_gf_2d # pc_scene: (N, n_impr, w, h, n_coords)
         pc_scene_mask = torch.stack([mask_r, mask_l], dim=1) # (N, n_impr, w, h)
         pc_scene_mask = pc_scene_mask.unsqueeze(-1).repeat_interleave(2, dim=-1) # (N, n_impr, w, h, n_coords)
-        pc_model_projected_2d = pc_model_projected[...,:2] # pc_model: (N, n_model_points, n_coords)
+        pc_model_projected_2d = pc_model_projected[..., :2] # pc_model: (N, n_model_points, n_coords)
         
         # Apply ICP:
         device = self.device
         # TODO: Improve this filtering fuctions:
-        pc_model_projected_2d = pc_model_projected_2d[:,:100,:] # TODO: Find a better way to downsample the model
+        pc_model_projected_2d = pc_model_projected_2d[:, :100, :] # TODO: Find a better way to downsample the model
         pc_scene = pc_scene[:, :, ::5, ::5, :]
         pc_scene_mask = pc_scene_mask[:, :, ::5, ::5, :]
 
-        pc_model_projected_2d = pc_model_projected_2d.type(torch.float).to(device)
+        pc_model_projected_2d = pc_model_projected_2d.type(torch.float).to(device) # This call takes almost 2 sec
         pc_scene = pc_scene.type(torch.float).to(device)
         pc_scene_mask = pc_scene_mask.to(device)
         
         # TODO: Convert from float32 to float64
         Rs, ts = icp_2d_masked(pc_model_projected_2d, pc_scene, pc_scene_mask, num_iter=num_iterations)
-        Rs = Rs.to(torch.device('cpu'))
-        ts = ts.to(torch.device('cpu'))
-        
+        Rs = Rs.cpu()
+        ts = ts.cpu()
+
         # Obtain object pose in grasp frame
         projected_ic_tr = torch.zeros(ts.shape[:-1]+(4, 4))
         projected_ic_tr[..., :2, :2] = Rs
         projected_ic_tr[..., :2,  3] = ts
+        projected_ic_tr[..., 2, 2] = 1
+        projected_ic_tr[..., 3, 3] = 1
         projection_tr = projection_tr.type(torch.float)
         unproject_tr = torch.linalg.inv(projection_tr)
         gf_X_objpose = torch.einsum('ji,kil->kjl', unproject_tr, torch.einsum('kij,jl->kil', projected_ic_tr, projection_tr))
@@ -152,7 +154,7 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         # convert it to pose format [xs, ys, zs, qxs, qyx, qzs, qws]
         estimated_pos = wf_X_objpose[..., :3, 3]
         _estimated_quat = batched_trs.matrix_to_quaternion(wf_X_objpose[..., :3, :3]) # (qw,qx,qy,qz)
-        estimated_quat = torch.index_select(_estimated_quat, dim=1, index=torch.LongTensor([1, 2, 3, 0]))# (qx,qy,qz,qw)
+        estimated_quat = torch.index_select(_estimated_quat, dim=-1, index=torch.LongTensor([1, 2, 3, 0]))# (qx,qy,qz,qw)
         estimated_poses = torch.cat([estimated_pos, estimated_quat], dim=-1)
         return estimated_poses
 
