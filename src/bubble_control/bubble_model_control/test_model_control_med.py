@@ -109,7 +109,7 @@ if __name__ == '__main__':
                              grasp_width_limits=(15, 25))
 
     # ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear', device=torch.device('cuda'), imprint_selection='threshold') #thresholded imprint esimation
-    ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear', device=torch.device('cuda'), imprint_selection='percentile', imprint_percentile=0.05) #percentile
+    ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear', device=torch.device('cuda'), imprint_selection='percentile', imprint_percentile=0.005) #percentile
 
     # pose_loss = PoseLoss()
 
@@ -138,6 +138,7 @@ if __name__ == '__main__':
     controller = BubbleModelMPPIBatchedController(model, env, ope, test_cost_function, action_model=drawing_action_model_one_dir, num_samples=num_samples, horizon=horizon, noise_sigma=None, _noise_sigma_value=1.)
 
     #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Control   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    random_action = False
     init_action = {
         'start_point': np.array([0.55, 0.2]),
         'direction': np.deg2rad(270),
@@ -151,13 +152,14 @@ if __name__ == '__main__':
         obs_sample = format_observation_sample(obs_sample_raw)
         obs_sample = block_downsample_tr(obs_sample)
 
-        action_raw = controller.control(obs_sample).detach().cpu().numpy()
-        print(action_raw)
-        if np.isnan(action_raw).any():
-            print('Nan Value --- {}'.format(action_raw))
-            break
-        for i, (k, v) in enumerate(action.items()):
-            action[k] = action_raw[i]
+        if not random_action:
+            action_raw = controller.control(obs_sample).detach().cpu().numpy()
+            print(action_raw)
+            if np.isnan(action_raw).any():
+                print('Nan Value --- {}'.format(action_raw))
+                break
+            for i, (k, v) in enumerate(action.items()):
+                action[k] = action_raw[i]
         print('Action:', action)
         obs_sample_raw, reward, done, info = env.step(action)
         if done:
