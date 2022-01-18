@@ -187,8 +187,11 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
         return loss
 
 
-
 class BubbleFullDynamicsPretrainedAEModel(pl.LightningModule):
+
+    @classmethod
+    def get_name(cls):
+        return 'bubble_full_dynamics_pretrained_autoencoder_model'
 
     def _get_dyn_model(self):
         sizes = self._get_sizes()
