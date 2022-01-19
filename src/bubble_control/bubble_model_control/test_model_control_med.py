@@ -1,29 +1,21 @@
 import numpy as np
-import os
-import sys
 import torch
-import copy
 import rospy
-import tf2_ros as tf
-import tf.transformations as tr
-from geometry_msgs.msg import TransformStamped
 import pytorch3d.transforms as batched_tr
 
 from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
 from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
-from bubble_control.bubble_learning.aux.img_trs.block_upsampling_tr import BlockUpSamplingTr
 from bubble_control.bubble_learning.models.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel
+from bubble_control.bubble_model_control.aux.bubble_dynamics_fixed_model import BubbleDynamicsFixedModel
 
-from bubble_control.bubble_model_control.model_output_object_pose_estimaton import ModelOutputObjectPoseEstimation, BatchedModelOutputObjectPoseEstimation
-from bubble_control.bubble_model_control.bubble_model_controler import BubbleModelMPPIController, BubbleModelMPPIBatchedController
+from bubble_control.bubble_model_control.model_output_object_pose_estimaton import \
+    BatchedModelOutputObjectPoseEstimation
+from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIBatchedController
 from bubble_control.bubble_envs.bubble_drawing_env import BubbleOneDirectionDrawingEnv
-from bubble_utils.bubble_tools.bubble_img_tools import process_bubble_img, unprocess_bubble_img
-from bubble_control.bubble_learning.aux.pose_loss import PoseLoss
+from bubble_utils.bubble_tools.bubble_img_tools import process_bubble_img
 
 from bubble_control.bubble_model_control.drawing_action_models import drawing_action_model_one_dir
 from bubble_control.bubble_learning.aux.load_model import load_model_version
-
-
 
 
 def format_observation_sample(obs_sample):
@@ -84,20 +76,24 @@ def format_observation_sample(obs_sample):
 if __name__ == '__main__':
     
     rospy.init_node('drawin_model_mmpi_test')
-    
-    data_name = '/home/mmint/Desktop/drawing_data_one_direction'
-    load_version = 0
-    object_name = 'marker'
-    Model = BubbleDynamicsPretrainedAEModel
 
+    object_name = 'marker'
     num_samples = 100
     horizon = 2
+    random_action = False # Set to False for controls (Mppi)
 
-    dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame') # TODO: Remove
-    block_downsample_tr = BlockDownSamplingTr(factor_x=7, factor_y=7, reduction='mean', keys_to_tr=['init_imprint'])
 
     # load model:
+    # learned model -------------------
+    data_name = '/home/mmint/Desktop/drawing_data_one_direction'
+    load_version = 0
+    Model = BubbleDynamicsPretrainedAEModel
     model = load_model_version(Model, data_name, load_version)
+    # Fixed model ----------------------
+    # model = BubbleDynamicsFixedModel()
+
+
+    block_downsample_tr = BlockDownSamplingTr(factor_x=7, factor_y=7, reduction='mean', keys_to_tr=['init_imprint'])
 
     env = BubbleOneDirectionDrawingEnv(prob_axis=0.08,
                              impedance_mode=False,
@@ -108,10 +104,9 @@ if __name__ == '__main__':
                              wrap_data=False,
                              grasp_width_limits=(15, 25))
 
+    # Object Pose Estimation Algorithms:
     # ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear', device=torch.device('cuda'), imprint_selection='threshold') #thresholded imprint esimation
-    ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear', device=torch.device('cuda'), imprint_selection='percentile', imprint_percentile=0.05) #percentile
-
-    # pose_loss = PoseLoss()
+    ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear', device=torch.device('cuda'), imprint_selection='percentile', imprint_percentile=0.005) #percentile
 
 
     def test_cost_function(estimated_poses, states, actions):
@@ -151,13 +146,14 @@ if __name__ == '__main__':
         obs_sample = format_observation_sample(obs_sample_raw)
         obs_sample = block_downsample_tr(obs_sample)
 
-        action_raw = controller.control(obs_sample).detach().cpu().numpy()
-        print(action_raw)
-        if np.isnan(action_raw).any():
-            print('Nan Value --- {}'.format(action_raw))
-            break
-        for i, (k, v) in enumerate(action.items()):
-            action[k] = action_raw[i]
+        if not random_action:
+            action_raw = controller.control(obs_sample).detach().cpu().numpy()
+            print(action_raw)
+            if np.isnan(action_raw).any():
+                print('Nan Value --- {}'.format(action_raw))
+                break
+            for i, (k, v) in enumerate(action.items()):
+                action[k] = action_raw[i]
         print('Action:', action)
         obs_sample_raw, reward, done, info = env.step(action)
         if done:
