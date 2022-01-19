@@ -6,42 +6,18 @@ import tf.transformations as tr
 from pytorch_mppi import mppi
 import pytorch3d.transforms as batched_trs
 
+from bubble_control.bubble_model_control.controllers.bubble_controller_base import BubbleModelController
 from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample, get_transformation_matrix, tr_frame, convert_all_tfs_to_tensors
 
-class BubbleModelController(abc.ABC):
 
-    def __init__(self, model, object_pose_estimator, cost_function):
-
-        self.model = model
-        self.object_pose_estimator = object_pose_estimator
-        self.cost_function = cost_function
-        self.controller = self._get_controller()
-
-    def control(self, state_sample):
-        action = self._query_controller(state_sample)
-        return action
-
-    @abc.abstractmethod
-    def _get_controller(self):
-        pass
-
-    @abc.abstractmethod
-    def _query_controller(self, state_sample):
-        pass
-
-
-class BubbleModelMPPIController(object):
+class BubbleModelMPPIController(BubbleModelController):
     # THis used to inherit from BubbleModelController. In the future abstract out again the general controller stuff.
 
     def __init__(self, model, env, object_pose_estimator, cost_function, action_model, num_samples=100, horizon=3, lambda_=0.01, noise_sigma=None, _noise_sigma_value=0.2):
-        self.model = model
-        self.env = env
-        self.object_pose_estimator = object_pose_estimator
-        self.cost_function = cost_function
         self.action_model = action_model
         self.num_samples = num_samples
         self.horizon = horizon
-        self.original_state_shape = None
+        super().__init__(model, env, object_pose_estimator, cost_function)
         self.noise_mu = None
         self.noise_sigma = noise_sigma
         self._noise_sigma_value = _noise_sigma_value
@@ -51,13 +27,9 @@ class BubbleModelMPPIController(object):
         self.u_min, self.u_max = self._get_action_space_limits()
 
         self.sample = None # Container to share sample across functions
-        self.state_size = np.prod(self.model._get_sizes()['imprint']) # TODO: Make more general
-
-        self.controller = self._get_controller()
-
-    def control(self, state_sample):
-        action = self._query_controller(state_sample)
-        return action
+        self.original_state_shape = None
+        self.state_size = None
+        self.controller = None # controller not initialized yet
 
     def dynamics(self, state_t, action_t):
         """
@@ -110,8 +82,6 @@ class BubbleModelMPPIController(object):
 
     def _init_params(self):
         # TODO: Make more general
-        self.original_state_shape = self.model.input_sizes['init_imprint']
-        self.state_size = np.prod(self.original_state_shape)
         if self.noise_sigma is None:
             self.noise_sigma = self._noise_sigma_value * torch.diag(self.u_max - self.u_min)
         else:
@@ -164,6 +134,11 @@ class BubbleModelMPPIController(object):
         return controller
 
     def _query_controller(self, state_sample):
+        if not self.controller:
+            # Initialize the controller
+            self.original_state_shape = state_sample['init_imprint'].shape
+            self.state_size = np.prod(self.original_state_shape)
+            self.controller = self._get_controller()
         self.sample = state_sample
         state = self._unpack_state_sample(state_sample)
         state_t = self._pack_state_to_tensor(state)
