@@ -1,20 +1,15 @@
 import numpy as np
 import os
-import sys
 import torch
 import copy
 import rospy
-import tf2_ros as tf
-import tf.transformations as tr
-from geometry_msgs.msg import TransformStamped
 
 from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
 from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
-from bubble_control.bubble_learning.aux.img_trs.block_upsampling_tr import BlockUpSamplingTr
 from bubble_control.bubble_learning.models.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel
 
 from bubble_control.bubble_model_control.model_output_object_pose_estimaton import ModelOutputObjectPoseEstimation, BatchedModelOutputObjectPoseEstimation
-from bubble_control.bubble_model_control.bubble_model_controler import BubbleModelMPPIController, BubbleModelMPPIBatchedController
+from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIBatchedController
 
 
 
