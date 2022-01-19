@@ -56,7 +56,6 @@ class BubbleModelMPPIController(BubbleModelController):
 
         estimated_poses = []
         for i, state_i in enumerate(states):
-            # TODO: Add the action pose correction -- consider adding the simulation in the environment.
             state_sample_i = self._pack_state_to_sample(state_i, self.sample)
             estimated_pose_i = self.object_pose_estimator.estimate_pose(state_sample_i)
             estimated_poses.append(estimated_pose_i)
@@ -115,15 +114,16 @@ class BubbleModelMPPIController(BubbleModelController):
         return action
 
     def _unpack_state_sample(self, state_sample):
+        # Extract state from sample
         state = None
         state = state_sample['init_imprint']
-        # TODO: Extract state from sample
         return state
 
     def _pack_state_to_sample(self, state, sample_ref):
+        # Add state to sample
         sample = copy.deepcopy(sample_ref)
         sample['next_imprint'] = state
-        # TODO: Add state to sample
+
         return sample
 
     def _get_controller(self):
@@ -162,8 +162,6 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         :param action: (K, action_size) tensor
         :return: cost: (K, 1) tensor
         """
-        costs_t = torch.zeros((len(state_t), 1))
-
         states = self._unpack_state_tensor(state_t)
         actions = self._unpack_action_tensor(action_t)
 
@@ -172,7 +170,6 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         estimated_poses = self.object_pose_estimator.estimate_pose(state_samples)
         costs = self.cost_function(estimated_poses, states, actions)
         costs_t = torch.tensor(costs).reshape(-1, 1)
-
         costs_t = costs_t.flatten() # This fixes the error on mppi _compute_rollout_costs, although the documentation says that cost should be a (K,1)
         return costs_t
 

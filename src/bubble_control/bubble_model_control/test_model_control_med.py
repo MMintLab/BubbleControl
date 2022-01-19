@@ -18,8 +18,6 @@ from bubble_control.bubble_model_control.drawing_action_models import drawing_ac
 from bubble_control.bubble_learning.aux.load_model import load_model_version
 
 
-
-
 def format_observation_sample(obs_sample):
     formatted_obs_sample = {}
     # obs sample should have:
