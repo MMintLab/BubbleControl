@@ -191,7 +191,6 @@ class ToolContactPointEstimator(object):
         rospy.sleep(2.0)
         self.raise_up()
 
-
     def compensate_tool(self):
         num_steps = 20
         self.med.set_control_mode(ControlMode.JOINT_POSITION, vel=0.1)
@@ -209,15 +208,6 @@ class ToolContactPointEstimator(object):
             rospy.sleep(3.0)
         self.raise_up()
         rospy.sleep(2.0)
-
-    def reorient_in_drawing_direction(self, desired_direction):
-        contact_point = self.get_contact_point()
-        grasp_frame_tf = self.tf2_listener.get_transform(parent='med_base', child='grasp_frame')
-        current_direction = (grasp_frame_tf[:3,:3] @ np.array([0, 0, 1]))[:2]
-        angle = np.arccos(np.dot(current_direction, desired_direction))
-        if np.cross(current_direction, desired_direction)[2] < 0:
-            angle *= -1
-        self.med.rotation_along_axis_point_angle(axis=np.array([0, 0, 1]), angle=angle, point=contact_point, frame_id='grasp_frame')
 
     def close(self):
         self.contact_point_marker_publisher.finish()
