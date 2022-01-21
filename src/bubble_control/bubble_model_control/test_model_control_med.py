@@ -130,7 +130,7 @@ if __name__ == '__main__':
         cost = ori_cost + 10*is_nan_action + 10 * is_nan_pose
         return cost
 
-    controller = BubbleModelMPPIBatchedController(model, env, ope, test_cost_function, action_model=drawing_action_model_one_dir, num_samples=num_samples, horizon=horizon, noise_sigma=None, _noise_sigma_value=1.)
+    controller = BubbleModelMPPIBatchedController(model, env, ope, test_cost_function, action_model=drawing_action_model_one_dir, num_samples=num_samples, horizon=horizon, noise_sigma=None, _noise_sigma_value=.3)
 
 
     # +++++++++++++++++++++++
