@@ -124,7 +124,7 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         device = self.device
         pc_model_projected_2d = self._filter_model_pc(pc_model_projected_2d)
         pc_scene, pc_scene_mask = self._filter_scene_pc(pc_scene, pc_scene_mask)
-        print(torch.sum(pc_scene_mask.reshape(pc_scene_mask.shape[0], -1), dim=1))
+        # print(torch.sum(pc_scene_mask.reshape(pc_scene_mask.shape[0], -1), dim=1)) # report number of points per scene
         pc_model_projected_2d = pc_model_projected_2d.type(torch.float).to(device) # This call takes almost 2 sec
         pc_scene = pc_scene.type(torch.float).to(device)
         pc_scene_mask = pc_scene_mask.to(device)
