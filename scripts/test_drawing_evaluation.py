@@ -4,11 +4,13 @@ import tf.transformations as tr
 import rospy
 import numpy as np
 import cv2
+import os
 
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mmint_camera_utils.point_cloud_parsers import RealSensePointCloudParser
 from mmint_camera_utils.camera_utils import project_points_pinhole
 from matplotlib import pyplot as plt
+from scipy.spatial import KDTree
 
 
 def transform_points(points, X):
@@ -27,6 +29,17 @@ def transform_vectors(vectors, X):
     vectors_tr = vectors_tr.reshape(vectors_original_shape)
     return vectors_tr
 
+
+def invert_img(img):
+    origin_type = img.dtype
+    img = img.astype(np.float32)
+    max_v = np.max(img)
+    min_v = np.min(img)
+    # set max_v to min_v and min_v to max_v
+    img_norm = (img-min_v)/(max_v-min_v)
+    img_inv = img_norm*(min_v-max_v) + max_v
+    img_inv = img_inv.astype(origin_type)
+    return img_inv
 
 
 if __name__ == '__main__':
@@ -141,13 +154,79 @@ if __name__ == '__main__':
     gray_img = cv2.cvtColor(processed_unwarped_img, cv2.COLOR_BGR2GRAY)
     th, gray_img_th_otsu = cv2.threshold(gray_img, 128, 192, cv2.THRESH_OTSU)
     # import pdb; pdb.set_trace()
-    gray_img_th_otsu = filter_corners(gray_img_th_otsu)
+    gray_img_th_otsu_or = filter_corners(gray_img_th_otsu)
+    gray_img_th_otsu = invert_img(gray_img_th_otsu_or)
 
     plt.figure(3)
     plt.imshow(gray_img_th_otsu)
 
 
-    plt.show()
+
+    # Display points from board coordinates to rectified image coordinates
+    num_points = 1000
+    drawing_base = np.zeros_like(gray_img_th_otsu)
+    drawing_board_coordinates_xs = board_x_size*0.5*np.ones((num_points,))-tag_size*0.5
+    drawing_board_coordinates_ys = np.linspace(-board_y_size+0.5*tag_size,0.5*tag_size, num=num_points)
+    drawing_board_coordinates_zs = np.zeros((num_points, ))
+    drawing_bc= np.stack([drawing_board_coordinates_xs, drawing_board_coordinates_ys, drawing_board_coordinates_zs], axis=-1) # ub board coordinates
+    drawing_cof = transform_points(drawing_bc, cof_X_bc) # on camera optical frame coordiantes
+    drawing_uvs = project_points_pinhole(drawing_cof, camera_info_color['K'])[...,:2]
+    drawing_uvs_rectified = np.clip(np.rint((np.concatenate([drawing_uvs, np.ones((drawing_uvs.shape[0], 1))],axis=-1) @ H.T)[...,:2]), np.zeros(2), np.flip(drawing_base.shape[:2])-1).astype(np.int32)
+
+    drawing_base[drawing_uvs_rectified[...,1], drawing_uvs_rectified[...,0]] = 255 # paint it white
+
+
+    # view desired drawing on the image
+    drawing_uvs_int = np.clip(np.rint(drawing_uvs), np.zeros(2), np.flip(detected_color_img_q.shape[:2])-1).astype(np.int32)
+    detected_color_img_q[drawing_uvs_int[...,1], drawing_uvs_int[...,0]] = np.array([255, 165,0]) # paint it orange
+
+    plt.figure(4)
+    plt.imshow(detected_color_img_q)
+
+    plt.figure(5)
+    plt.imshow(drawing_base)
+
+
+
+    base_name = 'case_2'
+    path = '/home/mik/Desktop/drawing_evaluation'
+    # import pdb; pdb.set_trace()
+    figs = [plt.figure(i) for i in plt.get_fignums()]
+    for i, fig_num in enumerate(plt.get_fignums()):
+        file_name = '{}_{}.png'.format(base_name, i)
+        fig_path = os.path.join(path, file_name)
+        if not os.path.exists(path):
+            os.makedirs(path)
+            print('created: ', path)
+        # plt.figure(fig_num)
+        plt.savefig(fig_path)
+
+
+    plt.show(block=False)
+    # Compute the score between the actual drawn image and the desired one.
+    # -- For each point in the desired drawing, compute the closest one in the actual drawing
+
+
+    actual_drawing = gray_img_th_otsu
+    desired_drawing = drawing_base
+    img_th = 50
+    current_drawing_pixels = np.stack(np.where(actual_drawing>img_th), axis=-1)
+    desired_drawing_pixels = np.stack(np.where(desired_drawing>img_th), axis=-1)
+    tree = KDTree(current_drawing_pixels)
+    min_dists, min_indxs = tree.query(desired_drawing_pixels)
+
+    score = np.mean(min_dists)
+    print('SCORE:', score)
+    _ = input('Press enter')
+
+
+
+
+
+
+
+
+
 
 
 
