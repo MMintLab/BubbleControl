@@ -130,38 +130,54 @@ if __name__ == '__main__':
         cost = ori_cost + 10*is_nan_action + 10 * is_nan_pose
         return cost
 
-    controller = BubbleModelMPPIBatchedController(model, env, ope, test_cost_function, action_model=drawing_action_model_one_dir, num_samples=num_samples, horizon=horizon, noise_sigma=None, _noise_sigma_value=1.)
+    controller = BubbleModelMPPIBatchedController(model, env, ope, test_cost_function, action_model=drawing_action_model_one_dir, num_samples=num_samples, horizon=horizon, noise_sigma=None, _noise_sigma_value=.3)
 
-    #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Control   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    # +++++++++++++++++++++++
+    # DRAWING FUNCTION
+    def draw_steps(num_steps):
+        init_obs_sample = env.get_observation()
+        obs_sample_raw = init_obs_sample.copy()
+        for i in range(num_steps):
+            # Downsample the sample
+            action, valid_action = env.get_action()  # this is a
+            obs_sample = format_observation_sample(obs_sample_raw)
+            obs_sample = block_downsample_tr(obs_sample)
+
+            if not random_action:
+                action_raw = controller.control(obs_sample).detach().cpu().numpy()
+                print(action_raw)
+                if np.isnan(action_raw).any():
+                    print('Nan Value --- {}'.format(action_raw))
+                    break
+                for i, (k, v) in enumerate(action.items()):
+                    action[k] = action_raw[i]
+            print('Action:', action)
+            obs_sample_raw, reward, done, info = env.step(action)
+            if done:
+                return i
+
+    #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Control -- STRAIGTH LINE  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     init_action = {
         'start_point': np.array([0.55, 0.2]),
         'direction': np.deg2rad(270),
     }
     env.do_init_action(init_action)
-    init_obs_sample = env.get_observation()
-    obs_sample_raw = init_obs_sample.copy()
-    for i in range(40):
-        # Downsample the sample
-        action, valid_action = env.get_action() # this is a
-        obs_sample = format_observation_sample(obs_sample_raw)
-        obs_sample = block_downsample_tr(obs_sample)
+    draw_steps(40)
 
-        if not random_action:
-            action_raw = controller.control(obs_sample).detach().cpu().numpy()
-            print(action_raw)
-            if np.isnan(action_raw).any():
-                print('Nan Value --- {}'.format(action_raw))
-                break
-            for i, (k, v) in enumerate(action.items()):
-                action[k] = action_raw[i]
-        print('Action:', action)
-        obs_sample_raw, reward, done, info = env.step(action)
-        if done:
-            break
+    #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Control -- Triangle  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-
-
-
-
-
+    # init_action = {
+    #     'start_point': np.array([0.50, 0.2]),
+    #     'direction': np.deg2rad(270),
+    # }
+    # env.do_init_action(init_action)
+    # draw_steps(8)
+    #
+    # env.change_drawing_direction(np.deg2rad(0))
+    # draw_steps(8)
+    # env.change_drawing_direction(np.deg2rad(90))
+    # draw_steps(8)
+    # env.change_drawing_direction(np.deg2rad(180))
+    # draw_steps(8)
 

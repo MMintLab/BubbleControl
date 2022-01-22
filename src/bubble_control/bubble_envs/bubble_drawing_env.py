@@ -196,13 +196,16 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         draw_quat = tr.quaternion_multiply(rot_quat, self.med.draw_quat)
         draw_height = self.med._init_drawing(start_point_i, draw_quat=draw_quat)
         # SET Cartesian Impedance
+        self._set_cartesian_impedance()
+        self.previous_draw_height = copy.deepcopy(draw_height)
+        self.drawing_init = True
+
+    def _set_cartesian_impedance(self):
         cartesian_impedance_params = get_cartesian_impedance_params(
             velocity=self.drawing_vel * 40)  # we multiply by 40 because in get_control_mode they do the same...
         cartesian_impedance_params.cartesian_impedance_params.cartesian_stiffness.z = self.z_stiffness  # by default is 5000
         send_new_control_mode(arm='med', msg=cartesian_impedance_params)
         # self.med.set_control_mode(control_mode=ControlMode.CARTESIAN_IMPEDANCE, vel=0.25)
-        self.previous_draw_height = copy.deepcopy(draw_height)
-        self.drawing_init = True
 
     @classmethod
     def get_name(cls):
@@ -327,3 +330,57 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
             target_z = target_z + delta_z
         reached = self.med.move_delta_cartesian_impedance(arm=arm_id, dx=dx_desired, dy=dy_desired, target_z=target_z, target_orientation=target_orientation) # positions with respect the ee_link
         return reached
+
+    def get_contact_point(self, ref_frame='med_base'):
+        contact_point_tf = self.tf2_listener.get_transform(parent=ref_frame, child='tool_contact_point')
+        contact_xyz = contact_point_tf[:3,3]
+        return contact_xyz
+
+    def reorient_in_drawing_direction(self, desired_angle):
+        # self.med.set_control_mode(control_mode=ControlMode.JOINT_IMPEDANCE, vel=0.05)
+        self.med.set_control_mode(control_mode=ControlMode.JOINT_POSITION, vel=0.05)
+        desired_direction_wf = np.array([np.cos(desired_angle), np.sin(desired_angle), 0]) # desired drawing direction in world frame
+        contact_point = self.get_contact_point()
+        wf_X_gf = self.tf2_listener.get_transform(parent='med_base', child='grasp_frame')
+        current_direction_gf = np.array([0, -1, 0])
+        current_direction_wf = (wf_X_gf[:3, :3] @ current_direction_gf)
+        current_direction_planar = current_direction_wf[:2] / np.linalg.norm(current_direction_wf[:2])# assume that drawing plane normal is z
+        desired_direction_planar = desired_direction_wf[:2] / np.linalg.norm(desired_direction_wf[:2])# assume that drawing plane normal is z
+
+        angle = np.arccos(np.dot(current_direction_planar, desired_direction_planar))
+        if np.cross(current_direction_planar, desired_direction_planar) < 0:
+            angle *= -1
+        self.med.rotation_along_axis_point_angle(axis=np.array([0, 0, 1]), angle=angle, point=contact_point, frame_id='grasp_frame', ref_frame='med_base')
+        self._set_cartesian_impedance()
+        self.init_action['direction'] = desired_angle
+
+    def change_drawing_direction(self, desired_angle):
+        self.med.set_control_mode(control_mode=ControlMode.JOINT_POSITION, vel=0.05)
+        desired_direction_wf = np.array(
+            [np.cos(desired_angle), np.sin(desired_angle), 0])  # desired drawing direction in world frame
+        contact_point = self.get_contact_point() # consider averaging some a bunch of measurements
+        wf_X_gf = self.tf2_listener.get_transform(parent='med_base', child='grasp_frame')
+        current_direction_gf = np.array([0, -1, 0])
+        current_direction_wf = (wf_X_gf[:3, :3] @ current_direction_gf)
+        current_direction_planar = current_direction_wf[:2] / np.linalg.norm(
+            current_direction_wf[:2])  # assume that drawing plane normal is z
+        desired_direction_planar = desired_direction_wf[:2] / np.linalg.norm(
+            desired_direction_wf[:2])  # assume that drawing plane normal is z
+
+        angle = np.arccos(np.dot(current_direction_planar, desired_direction_planar))
+        if np.cross(current_direction_planar, desired_direction_planar) < 0:
+            angle *= -1
+
+        # TODO: Clean this code below ----------------------------------------------------------------------
+        self.med.raise_up()
+        self.med.rotation_along_axis_point_angle(axis=np.array([0, 0, 1]), angle=angle, point=contact_point,
+                                                 frame_id='grasp_frame', ref_frame='med_base')
+        draw_z = 0.065
+        draw_contact_gap = 0.005
+        contact_z =self.med.lower_down(z_value=draw_z)
+        draw_height = max(contact_z - draw_contact_gap, self.med.draw_height_limit)
+
+        # END Reorientation:
+        self._set_cartesian_impedance()
+        self.previous_draw_height = copy.deepcopy(draw_height)
+        self.init_action['direction'] = desired_angle

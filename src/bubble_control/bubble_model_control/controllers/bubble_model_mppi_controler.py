@@ -18,13 +18,14 @@ class BubbleModelMPPIController(BubbleModelController):
         self.num_samples = num_samples
         self.horizon = horizon
         super().__init__(model, env, object_pose_estimator, cost_function)
-        self.noise_mu = None
+        self.u_mu = None
         self.noise_sigma = noise_sigma
         self._noise_sigma_value = _noise_sigma_value
         self.state_size = None # To be filled with sample information or model information
         self.lambda_ = lambda_
         self.device = self.model.device
         self.u_min, self.u_max = self._get_action_space_limits()
+        self.U_init = None # Initial trajectory. We initialize it as the mean of the action space. Actions will be drawin as a gaussian noise added to this values.
 
         self.sample = None # Container to share sample across functions
         self.original_state_shape = None
@@ -86,8 +87,10 @@ class BubbleModelMPPIController(BubbleModelController):
         else:
             # convert it to a square tensor
             self.noise_sigma = torch.diag(torch.tensor(self.noise_sigma, device=self.device, dtype=torch.float))
-        if self.noise_mu is None:
-            self.noise_mu = 0.5 * (self.u_max + self.u_min)
+        if self.u_mu is None:
+            self.u_mu = 0.5 * (self.u_max + self.u_min)
+        if self.U_init is None:
+            self.U_init = self.u_mu.unsqueeze(0).repeat_interleave(self.horizon, dim=0)
 
     def _pack_state_to_tensor(self, state):
         """
@@ -130,7 +133,7 @@ class BubbleModelMPPIController(BubbleModelController):
         self._init_params()
         controller = mppi.MPPI(self.dynamics, self.compute_cost, self.state_size, self.noise_sigma,
                                lambda_=self.lambda_, device=self.model.device,
-                               num_samples=self.num_samples, horizon=self.horizon, u_min=self.u_min, u_max=self.u_max, u_init=self.noise_mu)
+                               num_samples=self.num_samples, horizon=self.horizon, u_min=self.u_min, u_max=self.u_max, u_init=self.u_mu, U_init=self.U_init)
         return controller
 
     def _query_controller(self, state_sample):

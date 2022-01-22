@@ -20,6 +20,7 @@ def icp_2d_masked(pc_model, pc_scene, pc_scene_mask, num_iter=30):
     R, t = R_init, t_init
     for i in tqdm(range(num_iter)):
         R, t = icp_2d_maksed_step(pc_model, pc_scene, pc_scene_mask, R_init, t_init)
+
         R_init = R
         t_init = t
     # R: (N, n_coords, n_coords)
@@ -55,7 +56,8 @@ def icp_2d_maksed_step(pc_model, pc_scene, pc_scene_mask, R_init, t_init):
 
     # Estimate correspondences (only masked):
     # compute distances and get minimums
-    pc_model_selected = estimate_correspondences_batched(pc_model_tr, pc_scene, pc_scene_mask)
+    batch_idxs, corr_indxs = estimate_correspondences_batched(pc_model_tr, pc_scene, pc_scene_mask)
+    pc_model_selected = pc_model[batch_idxs, corr_indxs, :]
 
     # Compute new transform
     R_star, t_star = find_best_transform_batched_masked(pc_model_selected, pc_scene, pc_scene_mask)
@@ -102,17 +104,17 @@ def estimate_correspondences_batched(a1, a2, a2_mask):
     # Compute distances
     N1, n_1_points, n_coords_1 = a1.shape
     N2, n_2_points, n_coords_2 = a2.shape
-    a12 = a1.unsqueeze(1).repeat_interleave(n_2_points, dim=1)
-    a21 = a2.unsqueeze(2).repeat_interleave(n_1_points, dim=2)
-    dists = torch.sqrt(torch.sum((a12 - a21) ** 2, dim=-1))
+
+    dists = (torch.sum((a1 ** 2), dim=-1).unsqueeze(-1) -
+             torch.bmm(a1, a2.transpose(1, 2)) * 2 +
+             torch.sum((a2 ** 2), dim=-1).unsqueeze(-2)).transpose(1, 2)
 
     # Get clossest point indxs
     corr_indxs = torch.argmin(dists, axis=-1)  # get a1 index that minimizes distance to a2
 
     # Apply correspondences
     batch_idxs = torch.arange(0, corr_indxs.shape[0]).unsqueeze(-1).repeat_interleave(n_2_points, dim=-1)
-    a_1corr = a1[batch_idxs, corr_indxs, :]
-    return a_1corr
+    return batch_idxs, corr_indxs
 
 
 def find_best_transform_batched_masked(pc_model, pc_scene, pc_mask):
