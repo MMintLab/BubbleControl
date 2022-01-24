@@ -16,6 +16,7 @@ from bubble_utils.bubble_tools.bubble_img_tools import process_bubble_img
 
 from bubble_control.bubble_model_control.drawing_action_models import drawing_action_model_one_dir
 from bubble_control.bubble_learning.aux.load_model import load_model_version
+from bubble_control.aux.drawing_evaluation import DrawingEvaluator
 
 
 def format_observation_sample(obs_sample):
@@ -157,14 +158,30 @@ if __name__ == '__main__':
             if done:
                 return i
 
+
+    # EVALUATOR -----------
+    drawing_evaluator = DrawingEvaluator()
+
+
+
     #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Control -- STRAIGTH LINE  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     init_action = {
         'start_point': np.array([0.55, 0.2]),
         'direction': np.deg2rad(270),
     }
-    env.do_init_action(init_action)
-    draw_steps(40)
+    # env.do_init_action(init_action)
+    # draw_steps(40)
+    env.med.home_robot()
+    env.med.set_robot_conf('zero_conf')
 
+
+    num_points = 1000
+    edc_x = init_action['start_point'][0]*np.ones((num_points,))
+    edc_y = np.linspace(init_action['start_point'][1]-0.4,init_action['start_point'][1], num=num_points)
+    edc_z = np.zeros((num_points,))
+    expected_drawing_cooridnates = np.stack([edc_x, edc_y, edc_z], axis=-1)
+    score = drawing_evaluator.evaluate(expected_drawing_cooridnates, frame='med_base', save_path='/home/mmint/Desktop/drawing_evaluation/test_model_control_med')
+    print('SCORE: ', score)
     #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Control -- Triangle  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     # init_action = {

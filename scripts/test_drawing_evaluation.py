@@ -53,7 +53,7 @@ if __name__ == '__main__':
     projected_img_size = (1000*np.array([board_x_size, board_y_size])).astype(np.int32) # u,v (x,y)
 
     tf_listener = TF2Wrapper()
-    rsp = RealSensePointCloudParser(camera_indx=camera_indx)
+    rsp = RealSensePointCloudParser(camera_indx=camera_indx,verbose=False)
     camera_info_depth = rsp.get_camera_info_depth()
     camera_info_color = rsp.get_camera_info_color()
     camera_frame = 'camera_1_link'
@@ -97,21 +97,20 @@ if __name__ == '__main__':
 
     # tag_poses_w = np.stack(tag_poses_w, axis=0)
     # tag_poses_cof = transform_points(tag_poses_w, np.linalg.inv(w_X_cof))
-    tag_poses_cof = np.stack([X[:3,3] for X in cof_X_tags], axis=0)
+    tag_poses_cof = np.stack([X[:3, 3] for X in cof_X_tags], axis=0)
     # board_corners_cof = np.append(board_corners_cof, tag_poses_cof, axis=0)
 
 
 
     # Get the image coordinates of the board corners
-
     board_corners_uvw = project_points_pinhole(board_corners_cof, camera_info_color['K'])
     tag_centers_uvw = project_points_pinhole(tag_poses_cof, camera_info_color['K'])
-    board_corners_uv = np.floor(board_corners_uvw[...,:2]).astype(np.int32)
-    tag_centers_uv = np.floor(tag_centers_uvw[...,:2]).astype(np.int32)
+    board_corners_uv = np.floor(board_corners_uvw[..., :2]).astype(np.int32)
+    tag_centers_uv = np.floor(tag_centers_uvw[..., :2]).astype(np.int32)
     print('Corners uv', board_corners_uv)
 
-    axis_dirs = np.array([[0,1],[1,0],[0,-1],[-1,0]])
-    axis = np.concatenate([np.zeros((1,2), dtype=np.int32)]+[axis_dirs*(i+1) for i in range(10)], axis=0)
+    axis_dirs = np.array([[0,1], [1,0], [0,-1], [-1,0]])
+    axis = np.concatenate([np.zeros((1, 2), dtype=np.int32)]+[axis_dirs*(i+1) for i in range(10)], axis=0)
     uv_ext = np.concatenate([board_corners_uv + axis_i for axis_i in axis], axis=0)
     tag_uv_ext = np.concatenate([tag_centers_uv + axis_i for axis_i in axis], axis=0)
 
@@ -168,7 +167,7 @@ if __name__ == '__main__':
     drawing_board_coordinates_xs = board_x_size*0.5*np.ones((num_points,))-tag_size*0.5
     drawing_board_coordinates_ys = np.linspace(-board_y_size+0.5*tag_size,0.5*tag_size, num=num_points)
     drawing_board_coordinates_zs = np.zeros((num_points, ))
-    drawing_bc= np.stack([drawing_board_coordinates_xs, drawing_board_coordinates_ys, drawing_board_coordinates_zs], axis=-1) # ub board coordinates
+    drawing_bc = np.stack([drawing_board_coordinates_xs, drawing_board_coordinates_ys, drawing_board_coordinates_zs], axis=-1) # ub board coordinates
     drawing_cof = transform_points(drawing_bc, cof_X_bc) # on camera optical frame coordiantes
     drawing_uvs = project_points_pinhole(drawing_cof, camera_info_color['K'])[...,:2]
     drawing_uvs_rectified = np.clip(np.rint((np.concatenate([drawing_uvs, np.ones((drawing_uvs.shape[0], 1))],axis=-1) @ H.T)[...,:2]), np.zeros(2), np.flip(drawing_base.shape[:2])-1).astype(np.int32)
@@ -188,8 +187,8 @@ if __name__ == '__main__':
 
 
 
-    base_name = 'case_2'
-    path = '/home/mik/Desktop/drawing_evaluation'
+    base_name = 'case_3'
+    path = '~/Desktop/drawing_evaluation'
     # import pdb; pdb.set_trace()
     figs = [plt.figure(i) for i in plt.get_fignums()]
     for i, fig_num in enumerate(plt.get_fignums()):
