@@ -12,10 +12,10 @@ from scipy.spatial import KDTree
 
 def transform_points(points, X):
     points_original_shape = points.shape
-    points = points.reshape(-1,points_original_shape[-1]) # add batch_dim
+    points = points.reshape(-1, points_original_shape[-1]) # add batch_dim
     points_h = np.concatenate([points, np.ones((points.shape[0], 1))], axis=-1)
     points_tr_h = points_h @ X.T
-    points_tr = points_tr_h[...,:3]
+    points_tr = points_tr_h[..., :3]
     points_tr = points_tr.reshape(points_original_shape)
     return points_tr
 
@@ -23,7 +23,7 @@ def transform_points(points, X):
 def transform_vectors(vectors, X):
     vectors_original_shape = vectors.shape
     vectors = vectors.reshape(-1, vectors_original_shape[-1]) # add batch_dim
-    vectors_tr = vectors @ X[:3,:3].T
+    vectors_tr = vectors @ X[:3, :3].T
     vectors_tr = vectors_tr.reshape(vectors_original_shape)
     return vectors_tr
 
@@ -232,7 +232,7 @@ class DrawingEvaluator(object):
             plt.imshow(expected_img)
             plt.savefig(full_path.format('expected_binarized_unwarped'), dpi=400)
 
-        return score
+        return score, binarized_img, expected_img
 
 
 

@@ -16,62 +16,11 @@ from bubble_utils.bubble_tools.bubble_img_tools import process_bubble_img
 
 from bubble_control.bubble_model_control.drawing_action_models import drawing_action_model_one_dir
 from bubble_control.bubble_learning.aux.load_model import load_model_version
-from bubble_control.aux.drawing_evaluation import DrawingEvaluator
+from bubble_control.aux.drawing_evaluator import DrawingEvaluator
+from bubble_control.bubble_model_control.aux.format_observation import format_observation_sample
+from bubble_control.bubble_model_control.cost_functions import vertical_tool_cost_function
 
 
-def format_observation_sample(obs_sample):
-    formatted_obs_sample = {}
-    # obs sample should have:
-    #           'init_imprint',
-    #           'init_wrench',
-    #           'init_pos',
-    #           'init_quat',
-    #           'final_imprint',
-    #           'final_wrench',
-    #           'final_pos',
-    #           'final_quat',
-    #           'action',
-    #           'undef_depth_r',
-    #           'undef_depth_l',
-    #           'camera_info_r',
-    #           'camera_info_l',
-    #           'all_tfs'
-    # input input expected keys:
-    #           'bubble_camera_info_color_right',
-    #           'bubble_camera_info_depth_right',
-    #           'bubble_color_img_right',
-    #           'bubble_depth_img_right',
-    #           'bubble_point_cloud_right',
-    #           'bubble_camera_info_color_left',
-    #           'bubble_camera_info_depth_left',
-    #           'bubble_color_img_left',
-    #           'bubble_depth_img_left',
-    #           'bubble_point_cloud_left',
-    #           'wrench',
-    #           'tfs',
-    #           'bubble_color_img_right_reference',
-    #           'bubble_depth_img_right_reference',
-    #           'bubble_point_cloud_right_reference',
-    #           'bubble_color_img_left_reference',
-    #           'bubble_depth_img_left_reference',
-    #           'bubble_point_cloud_left_reference'
-    # remap keys ---
-    key_map = {
-        'tfs': 'all_tfs',
-        'bubble_camera_info_depth_left': 'camera_info_l',
-        'bubble_camera_info_depth_right': 'camera_info_r',
-        'bubble_depth_img_right_reference': 'undef_depth_r',
-        'bubble_depth_img_left_reference': 'undef_depth_l',
-    }
-    for k_old, k_new in key_map.items():
-        formatted_obs_sample[k_new] = obs_sample[k_old]
-    # add imprints: -------
-    init_imprint_r = obs_sample['bubble_depth_img_right_reference'] - obs_sample['bubble_depth_img_right']
-    init_imprint_l = obs_sample['bubble_depth_img_left_reference'] - obs_sample['bubble_depth_img_left']
-    formatted_obs_sample['init_imprint'] = process_bubble_img(np.stack([init_imprint_r, init_imprint_l], axis=0))[...,0]
-
-    # apply the key_map
-    return formatted_obs_sample
 
 
 if __name__ == '__main__':
@@ -110,28 +59,7 @@ if __name__ == '__main__':
     ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear', device=torch.device('cuda'), imprint_selection='percentile', imprint_percentile=0.005) #percentile
 
 
-    def test_cost_function(estimated_poses, states, actions):
-        # Only position ----------------------------------------
-        # goal_xyz = np.zeros(3)
-        # estimated_xyz = estimated_poses[:, :3]
-        # cost = np.linalg.norm(estimated_xyz-goal_xyz, axis=1)
-
-        # Only orientation, using model points ------------
-        # tool axis is z, so we want tool frame z axis to be aligned with the world z axis
-        estimated_pos = estimated_poses[:, :3] # (x, y, z)
-        estimated_q = estimated_poses[:, 3:] # (qx,qy,qz,qw)
-        estimated_qwxyz = torch.index_select(estimated_q, dim=-1, index=torch.LongTensor([3, 0, 1, 2]))# (qw, qx,qy,qz)
-        estimated_R = batched_tr.quaternion_to_matrix(estimated_qwxyz) # careful! batched_tr quat is [qw,qx,qy,qz], we work as [qx,qy,qz,qw]
-        z_axis = torch.tensor([0., 0, 1.]).unsqueeze(0).repeat_interleave(estimated_R.shape[0], dim=0).float()
-        tool_z_axis_wf = torch.einsum('kij,kj->ki', estimated_R, z_axis)
-        ori_cost = 1-torch.abs(torch.einsum('ki,ki->k', z_axis, tool_z_axis_wf)) # TO MINIMIZE (perfect case tool axis parallel to z axis, aka dot(z_axis, tool_z_axis)=1)
-        ori_cost = torch.nan_to_num(ori_cost, nan=10.0)
-        is_nan_action = torch.any(torch.isnan(actions), dim=1)
-        is_nan_pose = torch.any(torch.isnan(estimated_pos), dim=1)
-        cost = ori_cost + 10*is_nan_action + 10 * is_nan_pose
-        return cost
-
-    controller = BubbleModelMPPIBatchedController(model, env, ope, test_cost_function, action_model=drawing_action_model_one_dir, num_samples=num_samples, horizon=horizon, noise_sigma=None, _noise_sigma_value=.3)
+    controller = BubbleModelMPPIBatchedController(model, env, ope, vertical_tool_cost_function, action_model=drawing_action_model_one_dir, num_samples=num_samples, horizon=horizon, noise_sigma=None, _noise_sigma_value=.3)
 
 
     # +++++++++++++++++++++++
@@ -180,8 +108,9 @@ if __name__ == '__main__':
     edc_y = np.linspace(init_action['start_point'][1]-0.4,init_action['start_point'][1], num=num_points)
     edc_z = np.zeros((num_points,))
     expected_drawing_cooridnates = np.stack([edc_x, edc_y, edc_z], axis=-1)
-    score = drawing_evaluator.evaluate(expected_drawing_cooridnates, frame='med_base', save_path='/home/mmint/Desktop/drawing_evaluation/test_model_control_med')
+    score, _, _ = drawing_evaluator.evaluate(expected_drawing_cooridnates, frame='med_base', save_path='/home/mmint/Desktop/drawing_evaluation/test_model_control_med')
     print('SCORE: ', score)
+
     #  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Control -- Triangle  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     # init_action = {
