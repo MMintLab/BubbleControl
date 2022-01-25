@@ -3,11 +3,13 @@ import torch
 import os
 import rospy
 import pytorch3d.transforms as batched_tr
+from tqdm import tqdm
 
 from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
 from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
 from bubble_control.bubble_learning.models.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel
 from bubble_control.bubble_model_control.aux.bubble_dynamics_fixed_model import BubbleDynamicsFixedModel
+from victor_hardware_interface_msgs.msg import ControlMode
 
 from bubble_control.bubble_model_control.model_output_object_pose_estimaton import \
     BatchedModelOutputObjectPoseEstimation
@@ -71,7 +73,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         Returns:
         """
         column_names = self._get_legend_column_names()
-        lines = np.array([data_params[cn] for cn in column_names], dtype=object).T
+        lines = [[data_params[cn] for cn in column_names]]
         return lines
 
     def _collect_data_sample(self, params=None):
@@ -81,17 +83,21 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             params:
         Returns: <dict> containing the parameters of the collected sample
         """
-        fc = self.get_new_filecode()
+
         self._init_collection_sample()
 
         # Draw
         num_steps = 40
+        num_steps_done = 40
         self.env.do_init_action(self.init_action)
         num_steps_done = self.draw_steps(num_steps=num_steps)
 
+        fc = self.get_new_filecode()
+
         # Evaluate
+        self.env.med.set_control_mode(ControlMode.JOINT_POSITION, vel=0.1)
         self.env.med.home_robot()
-        self.env.med.set_execute()
+        self.env.med.set_robot_conf('zero_conf')
         expected_drawing_cooridnates = self._get_expected_drawing()
         score, actual_drawing, expected_drawing = self.evaluator.evaluate(expected_drawing_cooridnates,
                                                                           frame='med_base',
@@ -163,15 +169,15 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
     def _get_expected_drawing(self):
         num_points = 1000
         edc_x = self.init_action['start_point'][0] * np.ones((num_points,))
-        edc_y = np.linspace(self.init_action['start_point'][1] - 0.4, self.init_action['start_point'][1], num=num_points)
-        edc_z = np.zeros((num_points,))
+        edc_y = np.linspace(self.init_action['start_point'][1] - 0.55, self.init_action['start_point'][1], num=num_points)
+        edc_z = 0.01*np.ones((num_points,))
         expected_drawing_cooridnates = np.stack([edc_x, edc_y, edc_z], axis=-1)
         return expected_drawing_cooridnates
 
     def draw_steps(self, num_steps):
         init_obs_sample = self.env.get_observation()
         obs_sample_raw = init_obs_sample.copy()
-        for i in range(num_steps):
+        for step_i in tqdm(range(num_steps)):
             # Downsample the sample
             action, valid_action = self.env.get_action()  # this is a
             obs_sample = format_observation_sample(obs_sample_raw)
@@ -179,14 +185,14 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
 
             if not self.random_action:
                 action_raw = self.controller.control(obs_sample).detach().cpu().numpy()
-                print(action_raw)
+                # print(action_raw)
                 if np.isnan(action_raw).any():
-                    print('Nan Value --- {}'.format(action_raw))
+                    # print('Nan Value --- {}'.format(action_raw))
                     break
                 for i, (k, v) in enumerate(action.items()):
                     action[k] = action_raw[i]
-            print('Action:', action)
+            # print('Action:', action)
             obs_sample_raw, reward, done, info = self.env.step(action)
             if done:
-                return i
+                return step_i
         return num_steps

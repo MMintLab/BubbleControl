@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 import argparse
+import rospy
 
 from bubble_control.bubble_data_collection.drawing_evaluation_data_collection import DrawingEvaluationDataCollection
 
@@ -13,7 +14,6 @@ if __name__ == '__main__':
     parser.add_argument('--fixed_model', action='store_true', help='reactive mode -- adjust tool position to be straight when we start drawing')
     # TODO: Add more parameters if needed
 
-
     args = parser.parse_args()
 
     save_path = args.save_path
@@ -21,6 +21,8 @@ if __name__ == '__main__':
     num_data = args.num_data
     random_action = args.random_action
     fixed_model = args.fixed_model
+
+    rospy.init_node('test_evaluation_drawing')
 
     dc = DrawingEvaluationDataCollection(data_path=save_path, scene_name=scene_name, fixed_model=fixed_model, random_action=random_action)
     dc.collect_data(num_data=num_data)

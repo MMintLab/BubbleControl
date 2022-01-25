@@ -184,8 +184,11 @@ class DrawingEvaluator(object):
         drawing_uvs = self._get_pixel_coordinates(drawing_cof, as_int=False)
         # Compute the expected image
         expected_img = np.zeros_like(binarized_img)
+        drawing_uvs_ext = np.concatenate([drawing_uvs, np.ones((drawing_uvs.shape[0], 1))], axis=-1)
+        drawing_uvs_rectified_uvw = np.einsum('ij,kj->ki', H, drawing_uvs_ext)
+        drawing_uvs_rectified = (drawing_uvs_rectified_uvw/drawing_uvs_rectified_uvw[...,-1:].repeat(3, axis=-1))[..., :2] # Normalize
         drawing_uvs_rectified = np.clip(
-            np.rint((np.concatenate([drawing_uvs, np.ones((drawing_uvs.shape[0], 1))], axis=-1) @ H.T)[..., :2]),
+            np.rint(drawing_uvs_rectified),
             np.zeros(2), np.flip(expected_img.shape[:2]) - 1).astype(np.int32)
 
         expected_img[drawing_uvs_rectified[..., 1], drawing_uvs_rectified[..., 0]] = 255  # paint it white

@@ -167,7 +167,7 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         """
         states = self._unpack_state_tensor(state_t)
         actions = self._unpack_action_tensor(action_t)
-
+        # print(action_t)
         state_samples = self._pack_state_to_sample(states, self.sample)
         state_samples = self._action_correction(state_samples, actions)
         estimated_poses = self.object_pose_estimator.estimate_pose(state_samples)
