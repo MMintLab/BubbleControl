@@ -18,7 +18,7 @@ def icp_2d_masked(pc_model, pc_scene, pc_scene_mask, num_iter=30):
                                 start_dim=-1)  # mean of the scene
 
     R, t = R_init, t_init
-    for i in tqdm(range(num_iter)):
+    for i in range(num_iter):
         R, t = icp_2d_maksed_step(pc_model, pc_scene, pc_scene_mask, R_init, t_init)
 
         R_init = R
