@@ -7,23 +7,23 @@ import pytorch3d.transforms as batched_trs
 
 
 def convert_all_tfs_to_tensors(all_tfs):
-        """
-        Convert a DataFrame object containing the tfs with respect a common frame into a dictionary of tensor transformation matrices
-        :param all_tfs: DataFrame
-        :return:
-        """
-        # Transform a DF into a dictionary of homogeneous transformations matrices (4x4)
-        converted_all_tfs = {}
-        parent_frame = all_tfs['parent_frame'][0] # Assume that are all teh same
-        child_frames = all_tfs['child_frame']
-        converted_all_tfs[parent_frame] = np.eye(4) # Transformation to itself is the identity
-        all_poses = all_tfs[['x', 'y', 'z', 'qx', 'qy', 'qz', 'qw']]
-        for i, child_frame_i in enumerate(child_frames):
-            pose_i = all_poses.iloc[i]
-            X_i = tr.quaternion_matrix(pose_i[3:])
-            X_i[:3, 3] = pose_i[:3]
-            converted_all_tfs[child_frame_i] = X_i
-        return converted_all_tfs
+    """
+    Convert a DataFrame object containing the tfs with respect a common frame into a dictionary of tensor transformation matrices
+    :param all_tfs: DataFrame
+    :return:
+    """
+    # Transform a DF into a dictionary of homogeneous transformations matrices (4x4)
+    converted_all_tfs = {}
+    parent_frame = all_tfs['parent_frame'][0] # Assume that are all teh same
+    child_frames = all_tfs['child_frame']
+    converted_all_tfs[parent_frame] = np.eye(4) # Transformation to itself is the identity
+    all_poses = all_tfs[['x', 'y', 'z', 'qx', 'qy', 'qz', 'qw']]
+    for i, child_frame_i in enumerate(child_frames):
+        pose_i = all_poses.iloc[i]
+        X_i = tr.quaternion_matrix(pose_i[3:])
+        X_i[:3, 3] = pose_i[:3]
+        converted_all_tfs[child_frame_i] = X_i
+    return converted_all_tfs
 
 
 def tr_frame(all_tfs, frame_name, X, fixed_frame_names):
@@ -83,3 +83,9 @@ def batched_tensor_sample(sample, batch_size=None, device=None):
         else:
             batched_sample[k_i] = v_i
     return batched_sample
+
+def batched_matrix_to_euler_corrected(batched_matrix):
+    # Transform a batched matrix into euler angles with 'sxyz' convention
+    euler_unordered = batched_trs.matrix_to_euler_angles(batched_matrix, 'ZYX')
+    euler_ordered = torch.index_select(euler_unordered, dim=-1, index=torch.LongTensor([2, 1, 0]))
+    return euler_ordered
