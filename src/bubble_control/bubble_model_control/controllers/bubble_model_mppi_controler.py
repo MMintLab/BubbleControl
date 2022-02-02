@@ -41,7 +41,8 @@ class BubbleModelMPPIController(BubbleModelController):
         """
         state = self._unpack_state_tensor(state_t)
         action = self._unpack_action_tensor(action_t)
-        next_state = self.model(state, action)
+        output = self.model(*state, action)
+        next_state = self._expand_output_to_state(output, state, action)
         next_state_t = self._pack_state_to_tensor(next_state)
         return next_state_t
 
@@ -58,10 +59,11 @@ class BubbleModelMPPIController(BubbleModelController):
         estimated_poses = []
         for i, state_i in enumerate(states):
             state_sample_i = self._pack_state_to_sample(state_i, self.sample)
+            # TODO: Add action correction?
             estimated_pose_i = self.object_pose_estimator.estimate_pose(state_sample_i)
             estimated_poses.append(estimated_pose_i)
         estimated_poses = np.array(estimated_poses)
-        costs = self.cost_function(estimated_poses, states, actions)
+        costs = self.cost_function(estimated_poses, states, states, actions)
         costs_t = torch.tensor(costs).reshape(-1, 1)
 
         costs_t = costs_t.flatten() # This fixes the error on mppi _compute_rollout_costs, although the documentation says that cost should be a (K,1)
@@ -82,14 +84,21 @@ class BubbleModelMPPIController(BubbleModelController):
 
     def _init_params(self):
         # TODO: Make more general
-        if self.noise_sigma is None:
-            self.noise_sigma = self._noise_sigma_value * torch.diag(self.u_max - self.u_min)
+        # state_size is the sum of sizes of all items in the state
+        self.state_size = 0
+        sizes = self.model._get_sizes()
+        for (k, v) in sizes.items():
+            if k != 'action':
+                self.state_size += np.prod(v)
+        if self.noise_sigma is None or self.noise_sigma.shape[0] != self.u_max.shape[0]:
+            eps = 1e-7
+            self.noise_sigma = self._noise_sigma_value * torch.diag(self.u_max - self.u_min + eps)
         else:
             # convert it to a square tensor
             self.noise_sigma = torch.diag(torch.tensor(self.noise_sigma, device=self.device, dtype=torch.float))
-        if self.u_mu is None:
+        if self.u_mu is None or self.u_mu.shape[-1] != self.u_max.shape[0]:
             self.u_mu = 0.5 * (self.u_max + self.u_min)
-        if self.U_init is None:
+        if self.U_init is None or self.U_init.shape[-1] != self.u_max.shape[0]:
             self.U_init = self.u_mu.unsqueeze(0).repeat_interleave(self.horizon, dim=0)
 
     def _pack_state_to_tensor(self, state):
@@ -129,6 +138,9 @@ class BubbleModelMPPIController(BubbleModelController):
 
         return sample
 
+    def _expand_output_to_state(self, output, state, action):
+        return output
+
     def _get_controller(self):
         self._init_params()
         controller = mppi.MPPI(self.dynamics, self.compute_cost, self.state_size, self.noise_sigma,
@@ -167,18 +179,17 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         """
         states = self._unpack_state_tensor(state_t)
         actions = self._unpack_action_tensor(action_t)
-        # print(action_t)
         state_samples = self._pack_state_to_sample(states, self.sample)
+        prev_state_samples = copy.deepcopy(state_samples)
         state_samples = self._action_correction(state_samples, actions)
         estimated_poses = self.object_pose_estimator.estimate_pose(state_samples)
-        costs = self.cost_function(estimated_poses, states, actions)
+        costs = self.cost_function(estimated_poses, state_samples, prev_state_samples, actions)
         costs_t = torch.tensor(costs).reshape(-1, 1)
         costs_t = costs_t.flatten() # This fixes the error on mppi _compute_rollout_costs, although the documentation says that cost should be a (K,1)
         return costs_t
 
     def _pack_state_to_sample(self, state, sample_ref):
         sample = copy.deepcopy(sample_ref)
-        batch_size = state.shape[0]
         batch_size = state.shape[0]
         # convert all_tfs to tensors
         sample['all_tfs'] = self._convert_all_tfs_to_tensors(sample['all_tfs'])
