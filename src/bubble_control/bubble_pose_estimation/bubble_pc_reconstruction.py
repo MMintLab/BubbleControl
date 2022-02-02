@@ -178,7 +178,6 @@ class BubblePCReconsturctorTreeSearch(BubblePCReconstructorROSBase):
         self.last_tr = None
 
     def get_imprint(self, view=False, separate=False):
-        import pdb; pdb.set_trace()
         pc_r, frame_r = self.right_parser.get_point_cloud(return_ref_frame=True, ref_frame=self.references['right_frame'])
         pc_l, frame_l = self.left_parser.get_point_cloud(return_ref_frame=True, ref_frame=self.references['left_frame'])
         pc_r = self.filter_pc(pc_r)
