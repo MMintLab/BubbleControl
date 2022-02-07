@@ -106,10 +106,6 @@ def create_object_models(radius=0.005, height=0.12):
     # TODO: Add rest
     models = {'allen': allen_pcd, 'marker': marker_pcd, 'pen': pen_pcd}
 
-    # Add marker models
-    marker_models = create_marker_models()
-    models = models.update(marker_models)
-
     return models
 
 
@@ -145,4 +141,7 @@ if __name__ == '__main__':
     radius = 0.005
     height = 0.12
     models = create_object_models(radius=radius, height=height)
+    # Add marker models
+    marker_models = create_marker_models()
+    models = models.update(marker_models)
     save_object_models(models)
