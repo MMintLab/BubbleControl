@@ -31,6 +31,14 @@ class BubbleModelMPPIController(BubbleModelController):
         self.original_state_shape = None
         self.state_size = None
         self.controller = None # controller not initialized yet
+        self.action_container = self.env.get_action()
+
+    def control(self, state_sample):
+        # pack the action to the env format
+        action_raw = super().control(state_sample).detach().cpu().numpy()
+        for i, (k, v) in enumerate(self.action_container.items()):
+            self.action_container[k] = action_raw[i]
+        return self.action_container
 
     def dynamics(self, state_t, action_t):
         """

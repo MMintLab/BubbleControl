@@ -2,6 +2,7 @@ import yaml
 import sys
 import os
 import numpy as np
+import pandas as pd
 import bubble_utils
 from mmint_camera_utils.point_cloud_utils import pack_o3d_pcd, unpack_o3d_pcd
 
@@ -45,3 +46,9 @@ def save_object_models(object_models_dict):
         object_models_dict[k] = unpack_o3d_pcd(pcd_i)
     with open(bubble_icp_models_path, 'wb') as f:
         np.save(f, object_models_dict)
+
+
+def load_marker_params():
+    marker_params_path = os.path.join(package_path, 'config', 'marker_params.csv')
+    marker_params_df = pd.read_csv(marker_params_path)
+    return marker_params_df

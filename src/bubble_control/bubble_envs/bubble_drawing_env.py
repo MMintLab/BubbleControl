@@ -23,7 +23,7 @@ class BubbleDrawingBaseEnv(BubbleBaseEnv):
 
     def __init__(self, *args, impedance_mode=False, reactive=False, force_threshold=5., prob_axis=0.08,
                  drawing_area_center=(0.55, 0.), drawing_area_size=(.15, .15), drawing_length_limits=(0.01, 0.15),
-                 grasp_width_limits=(15, 25), **kwargs):
+                 grasp_width_limits=(15, 25), marker_code='marker', **kwargs):
         self.impedance_mode = impedance_mode
         self.reactive = reactive
         self.force_threshold = force_threshold
@@ -32,6 +32,7 @@ class BubbleDrawingBaseEnv(BubbleBaseEnv):
         self.drawing_area_size = drawing_area_size
         self.drawing_length_limits = drawing_length_limits
         self.grasp_width_limits = grasp_width_limits
+        self.marker_code = marker_code
         self.previous_end_point = None
         self.previous_draw_height = None
         self.drawing_init = False
@@ -95,6 +96,7 @@ class BubbleDrawingBaseEnv(BubbleBaseEnv):
         obs.update(bubble_obs)
         obs['wrench'] = self._get_wrench()
         obs['tfs'] = self._get_tfs()
+        obs['marker'] = self.marker_code
         # add the reference state
         obs = self._add_bubble_reference_to_observation(obs)
         return obs
