@@ -4,7 +4,7 @@ import rospy
 import pytorch3d.transforms as batched_tr
 
 
-def only_position_cost_function(estimated_poses, states, actions):
+def only_position_cost_function(estimated_poses, states, prev_states, actions):
     # Only position ----------------------------------------
     goal_xyz = torch.zeros(3)
     estimated_xyz = estimated_poses[:, :3]
@@ -12,7 +12,7 @@ def only_position_cost_function(estimated_poses, states, actions):
     return cost
 
 
-def vertical_tool_cost_function(estimated_poses, states, actions):
+def vertical_tool_cost_function(estimated_poses, states, prev_states, actions):
     # Only position ----------------------------------------
     # goal_xyz = np.zeros(3)
     # estimated_xyz = estimated_poses[:, :3]

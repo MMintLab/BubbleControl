@@ -80,8 +80,8 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         imprint_frame_r = 'pico_flexx_right_optical_frame'
         imprint_frame_l = 'pico_flexx_left_optical_frame'
 
-        depth_ref_r = batched_sample['undef_depth_r'].squeeze() # (N, w, h)
-        depth_ref_l = batched_sample['undef_depth_l'].squeeze() # (N, w, h)
+        depth_ref_r = batched_sample['undef_depth_r'].squeeze(-1) # (N, w, h)
+        depth_ref_l = batched_sample['undef_depth_l'].squeeze(-1) # (N, w, h)
         depth_def_r = depth_ref_r - imprint_pred_r  # CAREFUL: Imprint is defined as undef_depth_img - def_depth_img
         depth_def_l = depth_ref_l - imprint_pred_l  # CAREFUL: Imprint is defined as undef_depth_img - def_depth_img
 
@@ -190,7 +190,7 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         # depth_ref: (N, n_impr, w, h)
         if self.imprint_selection == 'threshold':
             imprint_threshold = self.imprint_threshold
-            pc_scene_mask = get_imprint_mask(depth_ref, depth_def, imprint_threshold)
+            pc_scene_mask = torch.tensor(get_imprint_mask(depth_ref, depth_def, imprint_threshold))
         elif self.imprint_selection == 'percentile':
             # select the points with larger deformation. In total will select top self.imprint_percentile*100%
             delta_depth = einops.rearrange(depth_ref - depth_def, 'N n w h -> N (n w h)')

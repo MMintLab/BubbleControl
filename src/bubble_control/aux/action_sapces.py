@@ -3,6 +3,7 @@ import numpy as np
 from collections import OrderedDict
 import gym
 import copy
+import tf.transformations as tr
 
 
 class AxisBiasedDirectionSpace(gym.spaces.Space):
@@ -33,30 +34,38 @@ class AxisBiasedDirectionSpace(gym.spaces.Space):
 
 class FinalPivotingPoseSpace(gym.spaces.Space):
     """
-    Sample pivoting pose (with orientation as quaternion)
+    Sample pivoting pose (with orientation as euler)
     """
     def __init__(self, med, current_pose, delta_y_limits, delta_z_limits, delta_roll_limits, seed=None):
         super().__init__((), np.float32, seed)
         self.current_pose = current_pose
+        self.current_pose = np.concatenate((current_pose[:3], tr.euler_from_quaternion(current_pose[3:], 'sxyz')))
         self.delta_y_limits = delta_y_limits
         self.delta_z_limits = delta_z_limits
         self.delta_roll_limits = delta_roll_limits
         self.med = med
+        self.low = np.array([self.current_pose[0], self.current_pose[1]+self.delta_y_limits[0], self.current_pose[2]+self.delta_z_limits[0],
+                                self.current_pose[3] + self.delta_roll_limits[0], 0, np.pi])
+        self.high = np.array([self.current_pose[0], self.current_pose[1]+self.delta_y_limits[1], self.current_pose[2]+self.delta_z_limits[1],
+                                self.current_pose[3] + self.delta_roll_limits[1], 0, np.pi])
 
     def sample(self):
         delta_y, delta_z = np.random.uniform(np.array([self.delta_y_limits[0], self.delta_z_limits[0]]), 
                                             np.array([self.delta_y_limits[1], self.delta_z_limits[0]]))
         movement_wf = delta_y * np.array([0,1,0]) + delta_z * np.array([0,0,1])
         delta_roll_wf = np.random.uniform(self.delta_roll_limits[0], self.delta_roll_limits[1])
-        orientation = self.med._compute_rotation_along_axis_point_angle(pose=self.current_pose, 
+        pose_w_quat = np.concatenate((self.current_pose[:3], tr.quaternion_from_euler(self.current_pose[3], self.current_pose[4], self.current_pose[5], 'sxyz')))
+        orientation = self.med._compute_rotation_along_axis_point_angle(pose=pose_w_quat, 
                         angle=delta_roll_wf, point=self.current_pose[:3], axis=np.array([1,0,0]))[3:]
-        final_pose_wf = np.concatenate([self.current_pose[:3]+movement_wf, orientation])
+        final_pose_wf = np.concatenate([self.current_pose[:3]+movement_wf, tr.euler_from_quaternion(orientation, 'sxyz')])
         return final_pose_wf
 
     #TODO: Add orientation limits
     def contains(self, position):
-        lower_bound = self.current_pose[:3] + np.array([0, self.delta_y_limits[0], self.delta_z_limits[0]])
-        upper_bound = self.current_pose[:3] + np.array([0, self.delta_y_limits[1], self.delta_z_limits[1]])
+        lower_bound = np.array([self.current_pose[0], self.current_pose[1]+self.delta_y_limits[0], self.current_pose[2]+self.delta_z_limits[0],
+                                self.current_pose[3] + self.delta_roll_limits[0], 0, np.pi])
+        upper_bound = np.array([self.current_pose[0], self.current_pose[1]+self.delta_y_limits[1], self.current_pose[2]+self.delta_z_limits[1],
+                                self.current_pose[3] + self.delta_roll_limits[1], 0, np.pi])
         return lower_bound  <= position <= upper_bound
 
 class InitialPivotingPoseSpace(gym.spaces.Space):
@@ -69,13 +78,16 @@ class InitialPivotingPoseSpace(gym.spaces.Space):
         self.init_y_limits = init_y_limits
         self.init_z_limits = init_z_limits
         self.roll_limits = roll_limits
+        self.low = np.array([self.init_x_limits[0], self.init_y_limits[0], self.init_z_limits[0], self.roll_limits[0], 0, np.pi]) #self.roll_limits[0] points away from user
+        self.high = np.array([self.init_x_limits[1], self.init_y_limits[1], self.init_z_limits[1], self.roll_limits[1], 0, np.pi])
 
     def sample(self):
         initial_position = np.random.uniform(np.array([self.init_x_limits[0], self.init_y_limits[0], self.init_z_limits[0]]),
                                              np.array([self.init_x_limits[1], self.init_y_limits[1], self.init_z_limits[1]]))
         roll = np.random.uniform(self.roll_limits[0],self.roll_limits[1])
         initial_orientation = np.array([roll, 0, np.pi])
-        initial_pose_wf = np.concatenate([initial_position, initial_orientation])                                            
+        initial_quaternion = tr.quaternion_from_euler(initial_orientation[0], initial_orientation[1], initial_orientation[2], 'sxyz')
+        initial_pose_wf = np.concatenate([initial_position, initial_quaternion])                                            
         return initial_pose_wf
 
     def contains(self, pose):
