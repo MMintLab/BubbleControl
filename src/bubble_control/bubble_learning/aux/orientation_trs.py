@@ -38,15 +38,18 @@ class QuaternionToAxis(object):
         # q = [qx, qy, qz, qw] where qw = cos(theta/2); qx = a1*sin(theta/2),...
         qw = x[..., -1]
         theta = 2 * np.arccos(qw)
+        if len(x.shape) == 2:
+            theta = np.expand_dims(theta, axis=1)        
         axis = x[..., :3] / np.sin(theta/2) # should be a unit vector
         x_tr = theta * axis
         return x_tr
 
     def _tr_inv(self, x_tr):
         theta = np.linalg.norm(x_tr, axis=-1)
+        if len(x_tr.shape) == 2:
+            theta = np.expand_dims(theta, axis=1)
         axis = x_tr/theta
         qw = np.cos(theta/2)
         qxyz = np.sin(theta/2)*axis
-        x = np.append(qxyz, 3, qw, axis=-1)
+        x = np.append(qxyz, qw, axis=-1)
         return x
-

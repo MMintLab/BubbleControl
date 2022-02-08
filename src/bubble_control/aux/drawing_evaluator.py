@@ -72,7 +72,7 @@ class DrawingEvaluator(object):
         return board_corners_bc
 
     def _filter_corners(self, img):
-        patch_size = int(1.1 * self.tag_pixel_size)
+        patch_size = int(1.2 * self.tag_pixel_size)
         filtered_img = img.copy()
         max_value = np.max(img)
         filtered_img[:patch_size, :patch_size] = max_value
