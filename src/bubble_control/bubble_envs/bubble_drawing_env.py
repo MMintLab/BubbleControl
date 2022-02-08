@@ -232,6 +232,8 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         return action_space
 
     def is_action_valid(self, action):
+        if self.init_action is None:
+            return True
         direction_i = self.init_action['direction']
         length_i = action['length']
         drawing_area_center_point = np.asarray(self.drawing_area_center)
@@ -395,3 +397,13 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         self._set_cartesian_impedance()
         self.previous_draw_height = copy.deepcopy(draw_height)
         self.init_action['direction'] = desired_angle
+
+
+class BubbleLineDrawingEnv(BubbleOneDirectionDrawingEnv):
+
+    def initialize(self):
+        self.init_action = {
+        'start_point': np.array([0.55, 0.2]),
+        'direction': np.deg2rad(270),
+        }
+        self.do_init_action(self.init_action)

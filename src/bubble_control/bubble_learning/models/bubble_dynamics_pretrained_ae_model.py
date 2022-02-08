@@ -214,7 +214,7 @@ class BubbleFullDynamicsPretrainedAEModel(BubbleDynamicsPretrainedAEModel):
         dyn_input = torch.cat([state_dyn_input, action], dim=-1)
         state_dyn_delta = self.dyn_model(dyn_input)
         state_dyn_output = state_dyn_input + state_dyn_delta
-        imprint_output_emb, wrench_next, pos_next, ori_next = torch.split(state_dyn_output, (sizes['imprint'], sizes['wrench'], sizes['position'], sizes['orientation']), dim=-1)
+        imprint_output_emb, wrench_next, pos_next, ori_next = torch.split(state_dyn_output, (self.img_embedding_size, sizes['wrench'], sizes['position'], sizes['orientation']), dim=-1)
 
         # Decode imprint
         if self.load_norm:
@@ -228,7 +228,7 @@ class BubbleFullDynamicsPretrainedAEModel(BubbleDynamicsPretrainedAEModel):
         if self.load_norm:
             # apply the normalization to the imprint input, and then to the output, because the model has been trained on the normalized space.
             imprint_t = self.autoencoder._norm_imprint(imprint)
-            imprint_next, wrench_next, pos_next, ori_next = self.query(imprint_t, imprint, wrench, pos, ori, action)
+            imprint_next, wrench_next, pos_next, ori_next = self.query(imprint_t, wrench, pos, ori, action)
             imprint_next = self.autoencoder._denorm_imprint(imprint_next)
         else:
             imprint_next, wrench_next, pos_next, ori_next = self.query(imprint, action)

@@ -13,11 +13,11 @@ from bubble_control.bubble_model_control.aux.bubble_model_control_utils import b
 class BubbleModelMPPIController(BubbleModelController):
     # THis used to inherit from BubbleModelController. In the future abstract out again the general controller stuff.
 
-    def __init__(self, model, env, object_pose_estimator, cost_function, action_model, num_samples=100, horizon=3, lambda_=0.01, noise_sigma=None, _noise_sigma_value=0.2):
+    def __init__(self, model, env, object_pose_estimator, cost_function, action_model, state_trs=None, num_samples=100, horizon=3, lambda_=0.01, noise_sigma=None, _noise_sigma_value=0.2):
         self.action_model = action_model
         self.num_samples = num_samples
         self.horizon = horizon
-        super().__init__(model, env, object_pose_estimator, cost_function)
+        super().__init__(model, env, object_pose_estimator, cost_function, state_trs=state_trs)
         self.u_mu = None
         self.noise_sigma = noise_sigma
         self._noise_sigma_value = _noise_sigma_value
@@ -31,13 +31,15 @@ class BubbleModelMPPIController(BubbleModelController):
         self.original_state_shape = None
         self.state_size = None
         self.controller = None # controller not initialized yet
-        self.action_container = self.env.get_action()
+        self.action_container, _ = self.env.get_action()
 
     def control(self, state_sample):
         # pack the action to the env format
         action_raw = super().control(state_sample).detach().cpu().numpy()
         for i, (k, v) in enumerate(self.action_container.items()):
             self.action_container[k] = action_raw[i]
+            if i+1 >= action_raw.shape[-1]:
+                break
         return self.action_container
 
     def dynamics(self, state_t, action_t):
@@ -72,7 +74,10 @@ class BubbleModelMPPIController(BubbleModelController):
             estimated_poses.append(estimated_pose_i)
         estimated_poses = np.array(estimated_poses)
         costs = self.cost_function(estimated_poses, states, states, actions)
-        costs_t = torch.tensor(costs).reshape(-1, 1)
+        if not torch.is_tensor(costs):
+            costs_t = torch.tensor(costs)
+        else:
+            costs_t = costs
 
         costs_t = costs_t.flatten() # This fixes the error on mppi _compute_rollout_costs, although the documentation says that cost should be a (K,1)
         return costs_t
@@ -93,11 +98,6 @@ class BubbleModelMPPIController(BubbleModelController):
     def _init_params(self):
         # TODO: Make more general
         # state_size is the sum of sizes of all items in the state
-        self.state_size = 0
-        sizes = self.model._get_sizes()
-        for (k, v) in sizes.items():
-            if k != 'action':
-                self.state_size += np.prod(v)
         if self.noise_sigma is None or self.noise_sigma.shape[0] != self.u_max.shape[0]:
             eps = 1e-7
             self.noise_sigma = self._noise_sigma_value * torch.diag(self.u_max - self.u_min + eps)
@@ -115,7 +115,11 @@ class BubbleModelMPPIController(BubbleModelController):
         :param state: expected state for the model
         :return: state tensor
         """
-        state_t = torch.tensor(state)
+        imprint = state[0]
+        if not torch.is_tensor(imprint):
+            state_t = torch.tensor(imprint)
+        else:
+            state_t = imprint
         state_t = state_t.reshape(-1, self.state_size)
         return state_t
 
@@ -125,8 +129,8 @@ class BubbleModelMPPIController(BubbleModelController):
         :param state_t: (K, state_size) tensor
         :return: state -- expected state for the model
         """
-        state = state_t
-        state = state_t.reshape(-1, *self.original_state_shape)
+        imprint = state_t.reshape(-1, *self.original_state_shape)
+        state = (imprint,)
         return state
 
     def _unpack_action_tensor(self, action_t):
@@ -135,19 +139,20 @@ class BubbleModelMPPIController(BubbleModelController):
 
     def _unpack_state_sample(self, state_sample):
         # Extract state from sample
-        state = None
-        state = state_sample['init_imprint']
+        imprint = state_sample['init_imprint']
+        state = (imprint, )
         return state
 
     def _pack_state_to_sample(self, state, sample_ref):
         # Add state to sample
+        imprint = state[0]
         sample = copy.deepcopy(sample_ref)
-        sample['next_imprint'] = state
-
+        sample['next_imprint'] = imprint
         return sample
 
     def _expand_output_to_state(self, output, state, action):
-        return output
+        expanded_state = (output,)
+        return expanded_state
 
     def _get_controller(self):
         self._init_params()
@@ -178,6 +183,8 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
     """
     The object_pose_estimator admits batched samples
     """
+
+
     def compute_cost(self, state_t, action_t):
         """
         Compute the dynamics
@@ -188,23 +195,27 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         states = self._unpack_state_tensor(state_t)
         actions = self._unpack_action_tensor(action_t)
         state_samples = self._pack_state_to_sample(states, self.sample)
-        prev_state_samples = copy.deepcopy(state_samples)
+        prev_state_samples = state_samples.copy()
         state_samples = self._action_correction(state_samples, actions)
         estimated_poses = self.object_pose_estimator.estimate_pose(state_samples)
         costs = self.cost_function(estimated_poses, state_samples, prev_state_samples, actions)
-        costs_t = torch.tensor(costs).reshape(-1, 1)
+        if not torch.is_tensor(costs):
+            costs_t = torch.tensor(costs)
+        else:
+            costs_t = costs
         costs_t = costs_t.flatten() # This fixes the error on mppi _compute_rollout_costs, although the documentation says that cost should be a (K,1)
         return costs_t
 
     def _pack_state_to_sample(self, state, sample_ref):
-        sample = copy.deepcopy(sample_ref)
-        batch_size = state.shape[0]
+        sample = sample_ref.copy() # No copy
+        imprint = state[0]
+        batch_size = imprint.shape[0]
         # convert all_tfs to tensors
         sample['all_tfs'] = self._convert_all_tfs_to_tensors(sample['all_tfs'])
         # convert samples to tensors
-        batched_sample = batched_tensor_sample(sample, batch_size=batch_size, device=state.device)
+        batched_sample = batched_tensor_sample(sample, batch_size=batch_size, device=imprint.device)
         # and repeat the batch size (at least for camera_info_{r,l}['K'], undef_depth_{r,l}, all_tfs
-        batched_sample['next_imprint'] = state
+        batched_sample['next_imprint'] = imprint
         return batched_sample
 
     def _convert_all_tfs_to_tensors(self, all_tfs):
@@ -212,7 +223,7 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
         :param all_tfs: DataFrame
         :return:
         """
-        converted_all_tfs = convert_all_tfs_to_tensors((all_tfs))
+        converted_all_tfs = convert_all_tfs_to_tensors(all_tfs)
         return converted_all_tfs
 
 

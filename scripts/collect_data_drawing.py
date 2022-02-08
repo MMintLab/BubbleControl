@@ -12,7 +12,7 @@ import tf.transformations as tr
 import argparse
 
 from bubble_control.bubble_data_collection.bubble_draw_data_collection import BubbleDrawingDataCollection
-from bubble_control.bubble_envs.bubble_drawing_env import BubbleCartesianDrawingEnv, BubbleOneDirectionDrawingEnv
+from bubble_control.bubble_envs.bubble_drawing_env import BubbleCartesianDrawingEnv, BubbleOneDirectionDrawingEnv, BubbleLineDrawingEnv
 from bubble_utils.bubble_data_collection.env_data_collection import EnvDataCollector, BubbleEnvDataCollector
 from bubble_control.bubble_model_control.aux.bubble_dynamics_fixed_model import BubbleDynamicsFixedModel
 from bubble_control.bubble_model_control.aux.format_observation import format_observation_sample
@@ -21,6 +21,8 @@ from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler
 from bubble_control.bubble_model_control.model_output_object_pose_estimaton import BatchedModelOutputObjectPoseEstimation
 from bubble_control.bubble_model_control.drawing_action_models import drawing_action_model_one_dir
 from bubble_control.bubble_envs.controlled_env import ControlledEnvWrapper
+from bubble_control.bubble_model_control.aux.format_observation import format_observation_sample
+from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
 
 # TEST THE CODE: ------------------------------------------------------------------------------------------------------
 
@@ -59,26 +61,30 @@ def collect_data_drawing_env_jacobian_controller(save_path, scene_name, num_data
                                                  object_name='marker', num_samples=100, horizon=2, random_action_prob=0.15,
                                                  ):
 
-    env = BubbleOneDirectionDrawingEnv(prob_axis=prob_axis,
-                             impedance_mode=impedance_mode,
-                             reactive=reactive,
-                             drawing_area_center=drawing_area_center,
-                             drawing_area_size=drawing_area_size,
-                             drawing_length_limits=drawing_length_limits,
-                             grasp_width_limits=grasp_width_limits,
-                            wrap_data=True
+    # env = BubbleOneDirectionDrawingEnv(
+    env = BubbleLineDrawingEnv(
+             prob_axis=prob_axis,
+             impedance_mode=impedance_mode,
+             reactive=reactive,
+             drawing_area_center=drawing_area_center,
+             drawing_area_size=drawing_area_size,
+             drawing_length_limits=drawing_length_limits,
+             grasp_width_limits=grasp_width_limits,
+             wrap_data=True
                            )
     model = BubbleDynamicsFixedModel() # Fixed model for Jacobian controller
     ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear',
                                                  device=torch.device('cuda'), imprint_selection='percentile',
                                                  imprint_percentile=0.005)
 
+    block_downsample_tr = BlockDownSamplingTr(factor_x=7, factor_y=7, reduction='mean', keys_to_tr=['init_imprint'])
+
     controller = BubbleModelMPPIBatchedController(model, env, ope, vertical_tool_cost_function,
                                                   action_model=drawing_action_model_one_dir, num_samples=num_samples,
-                                                  horizon=horizon, noise_sigma=None, _noise_sigma_value=.3)
+                                                  horizon=horizon, noise_sigma=None, _noise_sigma_value=.3, state_trs=(format_observation_sample, block_downsample_tr))
 
 
-    controlled_env = ControlledEnvWrapper(env=env, controller=controller, random_action_prob=random_action_prob)
+    controlled_env = ControlledEnvWrapper(env=env, controller=controller, random_action_prob=random_action_prob, controlled_action_keys=['rotation', 'length'])
     dc = BubbleEnvDataCollector(controlled_env, data_path=save_path, scene_name=scene_name)
     dc.collect_data(num_data=num_data)
 
