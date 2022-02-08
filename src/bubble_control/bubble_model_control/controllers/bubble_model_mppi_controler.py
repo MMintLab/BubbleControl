@@ -42,6 +42,13 @@ class BubbleModelMPPIController(BubbleModelController):
         state = self._unpack_state_tensor(state_t)
         action = self._unpack_action_tensor(action_t)
         next_state = self.model(state, action)
+        # import matplotlib.pyplot as plt
+        # fig, axes = plt.subplots(nrows=2, ncols=2)
+        # axes[0][0].imshow(state[0, 0])
+        # axes[1][0].imshow(state[0, 1])
+        # axes[0][1].imshow(next_state[0, 0].detach().numpy())
+        # axes[1][1].imshow(next_state[0, 1].detach().numpy())
+        # plt.show()
         next_state_t = self._pack_state_to_tensor(next_state)
         return next_state_t
 
@@ -178,7 +185,6 @@ class BubbleModelMPPIBatchedController(BubbleModelMPPIController):
 
     def _pack_state_to_sample(self, state, sample_ref):
         sample = copy.deepcopy(sample_ref)
-        batch_size = state.shape[0]
         batch_size = state.shape[0]
         # convert all_tfs to tensors
         sample['all_tfs'] = self._convert_all_tfs_to_tensors(sample['all_tfs'])
