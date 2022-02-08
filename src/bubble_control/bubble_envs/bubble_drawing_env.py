@@ -260,10 +260,19 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
                 print('reached drawing area limit')
         return done
 
+    def _get_current_drawing_direction(self):
+        current_plane_pose = self.med.get_plane_pose()
+        pf_X_gf = self.med._pose_to_matrix(current_plane_pose)
+        drawing_direction_gf = np.array([0, -1, 0])
+        drawing_direction_pf = pf_X_gf[:3, :3] @ drawing_direction_gf
+        drawing_direction = np.arctan2(drawing_direction_pf[1], drawing_direction_pf[0])%(2*np.pi) # return the angle of the direction with respect to the pp frame.
+        return drawing_direction
+
     def _do_action(self, action):
         rotation_i = action['rotation']
         length_i = action['length']
-        direction_i = self.init_action['direction']
+        # direction_i = self.init_action['direction']
+        direction_i = self._get_current_drawing_direction()
         grasp_width_i = action['grasp_width']
         self.med.gripper.move(grasp_width_i, speed=10.0)
         current_plane_pose = self.med.get_plane_pose()
