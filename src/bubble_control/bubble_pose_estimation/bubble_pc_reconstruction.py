@@ -298,6 +298,11 @@ class BubblePCReconstructorOfflineDepth(BubblePCReconstructorBase):
             'left': None,
             'right': None,
         }
+        try:
+            rospy.init_node('offline_reconstructor')
+        except (rospy.exceptions.ROSInitException, rospy.exceptions.ROSException):
+            pass
+
         self.buffer = tf2.BufferCore()
 
         super().__init__(*args, **kwargs)
