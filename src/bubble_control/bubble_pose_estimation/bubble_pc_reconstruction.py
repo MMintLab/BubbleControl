@@ -38,11 +38,12 @@ class BubblePCReconstructorBase(abc.ABC):
     Gets Imprint and estimates the object pose from it
     """
 
-    def __init__(self, reconstruction_frame='grasp_frame', threshold=0.005, object_name='allen', estimation_type='icp3d', view=False, verbose=False):
+    def __init__(self, reconstruction_frame='grasp_frame', threshold=0.005, percentile=None, object_name='allen', estimation_type='icp3d', view=False, verbose=False):
         self.object_name = object_name
         self.estimation_type = estimation_type
         self.reconstruction_frame = reconstruction_frame
         self.threshold = threshold
+        self.percentile = percentile
         self.view = view
         self.verbose = verbose
         self.references = {
