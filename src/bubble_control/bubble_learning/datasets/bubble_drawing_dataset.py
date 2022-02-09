@@ -57,6 +57,7 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         camera_info_r = self._load_camera_info_depth(scene_name=scene_name, camera_name='right', fc=undef_fc)
         camera_info_l = self._load_camera_info_depth(scene_name=scene_name, camera_name='left', fc=undef_fc)
 
+        import pdb; pdb.set_trace()
         object_code = self._get_object_code(fc)
         object_model = self._get_object_model(object_code)
         init_object_pose = self._estimate_object_pose(init_imprint, undef_depth_r, undef_depth_l, camera_info_r, camera_info_l, all_tfs)
@@ -116,12 +117,13 @@ class BubbleDrawingDataset(BubbleDatasetBase):
 
     def _get_object_code(self, fc):
         dl_line = self.dl.iloc[fc]
-        object_code = dl_line['marker_init'].values
+        object_code = dl_line['marker_init']
         return object_code
 
     def _get_object_model(self, object_code):
         object_models = load_object_models() # TODO: Consdier doing this more efficient to avoid having to load every time
-        object_model = object_models[object_code]
+        object_model_pcd = object_models[object_code]
+        object_model = np.asarray(object_model_pcd.points)
         return object_model
 
     def _compute_delta_sample(self, sample):
@@ -199,7 +201,7 @@ class BubbleDrawingDownsampledCombinedDataset(BubbleDrawingDownsampledDataset):
 
 if __name__ == '__main__':
     # data_name = '/home/mmint/Desktop/drawing_data_cartesian'
-    data_name = '/home/mmint/Desktop/test_drawing_data'
+    data_name = '/home/mik/Desktop/test_drawing_data'
     dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame')
     # dataset = BubbleDrawingDownsampledDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame',downsample_factor_x=7, downsample_factor_y=7, downsample_reduction='mean')
     print('Dataset Name: ', dataset.name)
