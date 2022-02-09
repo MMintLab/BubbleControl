@@ -45,6 +45,10 @@ class BubbleDrawingDataset(BubbleDatasetBase):
 
         undef_depth_r = self._load_depth_img(fc=undef_fc, scene_name=scene_name, camera_name='right')
         undef_depth_l = self._load_depth_img(fc=undef_fc, scene_name=scene_name, camera_name='left')
+        init_def_depth_r = self._load_depth_img(fc=init_fc, scene_name=scene_name, camera_name='right')
+        init_def_depth_l = self._load_depth_img(fc=init_fc, scene_name=scene_name, camera_name='left')
+        final_def_depth_r = self._load_depth_img(fc=final_fc, scene_name=scene_name, camera_name='right')
+        final_def_depth_l = self._load_depth_img(fc=final_fc, scene_name=scene_name, camera_name='left')
 
         # load tf from cameras to grasp frame (should
         all_tfs = self._load_tfs(init_fc, scene_name)
@@ -57,11 +61,10 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         camera_info_r = self._load_camera_info_depth(scene_name=scene_name, camera_name='right', fc=undef_fc)
         camera_info_l = self._load_camera_info_depth(scene_name=scene_name, camera_name='left', fc=undef_fc)
 
-        import pdb; pdb.set_trace()
         object_code = self._get_object_code(fc)
         object_model = self._get_object_model(object_code)
-        init_object_pose = self._estimate_object_pose(init_imprint, undef_depth_r, undef_depth_l, camera_info_r, camera_info_l, all_tfs)
-        final_object_pose = self._estimate_object_pose(final_imprint, undef_depth_r, undef_depth_l, camera_info_r, camera_info_l, all_tfs)
+        init_object_pose = self._estimate_object_pose(init_def_depth_r, init_def_depth_l, undef_depth_r, undef_depth_l, camera_info_r, camera_info_l, all_tfs)
+        final_object_pose = self._estimate_object_pose(final_def_depth_r, final_def_depth_l, undef_depth_r, undef_depth_l, camera_info_r, camera_info_l, all_tfs)
 
         sample_simple = {
             'init_imprint': init_imprint,
@@ -98,20 +101,20 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         # action_i = length * np.array([np.cos(direction), np.sin(direction)])
         return action_i
 
-    def _estimate_object_pose(self, imprint, ref_r, ref_l, camera_info_r, camera_info_l, all_tfs):
+    def _estimate_object_pose(self, def_r, def_l, ref_r, ref_l, camera_info_r, camera_info_l, all_tfs):
         reconstructor = BubblePCReconstructorOfflineDepth(object_name='marker', estimation_type='icp2d', view=False, percentile=0.005)
         reconstructor.references['left'] = ref_l
         reconstructor.references['right'] = ref_r
-        import pdb; pdb.set_trace()
-        reconstructor.references['left_frame'] = 'frame_l' # TODO: Replace
-        reconstructor.references['right_frame'] = 'frame_r' # TODO: Replace
+        reconstructor.references['left_frame'] = 'pico_flexx_left_optical_frame'
+        reconstructor.references['right_frame'] = 'pico_flexx_right_optical_frame'
         reconstructor.camera_info['left'] = camera_info_l
         reconstructor.camera_info['right'] = camera_info_r
-        reconstructor.depth_r['img'] = imprint[0]
-        reconstructor.depth_l['img'] = imprint[1]
-        reconstructor.depth_r['frame'] = 'frame_r' # TODO: Replace
-        reconstructor.depth_l['frame'] = 'frame_l' # TODO: Replace
+        reconstructor.depth_r['img'] = def_r
+        reconstructor.depth_l['img'] = def_l
+        reconstructor.depth_r['frame'] = 'pico_flexx_right_optical_frame'
+        reconstructor.depth_l['frame'] = 'pico_flexx_left_optical_frame'
         reconstructor.add_tfs(all_tfs)
+        import pdb; pdb.set_trace()
         pose = reconstructor.estimate_pose(threshold=0)
         return pose
 
