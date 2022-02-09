@@ -95,6 +95,7 @@ class InitialPivotingPoseSpace(gym.spaces.Space):
         upper_bound = np.array([self.init_x_limits[1], self.init_y_limits[1], self.init_z_limits[1], self.roll_limits[1], 0, np.pi])
         return lower_bound  <= pose <= upper_bound
 
+
 class ConstantSpace(gym.spaces.Space):
     """
     Constant space. Only has one possible value. For convenience.
@@ -113,4 +114,32 @@ class ConstantSpace(gym.spaces.Space):
         return (
                 isinstance(other, ConstantSpace)
                 and self.value == other.value
+        )
+
+
+class DiscreteElementSpace(gym.spaces.Space):
+    """
+    Space given by a discrete set of elements
+    """
+    def __init__(self, elements, probs=None, seed=None):
+        self.elements = elements
+        self.probs = probs
+        if self.probs is None:
+            self.probs = 1/self.num_elements*np.ones(self.num_elements)
+        super().__init__((), np.float32, seed)
+
+    @property
+    def num_elements(self):
+        return len(self.elements)
+
+    def sample(self):
+        element_sampled = np.random.choice(self.elements, p=self.probs)
+        return element_sampled
+
+    def contains(self, value):
+        return value in self.elements
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, DiscreteElementSpace) and self.elements == other.elements
         )
