@@ -34,6 +34,9 @@ from bubble_control.aux.load_confs import load_object_models
 
 
 class BubblePCReconstructorBase(abc.ABC):
+    """
+    Gets Imprint and estimates the object pose from it
+    """
 
     def __init__(self, reconstruction_frame='grasp_frame', threshold=0.005, object_name='allen', estimation_type='icp3d', view=False, verbose=False):
         self.object_name = object_name
@@ -132,6 +135,9 @@ class BubblePCReconstructorBase(abc.ABC):
 
 
 class BubblePCReconstructorROSBase(BubblePCReconstructorBase):
+    """
+    It adds the broadcasting and reading from ROS network.
+    """
 
     def __init__(self, *args, broadcast_imprint=False, verbose=False, **kwargs):
         self.broadcast_imprint = broadcast_imprint
