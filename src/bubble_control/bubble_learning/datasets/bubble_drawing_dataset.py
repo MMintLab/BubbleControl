@@ -5,13 +5,15 @@ from bubble_utils.bubble_datasets.bubble_dataset_base import BubbleDatasetBase
 from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
 from bubble_control.aux.load_confs import load_object_models
 from bubble_control.bubble_pose_estimation.bubble_pc_reconstruction import BubblePCReconstructorOfflineDepth
+from mmint_camera_utils.ros_utils.utils import matrix_to_pose, pose_to_matrix
 
 
 class BubbleDrawingDataset(BubbleDatasetBase):
 
-    def __init__(self, *args, wrench_frame=None, tf_frame='grasp_frame', **kwargs):
+    def __init__(self, *args, wrench_frame=None, tf_frame='grasp_frame', view=False, **kwargs):
         self.wrench_frame = wrench_frame
         self.tf_frame = tf_frame
+        self.view = view
         super().__init__(*args, **kwargs)
 
     @classmethod
@@ -56,6 +58,7 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         # Action:
         action_fc = fc
         action = self._get_action(action_fc)
+        print(action)
 
         # camera info
         camera_info_r = self._load_camera_info_depth(scene_name=scene_name, camera_name='right', fc=undef_fc)
@@ -65,7 +68,6 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         object_model = self._get_object_model(object_code)
         init_object_pose = self._estimate_object_pose(init_def_depth_r, init_def_depth_l, undef_depth_r, undef_depth_l, camera_info_r, camera_info_l, all_tfs)
         final_object_pose = self._estimate_object_pose(final_def_depth_r, final_def_depth_l, undef_depth_r, undef_depth_l, camera_info_r, camera_info_l, all_tfs)
-
         sample_simple = {
             'init_imprint': init_imprint,
             'init_wrench': init_wrench,
@@ -102,7 +104,8 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         return action_i
 
     def _estimate_object_pose(self, def_r, def_l, ref_r, ref_l, camera_info_r, camera_info_l, all_tfs):
-        reconstructor = BubblePCReconstructorOfflineDepth(object_name='marker', estimation_type='icp2d', view=False, percentile=0.005)
+        reconstructor = BubblePCReconstructorOfflineDepth(object_name='marker', estimation_type='icp2d', view=self.view, percentile=0.005)
+        reconstructor.threshold = 0.0
         reconstructor.references['left'] = ref_l
         reconstructor.references['right'] = ref_r
         reconstructor.references['left_frame'] = 'pico_flexx_left_optical_frame'
@@ -114,8 +117,8 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         reconstructor.depth_r['frame'] = 'pico_flexx_right_optical_frame'
         reconstructor.depth_l['frame'] = 'pico_flexx_left_optical_frame'
         reconstructor.add_tfs(all_tfs)
-        import pdb; pdb.set_trace()
-        pose = reconstructor.estimate_pose(threshold=0)
+        pose_matrix = reconstructor.estimate_pose(threshold=0, view=self.view) # Homogeneous
+        pose = matrix_to_pose(pose_matrix)
         return pose
 
     def _get_object_code(self, fc):
@@ -204,8 +207,8 @@ class BubbleDrawingDownsampledCombinedDataset(BubbleDrawingDownsampledDataset):
 
 if __name__ == '__main__':
     # data_name = '/home/mmint/Desktop/drawing_data_cartesian'
-    data_name = '/home/mik/Desktop/test_drawing_data'
-    dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame')
+    data_name = '/home/mmint/Desktop/test_drawing_data'
+    dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame', view=False)
     # dataset = BubbleDrawingDownsampledDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame',downsample_factor_x=7, downsample_factor_y=7, downsample_reduction='mean')
     print('Dataset Name: ', dataset.name)
     print('Dataset Length:', len(dataset))

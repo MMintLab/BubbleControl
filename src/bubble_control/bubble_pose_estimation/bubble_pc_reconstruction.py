@@ -80,7 +80,7 @@ class BubblePCReconstructorBase(abc.ABC):
         if self.estimation_type == 'icp3d':
             pose_estimator = ICP3DPoseEstimator(obj_model=self.object_model, view=self.view)
         elif self.estimation_type == 'icp2d':
-            pose_estimator = ICP2DPoseEstimator(obj_model=self.object_model, projection_axis=(1,0,0), max_num_iterations=20)
+            pose_estimator = ICP2DPoseEstimator(obj_model=self.object_model, projection_axis=(1,0,0), max_num_iterations=20, view=self.view)
         else:
             raise NotImplementedError('pose estimation algorithm named "{}" not implemented yet. Available options: {}'.format(self.estimation_type, available_esttimation_types))
         return pose_estimator
@@ -321,7 +321,7 @@ class BubblePCReconstructorOfflineDepth(BubblePCReconstructorBase):
             self.buffer.set_transform(ts_msg_i, 'default_authority')
 
     def _tr_pc(self, pc, origin_frame, target_frame):
-        ts_msg = self.buffer.lookup_transform_core(origin_frame, target_frame, rospy.Time(0))
+        ts_msg = self.buffer.lookup_transform_core(target_frame, origin_frame, rospy.Time(0))
         t, R = self._unpack_transform_stamped_msg(ts_msg)
         pc_tr = tr_pointcloud(pc, R, t)
         return pc_tr
@@ -358,9 +358,9 @@ class BubblePCReconstructorOfflineDepth(BubblePCReconstructorBase):
         depth_r = self.depth_r['img']
         depth_l = self.depth_l['img']
         imprint_r = get_imprint_pc(self.references['right'].squeeze(-1), depth_r.squeeze(-1), threshold=self.threshold,
-                                   K=self.camera_info['right']['K'])
+                                   K=self.camera_info['right']['K'], percentile=self.percentile)
         imprint_l = get_imprint_pc(self.references['left'].squeeze(-1), depth_l.squeeze(-1), threshold=self.threshold,
-                                   K=self.camera_info['left']['K'])
+                                   K=self.camera_info['left']['K'], percentile=self.percentile)
         frame_r = self.depth_r['frame']
         frame_l = self.depth_l['frame']
 
@@ -370,6 +370,13 @@ class BubblePCReconstructorOfflineDepth(BubblePCReconstructorBase):
         # trasform imprints
         imprint_r = self._tr_pc(filtered_imprint_r, frame_r, self.reconstruction_frame)
         imprint_l = self._tr_pc(filtered_imprint_l, frame_l, self.reconstruction_frame)
+
+        if True:
+            print('visualizing the imprint on green')
+            # view
+            imprint_r[:, 3] = 1  # paint it red
+            imprint_l[:, 4] = 1  # paint it green
+            view_pointcloud([imprint_r, imprint_l], frame=True)
 
         imprint = np.concatenate([imprint_r, imprint_l], axis=0)
         if separate:

@@ -2,7 +2,8 @@ import numpy as np
 import copy
 
 from mmint_camera_utils.aux.wrapping_utils import AttributeWrapper
-from bubble_control.aux.action_sapces import DiscreteElementSpace
+from bubble_control.aux.action_spaces import DiscreteElementSpace
+
 
 class ControlledEnvWrapper(AttributeWrapper):
     """
@@ -22,6 +23,7 @@ class ControlledEnvWrapper(AttributeWrapper):
         self.random_action_prob = random_action_prob
         self.controlled_action_keys = controlled_action_keys
         super().__init__(env)
+        self.env.action_space = self._get_action_space() # modify the action space to include the action controller
         self.observation = self.env.get_observation()
 
     @property
@@ -34,15 +36,13 @@ class ControlledEnvWrapper(AttributeWrapper):
 
     def _get_action_space(self):
         action_space = self.env._get_action_space()
-        action_space['action_controller'] = DiscreteElementSpace(['random', '{}'.format(self.controller.name)], probs=[self.random_action_prob, 1-self.random_action_prob])
+        action_space['controller'] = DiscreteElementSpace(['random', '{}'.format(self.controller.name)], probs=[self.random_action_prob, 1-self.random_action_prob])
         return action_space
 
     def get_action(self):
         # We extend the original action dictionary to record weather or not the action came from a random or controlled policy
-        random_action_p = np.random.random()
         random_action, valid_random_action = self.env.get_action()
-        action_controller = random_action['action_controller']
-        import pdb; pdb.set_trace()
+        action_controller = random_action['controller']
         if action_controller == 'random':
             # Random action (sample env action space)
             return random_action, valid_random_action
@@ -54,7 +54,7 @@ class ControlledEnvWrapper(AttributeWrapper):
             #       Here, we will not update any information when we have random actions.
             # pack the action with the right order
             valid_controlled_action = self.env.is_action_valid(controlled_action)
-            controlled_action['action_controller'] = action_controller
+            controlled_action['controller'] = action_controller
 
             if self.controlled_action_keys is not None:
                 random_action_keys = [k for k in random_action.keys() if k not in self.controlled_action_keys]
