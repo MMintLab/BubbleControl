@@ -12,6 +12,7 @@ import sys
 from bubble_control.bubble_learning.models.aux.fc_module import FCModule
 from bubble_control.bubble_learning.models.aux.img_encoder import ImageEncoder
 from bubble_control.bubble_learning.models.aux.img_decoder import ImageDecoder
+from bubble_control.bubble_learning.aux.pose_loss import PoseLoss
 
 
 class BubbleEnd2EndModel(pl.LightningModule):
@@ -36,6 +37,7 @@ class BubbleEnd2EndModel(pl.LightningModule):
         self.dyn_model = self._get_dyn_model()
         self.loss = None  # TODO: Define the loss function
         self.mse_loss = nn.MSELoss()
+        self.pose_loss = PoseLoss(np.zeros(2,0), device=self.device)
 
         self.save_hyperparameters()  # Important! Every model extension must add this line!
 
@@ -112,9 +114,10 @@ class BubbleEnd2EndModel(pl.LightningModule):
         action = batch['action']
         obj_pos_gth = batch['obj_pos']
         obj_ori_gth = batch['obj_quat']
+        obj_model = batch['']
         obj_pos, obj_ori = self.forward(imprint_t, wrench_t, pos_t, quat_t, action)
 
-        loss = self._compute_loss(obj_pos, obj_ori, obj_pos_gth, obj_ori_gth)
+        loss = self._compute_loss(obj_pos, obj_ori, obj_pos_gth, obj_ori_gth, obj_model)
 
         self.log('{}_batch'.format(phase), batch_idx)
         self.log('{}_loss'.format(phase), loss)
@@ -129,7 +132,12 @@ class BubbleEnd2EndModel(pl.LightningModule):
         loss = self._step(val_batch, batch_idx, phase='val')
         return loss
 
-    def _compute_loss(self, obj_pose, obj_ori, obj_pose_gth, obj_ori_gth):
+    def _compute_loss(self, obj_pos, obj_ori, obj_pos_gth, obj_ori_gth, obj_model):
         # TODO: Compute the loss based on the object model.
-        pos_loss = self.mse_loss(obj_pose, obj_pose_gth)
-        return pos_loss
+        # self.pose_loss.model = obj_model
+        # R_pred =
+        # R_gth =
+        # pose_loss = self.pose_loss(R_pred, obj_pos, R_gth, obj_pos_gth)
+        # MSE Loss on position and orientation (encoded as aixis-angle 3 values)
+        pose_loss = self.mse_loss(obj_pos, obj_pos_gth) + self.mse_loss(obj_ori, obj_ori_gth)
+        return pose_loss
