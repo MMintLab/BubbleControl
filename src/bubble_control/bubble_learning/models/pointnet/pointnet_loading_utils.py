@@ -50,3 +50,8 @@ def get_pretrained_pointnet2_object_embeding(obj_embedding_size=10, freeze=False
     model = load_pointnet_model(model, freeze=freeze, partial_load=True, pretrained_model_name=PointNet2ClsMsg.get_name())
     return model
 
+
+
+# DEBUG:
+if __name__ == '__main__':
+    object_embedding_model = get_pretrained_pointnet2_object_embeding(obj_embedding_size=10)
