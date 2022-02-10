@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from bubble_control.bubble_learning.models.pointnet.pointnet2_utils import PointNetSetAbstractionMsg, PointNetSetAbstraction
 
+class PointNet2ClsBase(nn.Module):
 
-class PointNet2ClsMsg(nn.Module):
-    def __init__(self, num_class, normal_channel=True):
+    def __init__(self, normal_channel=True):
         super().__init__()
         in_channel = 3 if normal_channel else 0
         self.normal_channel = normal_channel
@@ -18,7 +18,6 @@ class PointNet2ClsMsg(nn.Module):
         self.fc2 = nn.Linear(512, 256)
         self.bn2 = nn.BatchNorm1d(256)
         self.drop2 = nn.Dropout(0.5)
-        self.fc3 = nn.Linear(256, num_class)
 
     def forward(self, xyz):
         B, _, _ = xyz.shape
@@ -33,6 +32,44 @@ class PointNet2ClsMsg(nn.Module):
         x = l3_points.view(B, 1024)
         x = self.drop1(F.relu(self.bn1(self.fc1(x))))
         x = self.drop2(F.relu(self.bn2(self.fc2(x))))
+        return x, l3_points
+
+    @classmethod
+    def get_name(cls):
+        return 'pointnet2_cls_msg_base'
+
+    @property
+    def name(self):
+        return self.get_name()
+
+
+class PointNet2ClsMsg(PointNet2ClsBase):
+    def __init__(self, num_class, normal_channel=True):
+        super().__init__(normal_channel=normal_channel)
+        self.fc3 = nn.Linear(256, num_class)
+
+    def forward(self, xyz):
+        x, l3_points = super().forward(xyz)
         x = self.fc3(x)
         x = F.log_softmax(x, -1)
-        return x,
+        return x, l3_points
+
+    @classmethod
+    def get_name(cls):
+        return 'pointnet2_cls_msg'
+
+
+class PointNet2ObjectEmbedding(PointNet2ClsBase):
+    def __init__(self, obj_embedding_size, normal_channel=True):
+        self.obj_embedding_size = obj_embedding_size
+        super().__init__(normal_channel=normal_channel)
+        self.embedding_fc = nn.Linear(256, self.obj_embedding_size)
+
+    def forward(self, xyz):
+        x, l3_points = super().forward(xyz)
+        x = self.embedding_fc(x)
+        return x, l3_points
+
+    @classmethod
+    def get_name(cls):
+        return 'pointnet2_obj_embedding'
