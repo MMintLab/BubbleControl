@@ -6,7 +6,7 @@ import bubble_control.bubble_learning.models.pointnet as pointnet_pkg
 from bubble_control.bubble_learning.models.pointnet.pointnet2_cls_msg import PointNet2ClsMsg, PointNet2ObjectEmbedding
 
 
-pointnet_pkg_path = os.path.abspath(pointnet_pkg.__file__)
+pointnet_pkg_path = os.path.dirname(os.path.abspath(pointnet_pkg.__file__))
 
 
 def get_checkpoints_path():
@@ -32,10 +32,12 @@ def load_pointnet_model(pointnet_model, freeze=False, partial_load=False, pretra
         pointnet_model.load_state_dict(checkpoint)
     if freeze:
         for param in pointnet_model.parameters():
-            if partial_load and param in checkpoint:
-                param.requires_grad = False
+            if partial_load:
+                if param in checkpoint:
+                    param.requires_grad = False
             else:
                 param.requires_grad = False
+
     return pointnet_model
 
 
@@ -55,3 +57,5 @@ def get_pretrained_pointnet2_object_embeding(obj_embedding_size=10, freeze=False
 # DEBUG:
 if __name__ == '__main__':
     object_embedding_model = get_pretrained_pointnet2_object_embeding(obj_embedding_size=10)
+    points = torch.ones((10, 129, 3)) # NOTE. the
+    out, _ = object_embedding_model(points)

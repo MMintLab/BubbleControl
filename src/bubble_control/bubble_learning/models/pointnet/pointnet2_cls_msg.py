@@ -6,9 +6,15 @@ from bubble_control.bubble_learning.models.pointnet.pointnet2_utils import Point
 class PointNet2ClsBase(nn.Module):
 
     def __init__(self, normal_channel=True):
+        """
+        NOTE: The input pointcloud must have more than 128 points.
+        Args:
+            normal_channel:
+        """
         super().__init__()
         in_channel = 3 if normal_channel else 0
         self.normal_channel = normal_channel
+        #  npoint, radius_list, nsample_list, in_channel, mlp_list
         self.sa1 = PointNetSetAbstractionMsg(512, [0.1, 0.2, 0.4], [16, 32, 128], in_channel, [[32, 32, 64], [64, 64, 128], [64, 96, 128]])
         self.sa2 = PointNetSetAbstractionMsg(128, [0.2, 0.4, 0.8], [32, 64, 128], 320, [[64, 64, 128], [128, 128, 256], [128, 128, 256]])
         self.sa3 = PointNetSetAbstraction(None, None, None, 640 + 3, [256, 512, 1024], True)
@@ -20,7 +26,8 @@ class PointNet2ClsBase(nn.Module):
         self.drop2 = nn.Dropout(0.5)
 
     def forward(self, xyz):
-        B, _, _ = xyz.shape
+        xyz = xyz.permute(0, 2, 1)
+        B, num_channels, num_points = xyz.shape
         if self.normal_channel:
             norm = xyz[:, 3:, :]
             xyz = xyz[:, :3, :]
