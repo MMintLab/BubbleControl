@@ -1,21 +1,6 @@
-import pdb
-
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import pytorch_lightning as pl
-import matplotlib.pyplot as plt
-from matplotlib import cm
-import torchvision
-import numpy as np
-import os
-import sys
 
-from bubble_control.bubble_learning.models.aux.fc_module import FCModule
-from bubble_control.bubble_learning.models.aux.img_encoder import ImageEncoder
-from bubble_control.bubble_learning.models.aux.img_decoder import ImageDecoder
-from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoEncoderModel
-from bubble_control.bubble_learning.models.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel, BubbleFullDynamicsPretrainedAEModel
+from bubble_control.bubble_learning.models.old.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel, BubbleFullDynamicsPretrainedAEModel
 
 
 class BubbleLinearDynamicsPretrainedAEModel(BubbleDynamicsPretrainedAEModel):

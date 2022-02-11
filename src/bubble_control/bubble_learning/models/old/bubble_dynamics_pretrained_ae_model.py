@@ -72,7 +72,6 @@ class BubbleDynamicsPretrainedAEModel(pl.LightningModule):
 
         return model
 
-
     def _get_dyn_model(self):
         sizes = self._get_sizes()
         action_size = sizes['action']

@@ -1,17 +1,9 @@
 import torch
-import os
-import pytorch_lightning as pl
-import argparse
-import numpy as np
-from torch.utils.data import DataLoader
-from pytorch_lightning.loggers import TensorBoardLogger
-from torch.utils.data import random_split
 
-from bubble_control.bubble_learning.models.bubble_dynamics_residual_model import BubbleDynamicsResidualModel
+from bubble_control.bubble_learning.models.old.bubble_dynamics_residual_model import BubbleDynamicsResidualModel
 from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoEncoderModel
 from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
-from bubble_control.bubble_learning.models.bubble_pca_dynamics_residual_model import BubblePCADynamicsResidualModel
-from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
+from bubble_control.bubble_learning.models.old.bubble_pca_dynamics_residual_model import BubblePCADynamicsResidualModel
 
 from bubble_control.bubble_learning.train_files.parsed_trainer import ParsedTrainer
 

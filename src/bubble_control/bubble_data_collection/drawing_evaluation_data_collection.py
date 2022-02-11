@@ -1,13 +1,10 @@
 import numpy as np
 import torch
 import os
-import rospy
-import pytorch3d.transforms as batched_tr
 from tqdm import tqdm
 
-from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
 from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
-from bubble_control.bubble_learning.models.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel
+from bubble_control.bubble_learning.models.old.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel
 from bubble_control.bubble_model_control.aux.bubble_dynamics_fixed_model import BubbleDynamicsFixedModel
 from victor_hardware_interface_msgs.msg import ControlMode
 
@@ -15,7 +12,6 @@ from bubble_control.bubble_model_control.model_output_object_pose_estimaton impo
     BatchedModelOutputObjectPoseEstimation
 from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIBatchedController
 from bubble_control.bubble_envs.bubble_drawing_env import BubbleOneDirectionDrawingEnv
-from bubble_utils.bubble_tools.bubble_img_tools import process_bubble_img
 
 from bubble_control.bubble_model_control.drawing_action_models import drawing_action_model_one_dir
 from bubble_control.bubble_learning.aux.load_model import load_model_version
@@ -26,7 +22,7 @@ from bubble_control.bubble_model_control.cost_functions import vertical_tool_cos
 
 from bubble_utils.bubble_data_collection.data_collector_base import DataCollectorBase
 
-from mmint_camera_utils.recorders.recording_utils import save_image, record_image_color
+from mmint_camera_utils.recorders.recording_utils import record_image_color
 
 
 
