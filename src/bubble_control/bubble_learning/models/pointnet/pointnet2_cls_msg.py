@@ -75,7 +75,7 @@ class PointNet2ObjectEmbedding(PointNet2ClsBase):
     def forward(self, xyz):
         x, l3_points = super().forward(xyz)
         x = self.embedding_fc(x)
-        return x, l3_points
+        return x
 
     @classmethod
     def get_name(cls):
