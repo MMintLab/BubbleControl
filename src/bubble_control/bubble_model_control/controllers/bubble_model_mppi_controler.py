@@ -158,7 +158,7 @@ class BubbleModelMPPIController(BubbleModelController):
         self._init_params()
         controller = mppi.MPPI(self.dynamics, self.compute_cost, self.state_size, self.noise_sigma,
                                lambda_=self.lambda_, device=self.model.device,
-                               num_samples=self.num_samples, horizon=self.horizon, u_min=self.u_min, u_max=self.u_max, u_init=self.u_mu, U_init=self.U_init)
+                               num_samples=self.num_samples, horizon=self.horizon, u_min=self.u_min, u_max=self.u_max, u_init=self.u_mu, U_init=self.U_init, noise_abs_cost=True)
         return controller
 
     def _query_controller(self, state_sample):

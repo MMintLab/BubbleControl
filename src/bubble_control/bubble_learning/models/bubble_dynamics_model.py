@@ -18,9 +18,11 @@ from bubble_control.bubble_learning.models.bubble_dynamics_model_base import Bub
 
 class BubbleDynamicsModel(BubbleDynamicsModelBase):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, input_batch_norm=True, **kwargs):
+        self.input_batch_norm = input_batch_norm
         super().__init__(*args, **kwargs)
-
+        sizes = self._get_sizes()
+        self.dyn_input_batch_norm = nn.BatchNorm1d(num_features=sizes['dyn_input_size']) # call eval() to freeze the mean and std estimation
         self.save_hyperparameters()
 
     @classmethod
@@ -49,6 +51,8 @@ class BubbleDynamicsModel(BubbleDynamicsModelBase):
         obj_model_emb = self.object_embedding_module(object_model) # (B, imprint_emb_size)
         state_dyn_input = torch.cat([imprint_input_emb, wrench], dim=-1)
         dyn_input = torch.cat([state_dyn_input, obj_model_emb, pos, ori, action], dim=-1)
+        if self.input_batch_norm:
+            dyn_input = self.dyn_input_batch_norm(dyn_input)
         state_dyn_output_delta = self.dyn_model(dyn_input)
         state_dyn_output = state_dyn_input + state_dyn_output_delta
         imprint_emb_next, wrench_next = torch.split(state_dyn_output, (self.img_embedding_size, sizes['wrench']), dim=-1)
