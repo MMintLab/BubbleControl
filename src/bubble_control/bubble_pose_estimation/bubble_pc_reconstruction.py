@@ -107,18 +107,35 @@ class BubblePCReconstructorBase(abc.ABC):
             imprint_pcd_r = pack_o3d_pcd(imprint_r)
             imprint_pcd_l = pack_o3d_pcd(imprint_l)
             distance_bubbles = None
-            if len(imprint_pcd_r.points) < 2 or len(imprint_pcd_l.points) < 2:
+            if len(imprint_pcd_r.points) < 5 or len(imprint_pcd_l.points) < 5:
                 print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
                 self.tool_detected_publisher.data = False
             else:
                 tree = KDTree(imprint_pcd_r.points)
                 corr_distances, _ = tree.query(imprint_pcd_l.points)
-                distance_bubbles = np.mean(corr_distances)
-                if (distance_bubbles is not None and distance_bubbles < 0.01):
-                    print(f"{term_colors.WARNING}Warning: No tool detected{term_colors.ENDC}")
-                    self.tool_detected_publisher.data = False
+                distance_bubbles = np.max(corr_distances)
+                
+                imprint_pcd_l.paint_uniform_color(np.array([1,0,0]))
+                imprint_r_array = np.asarray(imprint_pcd_r.points)
+                imprint_l_array = np.asarray(imprint_pcd_l.points)
+                # Filter out outliers
+                imprint_r_array = imprint_r_array[np.where(np.abs(imprint_r_array[:, 0]) < 0.02)]
+                imprint_l_array = imprint_l_array[np.where(np.abs(imprint_l_array[:, 0]) < 0.02)]
+                if imprint_r_array.shape[0] == 0 or imprint_l_array.shape[0] == 0:
+                    print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
+                    self.tool_detected_publisher.data = False   
                 else:
-                    self.tool_detected_publisher.data = True
+                    # Find the two points further apart in the x axis                 
+                    x_max_r = np.max(imprint_r_array[:,0])
+                    x_min_l = np.min(imprint_l_array[:,0])
+                    distance_bubbles_x = np.abs(x_max_r - x_min_l)
+                    
+                    #view_pointcloud([imprint_pcd_l,imprint_pcd_r], frame=True)
+                    if (distance_bubbles is not None and distance_bubbles_x < 0.01):
+                        print(f"{term_colors.WARNING}Warning: No tool detected{term_colors.ENDC}")
+                        self.tool_detected_publisher.data = False
+                    else:
+                        self.tool_detected_publisher.data = True
         else:
             imprint = self.get_imprint(view=view)
         estimated_pose = self._estimate_pose(imprint, threshold, verbose=verbose)
