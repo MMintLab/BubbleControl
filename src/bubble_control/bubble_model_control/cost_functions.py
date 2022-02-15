@@ -33,4 +33,4 @@ def vertical_tool_cost_function(estimated_poses, states, prev_states, actions):
     is_nan_action = torch.any(torch.isnan(actions), dim=1)
     is_nan_pose = torch.any(torch.isnan(estimated_pos), dim=1)
     cost = ori_cost + 10 * is_nan_action + 10 * is_nan_pose
-    return cost
+    return cost*100

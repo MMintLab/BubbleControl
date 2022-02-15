@@ -2,7 +2,7 @@ import numpy as np
 from mmint_camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud, tr_pointcloud
 import open3d as o3d
 
-from bubble_control.aux.load_confs import save_object_models
+from bubble_control.aux.load_confs import save_object_models, load_marker_params
 
 
 def create_object_models(radius=0.005, height=0.12):
@@ -109,10 +109,44 @@ def create_object_models(radius=0.005, height=0.12):
     return models
 
 
+def generate_general_cylinder_marker_model(width_1, width_2, length, num_points=3000):
+    point_per_circle = int(num_points*0.02)
+    num_circles = int(num_points/point_per_circle)
+    # x axis is the tool axis
+    diameters = np.linspace(width_1, width_2, num_circles)
+    x_values = np.linspace(-0.5*length, 0.5*length, num_circles)
+    radiis = 0.5*diameters
+    angles = (2*np.pi)/point_per_circle * np.arange(point_per_circle)
+    circle_yz_unit = np.stack([np.cos(angles), np.sin(angles)],axis=-1)
+    circles_yz_unit = np.repeat(np.expand_dims(circle_yz_unit,0), num_circles ,axis=0)
+    radiis = np.repeat(np.repeat(np.expand_dims(radiis, [-2,-1]), 2, axis=-1), point_per_circle, axis=-2)
+    x_values = np.repeat(np.expand_dims(x_values,[-2,-1]), point_per_circle,axis=-2) 
+    circles_yz = radiis*circles_yz_unit
+    circles_xyz = np.concatenate([x_values, circles_yz], axis=-1).reshape(-1,3)
+    marker_cylinder_model = np.concatenate([circles_xyz, np.zeros_like(circles_xyz)], axis=-1)
+    return marker_cylinder_model
+
+
+def create_marker_models(num_points=3000):
+    marker_models = {}
+    marker_params_df = load_marker_params()
+    for i, row_i in marker_params_df.iterrows():
+        marker_id_i = row_i['MarkerID']
+        width_1_i = row_i['Width1']
+        width_2_i = row_i['Width2']
+        length_i = row_i['Length']
+        marker_model_i = generate_general_cylinder_marker_model(width_1_i, width_2_i, length_i, num_points=num_points)
+        marker_models[marker_id_i] = pack_o3d_pcd(marker_model_i)
+    return marker_models
+
+
 # Save them:
 
 if __name__ == '__main__':
     radius = 0.005
     height = 0.12
     models = create_object_models(radius=radius, height=height)
+    # Add marker models
+    marker_models = create_marker_models()
+    models.update(marker_models)
     save_object_models(models)

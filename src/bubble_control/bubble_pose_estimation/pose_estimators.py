@@ -8,6 +8,7 @@ from scipy.spatial import KDTree
 from tqdm import tqdm
 from mmint_utils.terminal_colors import term_colors
 
+
 class PCPoseEstimatorBase(abc.ABC):
     """
     Given an imprint of the infered object points and the model of the object, infer the object position

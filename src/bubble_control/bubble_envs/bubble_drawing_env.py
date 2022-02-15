@@ -23,7 +23,7 @@ class BubbleDrawingBaseEnv(BubbleBaseEnv):
 
     def __init__(self, *args, impedance_mode=False, reactive=False, force_threshold=5., prob_axis=0.08,
                  drawing_area_center=(0.55, 0.), drawing_area_size=(.15, .15), drawing_length_limits=(0.01, 0.15),
-                 grasp_width_limits=(15, 25), **kwargs):
+                 grasp_width_limits=(15, 25), marker_code='marker', **kwargs):
         self.impedance_mode = impedance_mode
         self.reactive = reactive
         self.force_threshold = force_threshold
@@ -32,6 +32,7 @@ class BubbleDrawingBaseEnv(BubbleBaseEnv):
         self.drawing_area_size = drawing_area_size
         self.drawing_length_limits = drawing_length_limits
         self.grasp_width_limits = grasp_width_limits
+        self.marker_code = marker_code
         self.previous_end_point = None
         self.previous_draw_height = None
         self.drawing_init = False
@@ -95,6 +96,7 @@ class BubbleDrawingBaseEnv(BubbleBaseEnv):
         obs.update(bubble_obs)
         obs['wrench'] = self._get_wrench()
         obs['tfs'] = self._get_tfs()
+        obs['marker'] = self.marker_code
         # add the reference state
         obs = self._add_bubble_reference_to_observation(obs)
         return obs
@@ -230,6 +232,8 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         return action_space
 
     def is_action_valid(self, action):
+        if self.init_action is None:
+            return True
         direction_i = self.init_action['direction']
         length_i = action['length']
         drawing_area_center_point = np.asarray(self.drawing_area_center)
@@ -258,10 +262,19 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
                 print('reached drawing area limit')
         return done
 
+    def _get_current_drawing_direction(self):
+        current_plane_pose = self.med.get_plane_pose()
+        pf_X_gf = self.med._pose_to_matrix(current_plane_pose)
+        drawing_direction_gf = np.array([0, -1, 0])
+        drawing_direction_pf = pf_X_gf[:3, :3] @ drawing_direction_gf
+        drawing_direction = np.arctan2(drawing_direction_pf[1], drawing_direction_pf[0])%(2*np.pi) # return the angle of the direction with respect to the pp frame.
+        return drawing_direction
+
     def _do_action(self, action):
         rotation_i = action['rotation']
         length_i = action['length']
-        direction_i = self.init_action['direction']
+        # direction_i = self.init_action['direction']
+        direction_i = self._get_current_drawing_direction()
         grasp_width_i = action['grasp_width']
         self.med.gripper.move(grasp_width_i, speed=10.0)
         current_plane_pose = self.med.get_plane_pose()
@@ -384,3 +397,13 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         self._set_cartesian_impedance()
         self.previous_draw_height = copy.deepcopy(draw_height)
         self.init_action['direction'] = desired_angle
+
+
+class BubbleLineDrawingEnv(BubbleOneDirectionDrawingEnv):
+
+    def initialize(self):
+        self.init_action = {
+        'start_point': np.array([0.55, 0.2]),
+        'direction': np.deg2rad(270),
+        }
+        self.do_init_action(self.init_action)

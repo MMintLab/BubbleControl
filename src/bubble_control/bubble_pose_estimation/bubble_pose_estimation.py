@@ -33,6 +33,9 @@ from bubble_control.bubble_pose_estimation.bubble_pc_reconstruction import Bubbl
 
 
 class BubblePoseEstimator(object):
+    """
+    BubblePoseEstimation > BubblePCReconstructor > PoseEstimators
+    """
 
     def __init__(self, imprint_th=0.005, icp_th=0.01, rate=5.0, view=False, verbose=False, broadcast_imprint=False, object_name='allen', estimation_type='icp3d', reconstruction='depth', gripper_width=None):
         self.object_name = object_name
