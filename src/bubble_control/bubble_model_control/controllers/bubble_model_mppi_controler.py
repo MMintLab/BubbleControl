@@ -31,7 +31,11 @@ class BubbleModelMPPIController(BubbleModelController):
         self.original_state_shape = None
         self.state_size = None
         self.controller = None # controller not initialized yet
-        self.action_container, _ = self.env.get_action()
+        self.action_container = self._get_action_container()
+        
+    def _get_action_container(self):
+        action_container, _ = self.env.get_action()
+        return action_container
 
     def control(self, state_sample):
         # pack the action to the env format
