@@ -3,13 +3,26 @@ import tf.transformations as tr
 
 from bubble_utils.bubble_datasets.bubble_dataset_base import BubbleDatasetBase
 from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
+from bubble_control.aux.load_confs import load_object_models
+from bubble_control.bubble_pose_estimation.bubble_pc_reconstruction import BubblePCReconstructorOfflineDepth
+from mmint_camera_utils.ros_utils.utils import matrix_to_pose, pose_to_matrix
 
 
 class BubbleDrawingDataset(BubbleDatasetBase):
 
-    def __init__(self, *args, wrench_frame=None, tf_frame='grasp_frame', **kwargs):
+    def __init__(self, *args, wrench_frame=None, tf_frame='grasp_frame', view=False,  downsample_factor_x=1, downsample_factor_y=1, downsample_reduction='mean', **kwargs):
+        self.downsample_factor_x = downsample_factor_x
+        self.downsample_factor_y = downsample_factor_y
+        self.downsample_reduction = downsample_reduction
+        self.block_mean_downsampling_tr = BlockDownSamplingTr(factor_x=downsample_factor_x,
+                                                              factor_y=downsample_factor_y,
+                                                              reduction=self.downsample_reduction)  # downsample all imprint values
+        # add the block_mean_downsampling_tr to the tr list
+        kwargs = self._add_transformation_to_kwargs(kwargs, self.block_mean_downsampling_tr)
+
         self.wrench_frame = wrench_frame
         self.tf_frame = tf_frame
+        self.view = view
         super().__init__(*args, **kwargs)
 
     @classmethod
@@ -20,9 +33,9 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         # fc: index of the line in the datalegend (self.dl) of the sample
         dl_line = self.dl.iloc[fc]
         scene_name = dl_line['Scene']
-        undef_fc = dl_line['UndeformedFC']
-        init_fc = dl_line['InitialStateFC']
-        final_fc = dl_line['FinalStateFC']
+        undef_fc = int(dl_line['UndeformedFC'])
+        init_fc = int(dl_line['InitialStateFC'])
+        final_fc = int(dl_line['FinalStateFC'])
         # Load initial state:
         init_imprint_r = self._get_depth_imprint(undef_fc=undef_fc, def_fc=init_fc, scene_name=scene_name, camera_name='right')
         init_imprint_l = self._get_depth_imprint(undef_fc=undef_fc, def_fc=init_fc, scene_name=scene_name, camera_name='left')
@@ -43,6 +56,10 @@ class BubbleDrawingDataset(BubbleDatasetBase):
 
         undef_depth_r = self._load_depth_img(fc=undef_fc, scene_name=scene_name, camera_name='right')
         undef_depth_l = self._load_depth_img(fc=undef_fc, scene_name=scene_name, camera_name='left')
+        init_def_depth_r = self._load_depth_img(fc=init_fc, scene_name=scene_name, camera_name='right')
+        init_def_depth_l = self._load_depth_img(fc=init_fc, scene_name=scene_name, camera_name='left')
+        final_def_depth_r = self._load_depth_img(fc=final_fc, scene_name=scene_name, camera_name='right')
+        final_def_depth_l = self._load_depth_img(fc=final_fc, scene_name=scene_name, camera_name='left')
 
         # load tf from cameras to grasp frame (should
         all_tfs = self._load_tfs(init_fc, scene_name)
@@ -55,6 +72,10 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         camera_info_r = self._load_camera_info_depth(scene_name=scene_name, camera_name='right', fc=undef_fc)
         camera_info_l = self._load_camera_info_depth(scene_name=scene_name, camera_name='left', fc=undef_fc)
 
+        object_code = self._get_object_code(fc)
+        object_model = self._get_object_model(object_code)
+        init_object_pose = self._estimate_object_pose(init_def_depth_r, init_def_depth_l, undef_depth_r, undef_depth_l, camera_info_r, camera_info_l, all_tfs)
+        final_object_pose = self._estimate_object_pose(final_def_depth_r, final_def_depth_l, undef_depth_r, undef_depth_l, camera_info_r, camera_info_l, all_tfs)
         sample_simple = {
             'init_imprint': init_imprint,
             'init_wrench': init_wrench,
@@ -64,6 +85,10 @@ class BubbleDrawingDataset(BubbleDatasetBase):
             'final_wrench': final_wrench,
             'final_pos': final_pos,
             'final_quat': final_quat,
+            'object_code': object_code,
+            'object_model': object_model,
+            'init_object_pose': init_object_pose,
+            'final_object_pose': final_object_pose,
             'action': action,
             'undef_depth_r': undef_depth_r,
             'undef_depth_l': undef_depth_l,
@@ -85,6 +110,35 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         # length = dl_line['length']
         # action_i = length * np.array([np.cos(direction), np.sin(direction)])
         return action_i
+
+    def _estimate_object_pose(self, def_r, def_l, ref_r, ref_l, camera_info_r, camera_info_l, all_tfs):
+        reconstructor = BubblePCReconstructorOfflineDepth(object_name='marker', estimation_type='icp2d', view=self.view, percentile=0.005)
+        reconstructor.threshold = 0.0
+        reconstructor.references['left'] = ref_l
+        reconstructor.references['right'] = ref_r
+        reconstructor.references['left_frame'] = 'pico_flexx_left_optical_frame'
+        reconstructor.references['right_frame'] = 'pico_flexx_right_optical_frame'
+        reconstructor.camera_info['left'] = camera_info_l
+        reconstructor.camera_info['right'] = camera_info_r
+        reconstructor.depth_r['img'] = def_r
+        reconstructor.depth_l['img'] = def_l
+        reconstructor.depth_r['frame'] = 'pico_flexx_right_optical_frame'
+        reconstructor.depth_l['frame'] = 'pico_flexx_left_optical_frame'
+        reconstructor.add_tfs(all_tfs)
+        pose_matrix = reconstructor.estimate_pose(threshold=0, view=self.view) # Homogeneous
+        pose = matrix_to_pose(pose_matrix)
+        return pose
+
+    def _get_object_code(self, fc):
+        dl_line = self.dl.iloc[fc]
+        object_code = dl_line['marker_init']
+        return object_code
+
+    def _get_object_model(self, object_code):
+        object_models = load_object_models() # TODO: Consdier doing this more efficient to avoid having to load every time
+        object_model_pcd = object_models[object_code]
+        object_model = np.asarray(object_model_pcd.points)
+        return object_model
 
     def _compute_delta_sample(self, sample):
         # TODO: improve this computation
@@ -108,81 +162,44 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         sample['action'] = sample['action'].flatten()
         return sample
 
-
-class BubbleDrawingDownsampledDataset(BubbleDrawingDataset):
-    def __init__(self, *args, downsample_factor_x=5, downsample_factor_y=5, downsample_reduction='mean', **kwargs):
-        self.downsample_factor_x = downsample_factor_x
-        self.downsample_factor_y = downsample_factor_y
-        self.downsample_reduction = downsample_reduction
-        self.block_mean_downsampling_tr = BlockDownSamplingTr(factor_x=downsample_factor_x, factor_y=downsample_factor_y, reduction=self.downsample_reduction) #downsample all imprint values
-        # add the block_mean_downsampling_tr to the tr list
+    def _add_transformation_to_kwargs(self, kwargs, tr):
         if 'transformation' in kwargs:
             if type(kwargs['transformation']) in (list, tuple):
-                kwargs['transformation'] = list(kwargs['transformation']) + [self.block_mean_downsampling_tr]
+                kwargs['transformation'] = list(kwargs['transformation']) + [tr]
             else:
                 print('')
-                raise AttributeError('Not supportes trasformations: {} type {}'.format(kwargs['transformation'], type(kwargs['transformation'])))
+                raise AttributeError('Not supportes trasformations: {} type {}'.format(kwargs['transformation'],
+                                                                                       type(kwargs['transformation'])))
         else:
-            kwargs['transformation'] = [self.block_mean_downsampling_tr]
-        super().__init__(*args, **kwargs)
-
-    @classmethod
-    def get_name(self):
-        return 'bubble_drawing_downsampled_dataset'
+            kwargs['transformation'] = [tr]
+        return kwargs
 
 
-class BubbleDrawingDownsampledCombinedDataset(BubbleDrawingDownsampledDataset):
-    """"""
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    @classmethod
-    def get_name(self):
-        return 'bubble_drawing_downsampled_combined_dataset'
-
-    def _get_filecodes(self):
-        # duplicate the filecodes:
-        fcs = np.arange(2 * len(super()._get_filecodes()))
-        return fcs
-
-    def _get_sample(self, indx):
-        # fc: index of the line in the datalegend (self.dl) of the sample
-        true_indx = indx // 2
-        dl_line = self.dl.iloc[true_indx]
-        sample = super()._get_sample(true_indx)
-        if indx % 2 == 0:
-            # sample is the initial
-            sample['imprint'] = sample['init_imprint']
-        else:
-            sample['imprint'] = sample['final_imprint']
-        return sample
-
-# DEBUG:
-
+# DEBUG
 if __name__ == '__main__':
     # data_name = '/home/mmint/Desktop/drawing_data_cartesian'
-    data_name = '/home/mmint/Desktop/env_drawing_test_data'
-    # dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame')
-    dataset = BubbleDrawingDownsampledDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame',downsample_factor_x=7, downsample_factor_y=7, downsample_reduction='mean')
+    data_name = '/home/mmint/Desktop/test_drawing_data'
+    dataset = BubbleDrawingDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame', view=False)
+    # dataset = BubbleDrawingDownsampledDataset(data_name=data_name, wrench_frame='med_base', tf_frame='grasp_frame',downsample_factor_x=7, downsample_factor_y=7, downsample_reduction='mean')
     print('Dataset Name: ', dataset.name)
     print('Dataset Length:', len(dataset))
     sample_0 = dataset[0]
     print('Sample 0:', sample_0)
 
-    # save downsampled and undownsampled images
-    import matplotlib.pyplot as plt
-    # sample_indxs = np.random.randint(0,len(dataset),5)
-    sample_indxs = [0,1,2,3,4]
-
-    for sample_indx in sample_indxs:
-        sample_i = dataset[sample_indx]
-        img_o = sample_i['init_imprint_undownsampled'].reshape(-1,sample_i['init_imprint_undownsampled'].shape[-1])
-        img_d = sample_i['init_imprint'].reshape(-1,sample_i['init_imprint'].shape[-1])
-
-        fig, axes = plt.subplots(1, 2)
-        axes[0].imshow(img_o)
-        axes[0].set_title('Original Resolution')
-        axes[1].imshow(img_d)
-        axes[1].set_title('Image Downsampled (Avg Pooling)')
-
-        plt.savefig('/home/mmint/Desktop/resolution_comparison_{}.png'.format(sample_indx))
+    # # save downsampled and undownsampled images
+    # import matplotlib.pyplot as plt
+    # # sample_indxs = np.random.randint(0,len(dataset),5)
+    # sample_indxs = [0,1,2,3,4]
+    #
+    # for sample_indx in sample_indxs:
+    #     sample_i = dataset[sample_indx]
+    #     img_o = sample_i['init_imprint_undownsampled'].reshape(-1, sample_i['init_imprint_undownsampled'].shape[-1])
+    #     img_d = sample_i['init_imprint'].reshape(-1, sample_i['init_imprint'].shape[-1])
+    #
+    #     fig, axes = plt.subplots(1, 2)
+    #     axes[0].imshow(img_o)
+    #     axes[0].set_title('Original Resolution')
+    #     axes[1].imshow(img_d)
+    #     axes[1].set_title('Image Downsampled (Avg Pooling)')
+    #
+    #     plt.savefig('/home/mmint/Desktop/resolution_comparison_{}.png'.format(sample_indx))

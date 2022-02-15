@@ -40,7 +40,7 @@ def collect_data_drawing_test(save_path, scene_name, num_data=10, prob_axis=0.08
     dc.collect_data(num_data=num_data)
 
 
-def collect_data_drawing_env_test(save_path, scene_name, num_data=10, prob_axis=0.08, impedance_mode=False, reactive=False, drawing_area_center=(0.55, 0.), drawing_area_size=(.15, .15), drawing_length_limits=(0.01, 0.15), grasp_width_limits=(15, 25)):
+def collect_data_drawing_env_test(save_path, scene_name, num_data=10, prob_axis=0.08, impedance_mode=False, reactive=False, drawing_area_center=(0.55, 0.), drawing_area_size=(.15, .15), drawing_length_limits=(0.01, 0.15), grasp_width_limits=(15, 25), object_name='marker'):
 
     env = BubbleOneDirectionDrawingEnv(prob_axis=prob_axis,
                              impedance_mode=impedance_mode,
@@ -49,7 +49,8 @@ def collect_data_drawing_env_test(save_path, scene_name, num_data=10, prob_axis=
                              drawing_area_size=drawing_area_size,
                              drawing_length_limits=drawing_length_limits,
                              grasp_width_limits=grasp_width_limits,
-                             wrap_data=True
+                             wrap_data=True,
+                                       marker_code=object_name,
                            )
     dc = BubbleEnvDataCollector(env, data_path=save_path, scene_name=scene_name)
     dc.collect_data(num_data=num_data)
@@ -70,10 +71,11 @@ def collect_data_drawing_env_jacobian_controller(save_path, scene_name, num_data
              drawing_area_size=drawing_area_size,
              drawing_length_limits=drawing_length_limits,
              grasp_width_limits=grasp_width_limits,
+             marker_code=object_name,
              wrap_data=True
                            )
     model = BubbleDynamicsFixedModel() # Fixed model for Jacobian controller
-    ope = BatchedModelOutputObjectPoseEstimation(object_name=object_name, factor_x=7, factor_y=7, method='bilinear',
+    ope = BatchedModelOutputObjectPoseEstimation(object_name='marker', factor_x=7, factor_y=7, method='bilinear',
                                                  device=torch.device('cuda'), imprint_selection='percentile',
                                                  imprint_percentile=0.005)
 
@@ -102,9 +104,10 @@ if __name__ == '__main__':
     parser.add_argument('--drawing_area_center', type=float, nargs=2, default=(0.55, 0.), help='x y of the drawing area center')
     parser.add_argument('--drawing_area_size', type=float, nargs=2, default=(0.15, 0.3), help='delta_x delta_y of the semiaxis drawing area')
     parser.add_argument('--drawing_length_limits', type=float, nargs=2, default=(0.01, 0.02), help='min_length max_length of the drawing move')
-    parser.add_argument('--grasp_width_limits', type=float, nargs=2, default=(10, 40), help='min and max grasp width values')
+    parser.add_argument('--grasp_width_limits', type=float, nargs=2, default=(10, 35), help='min and max grasp width values')
     parser.add_argument('--controlled', action='store_true', help='collect data using a controlled policy -- with probability random_action_prob perform a random action')
     parser.add_argument('--random_action_prob', type=float,  default=0.15, help='probability of performing random actions')
+    parser.add_argument('--object_name', type=str,  default='marker', help='name of the grasped object, we may record it on our dataset')
 
     args = parser.parse_args()
 
@@ -120,14 +123,15 @@ if __name__ == '__main__':
     grasp_width_limits = args.grasp_width_limits
     random_action_prob = args.random_action_prob
     controlled = args.controlled
+    object_name = args.object_name
 
     if controlled:
         collect_data_drawing_env_jacobian_controller(save_path, scene_name, num_data=num_data, prob_axis=prob_axis,
                                       impedance_mode=impedance_mode, reactive=reactive,
                                       drawing_area_center=drawing_area_center,
                                       drawing_area_size=drawing_area_size, drawing_length_limits=drawing_length_limits,
-                                      grasp_width_limits=grasp_width_limits, random_action_prob=random_action_prob)
+                                      grasp_width_limits=grasp_width_limits, random_action_prob=random_action_prob, object_name=object_name)
     else:
         collect_data_drawing_env_test(save_path, scene_name, num_data=num_data, prob_axis=prob_axis,
                               impedance_mode=impedance_mode, reactive=reactive, drawing_area_center=drawing_area_center,
-                              drawing_area_size=drawing_area_size, drawing_length_limits=drawing_length_limits, grasp_width_limits=grasp_width_limits)
+                              drawing_area_size=drawing_area_size, drawing_length_limits=drawing_length_limits, grasp_width_limits=grasp_width_limits, object_name=object_name)

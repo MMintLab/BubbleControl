@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import random_split
 
-from bubble_utils.bubble_datasets.bubble_dataset_base import DatasetBase, BubbleDatasetBase
+from bubble_utils.bubble_datasets.dataset_base import DatasetBase
 from bubble_utils.bubble_datasets.dataset_transformed import transform_dataset
 from bubble_control.bubble_learning.aux.dataframe_tr import SplitDataFramesTr
 from bubble_control.bubble_learning.aux.remove_nontensor_elements_tr import RemoveNonTensorElementsTr
@@ -17,11 +17,18 @@ from bubble_control.bubble_learning.aux.remove_nontensor_elements_tr import Remo
 
 class ParsedTrainer(object):
     """
-    Class for training one or multiple
+    Class for training one dataset and one model selected using arguments from a list of provides
     All options are provided on the commandline using argparse
     """
 
     def __init__(self, Model, Dataset, default_args=None, default_types=None):
+        """
+        Args:
+            Model: Model or list of Models to be selected. Only one among them will be used
+            Dataset: Dataset or list of Datasets to be selected. Only one among them will be used.
+            default_args:
+            default_types:
+        """
         self.default_args = default_args
         self.models_dict = self._get_models(Model)
         self.datasets_dict = self._get_datasets(Dataset)

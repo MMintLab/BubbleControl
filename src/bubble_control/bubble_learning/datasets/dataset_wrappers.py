@@ -36,27 +36,28 @@ def imprint_downsampled_dataset(cls):
     return Wrapper
 
 
-class CombinedDatasetWrapper(ClassWrapper):
-    @classmethod
-    def get_name(self):
-        return '{}_combined'.format(self.wrapped_object.get_name())
+class BubbleImprintCombinedDatasetWrapper(BubbleDatasetBase):
+    """
+    Creates a new dataset from the original wrapped dataset which is the the dataset in 2 so samples contain 'imprint' which is the combination of 'init_imprint' and 'final_imprint'
+    """
+    def __init__(self, dataset):
+        self.dataset = dataset
+        super().__init__(data_name=dataset.data_path)
 
     def _get_filecodes(self):
-        # duplicate the filecodes:
-        fcs = np.arange(2 * len(self.wrapped_object._get_filecodes()))
-        return fcs
+        filecodes = np.arange(2*len(self.dataset))
+        return filecodes
 
-    def _get_sample(self, indx):
-        # fc: index of the line in the datalegend (self.dl) of the sample
-        true_indx = indx // 2
-        dl_line = self.dl.iloc[true_indx]
-        sample = self.wrapped_object._get_sample(true_indx)
-        if indx % 2 == 0:
+    def _get_sample(self, fc):
+        true_fc = fc // 2
+        sample = self.dataset[true_fc]
+        if fc % 2 == 0:
             # sample is the initial
             sample['imprint'] = sample['init_imprint']
         else:
             sample['imprint'] = sample['final_imprint']
         return sample
 
-
-combined_dataset = DecoratorWrapper(CombinedDatasetWrapper)
+    def get_name(self):
+        name = '{}_imprint_combined'.format(self.dataset.name)
+        return name
