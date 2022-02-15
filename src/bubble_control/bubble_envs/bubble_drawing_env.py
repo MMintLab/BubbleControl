@@ -13,11 +13,7 @@ from geometry_msgs.msg import Pose, Point, Quaternion
 
 from mmint_camera_utils.recorders.data_recording_wrappers import DataSelfSavedWrapper
 from bubble_control.bubble_drawer.bubble_drawer import BubbleDrawer
-<<<<<<< HEAD
-from bubble_control.src.bubble_control.aux.action_spaces import ConstantSpace, AxisBiasedDirectionSpace
-=======
 from bubble_control.aux.action_spaces import ConstantSpace, AxisBiasedDirectionSpace
->>>>>>> 577a86be27439833eabbdba4639cdb5faed9ebad
 from bubble_control.bubble_envs.base_env import BubbleBaseEnv
 from victor_hardware_interface_msgs.msg import ControlMode
 from victor_hardware_interface.victor_utils import get_cartesian_impedance_params, send_new_control_mode
