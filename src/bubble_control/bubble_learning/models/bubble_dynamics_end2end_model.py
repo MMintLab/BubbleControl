@@ -16,7 +16,7 @@ from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoE
 from bubble_control.bubble_learning.models.bubble_dynamics_model_base import BubbleDynamicsModelBase
 
 
-class BubbleDynamicsModel(BubbleDynamicsModelBase):
+class BubbleEnd2EndDynamicsModel(BubbleDynamicsModelBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -25,7 +25,7 @@ class BubbleDynamicsModel(BubbleDynamicsModelBase):
 
     @classmethod
     def get_name(cls):
-        return 'bubble_end2end_model'
+        return 'bubble_end2end_dynamics_model'
 
     def _get_img_encoder(self):
         sizes = self._get_sizes()

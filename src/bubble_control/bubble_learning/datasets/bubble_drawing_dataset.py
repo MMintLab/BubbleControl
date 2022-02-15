@@ -10,7 +10,16 @@ from mmint_camera_utils.ros_utils.utils import matrix_to_pose, pose_to_matrix
 
 class BubbleDrawingDataset(BubbleDatasetBase):
 
-    def __init__(self, *args, wrench_frame=None, tf_frame='grasp_frame', view=False, **kwargs):
+    def __init__(self, *args, wrench_frame=None, tf_frame='grasp_frame', view=False,  downsample_factor_x=1, downsample_factor_y=1, downsample_reduction='mean', **kwargs):
+        self.downsample_factor_x = downsample_factor_x
+        self.downsample_factor_y = downsample_factor_y
+        self.downsample_reduction = downsample_reduction
+        self.block_mean_downsampling_tr = BlockDownSamplingTr(factor_x=downsample_factor_x,
+                                                              factor_y=downsample_factor_y,
+                                                              reduction=self.downsample_reduction)  # downsample all imprint values
+        # add the block_mean_downsampling_tr to the tr list
+        kwargs = self._add_transformation_to_kwargs(kwargs, self.block_mean_downsampling_tr)
+
         self.wrench_frame = wrench_frame
         self.tf_frame = tf_frame
         self.view = view
@@ -154,56 +163,17 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         sample['action'] = sample['action'].flatten()
         return sample
 
-
-class BubbleDrawingDownsampledDataset(BubbleDrawingDataset):
-    def __init__(self, *args, downsample_factor_x=5, downsample_factor_y=5, downsample_reduction='mean', **kwargs):
-        self.downsample_factor_x = downsample_factor_x
-        self.downsample_factor_y = downsample_factor_y
-        self.downsample_reduction = downsample_reduction
-        self.block_mean_downsampling_tr = BlockDownSamplingTr(factor_x=downsample_factor_x, factor_y=downsample_factor_y, reduction=self.downsample_reduction) #downsample all imprint values
-        # add the block_mean_downsampling_tr to the tr list
+    def _add_transformation_to_kwargs(self, kwargs, tr):
         if 'transformation' in kwargs:
             if type(kwargs['transformation']) in (list, tuple):
-                kwargs['transformation'] = list(kwargs['transformation']) + [self.block_mean_downsampling_tr]
+                kwargs['transformation'] = list(kwargs['transformation']) + [tr]
             else:
                 print('')
-                raise AttributeError('Not supportes trasformations: {} type {}'.format(kwargs['transformation'], type(kwargs['transformation'])))
+                raise AttributeError('Not supportes trasformations: {} type {}'.format(kwargs['transformation'],
+                                                                                       type(kwargs['transformation'])))
         else:
-            kwargs['transformation'] = [self.block_mean_downsampling_tr]
-        super().__init__(*args, **kwargs)
+            kwargs['transformation'] = [tr]
 
-    @classmethod
-    def get_name(self):
-        return 'bubble_drawing_downsampled_dataset'
-
-
-class BubbleDrawingDownsampledCombinedDataset(BubbleDrawingDownsampledDataset):
-    """"""
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    @classmethod
-    def get_name(self):
-        return 'bubble_drawing_downsampled_combined_dataset'
-
-    def _get_filecodes(self):
-        # duplicate the filecodes:
-        fcs = np.arange(2 * len(super()._get_filecodes()))
-        return fcs
-
-    def _get_sample(self, indx):
-        # fc: index of the line in the datalegend (self.dl) of the sample
-        true_indx = indx // 2
-        dl_line = self.dl.iloc[true_indx]
-        sample = super()._get_sample(true_indx)
-        if indx % 2 == 0:
-            # sample is the initial
-            sample['imprint'] = sample['init_imprint']
-        else:
-            sample['imprint'] = sample['final_imprint']
-        return sample
-
-# DEBUG:
 
 if __name__ == '__main__':
     # data_name = '/home/mmint/Desktop/drawing_data_cartesian'

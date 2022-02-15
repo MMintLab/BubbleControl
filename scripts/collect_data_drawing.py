@@ -50,7 +50,7 @@ def collect_data_drawing_env_test(save_path, scene_name, num_data=10, prob_axis=
                              drawing_length_limits=drawing_length_limits,
                              grasp_width_limits=grasp_width_limits,
                              wrap_data=True,
-                                       object_name=object_name,
+                                       marker_code=object_name,
                            )
     dc = BubbleEnvDataCollector(env, data_path=save_path, scene_name=scene_name)
     dc.collect_data(num_data=num_data)

@@ -52,12 +52,12 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.controller = None
         super().__init__(*args, **kwargs)
 
-
     def _get_legend_column_names(self):
         """
         Return a list containing the column names of the datalegend
         Returns:
         """
+        # TODO: REcord also all the information like states and observations.
         column_names = ['FileCode', 'SceneName', 'ControllerMethod', 'Score', 'NumSteps', 'NumStepsExpected']
         return column_names
 
@@ -141,7 +141,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
                                            drawing_area_center=(0.55, 0.),
                                            drawing_area_size=(0.15, 0.3),
                                            drawing_length_limits=(0.01, 0.02),
-                                           wrap_data=False,
+                                           wrap_data=True,
                                            grasp_width_limits=(15, 25))
         return env
 
