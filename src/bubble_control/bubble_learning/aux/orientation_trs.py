@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import tf.transformations as tr
-
+import pytorch3d.transforms as batched_trs
 
 class QuaternionToAxis(object):
 
@@ -53,3 +53,22 @@ class QuaternionToAxis(object):
         qxyz = np.sin(theta/2)*axis
         x = np.append(qxyz, qw, axis=-1)
         return x
+
+class EulerToAxis(object):
+    def __init__(self):
+        self.quat_to_axis = QuaternionToAxis()
+
+    def euler_sxyz_to_axis_angle(self, euler_sxyz):
+        # transform an euler encoded rotation to an axis one with 3 values representing the axis of rotation where the modulus is the angle magnitude       
+        euler_reordered = torch.index_select(torch.tensor(euler_sxyz), dim=-1, index=torch.LongTensor([2, 1, 0]))
+        matrix = batched_trs.euler_angles_to_matrix(euler_reordered, 'ZYX')
+        quaternion_wxyz = batched_trs.matrix_to_quaternion(matrix)
+        quaternion = torch.index_select(quaternion_wxyz, dim=-1, index=torch.LongTensor([1, 2, 3, 0]))
+        axis_angle = self.quat_to_axis._tr(quaternion)
+        return axis_angle
+
+    def axis_angle_to_euler_sxyz(self, axis_angle):
+        matrix = batched_trs.axis_angle_to_matrix(axis_angle)
+        euler = batched_trs.matrix_to_euler_angles(matrix, 'ZYX')
+        euler_sxyz = torch.index_select(euler, dim=-1, index=torch.LongTensor([2,1,0]))
+        return euler_sxyz
