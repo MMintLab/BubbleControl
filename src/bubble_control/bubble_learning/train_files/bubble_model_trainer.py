@@ -1,18 +1,11 @@
 import torch
-import os
-import pytorch_lightning as pl
-import argparse
-import numpy as np
-from torch.utils.data import DataLoader
-from pytorch_lightning.loggers import TensorBoardLogger
-from torch.utils.data import random_split
 
-from bubble_control.bubble_learning.models.bubble_dynamics_residual_model import BubbleDynamicsResidualModel
 from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoEncoderModel
-from bubble_control.bubble_learning.models.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel, BubbleFullDynamicsPretrainedAEModel
-from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset, BubbleDrawingDownsampledDataset, BubbleDrawingDownsampledCombinedDataset
-from bubble_control.bubble_learning.datasets.fake_mnist_dataset import FakeMNISTDataset
-from bubble_control.bubble_learning.models.bubble_pca_dynamics_residual_model import BubblePCADynamicsResidualModel
+from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
+from bubble_control.bubble_learning.models.bubble_dynamics_model import BubbleDynamicsModel
+from bubble_control.bubble_learning.models.bubble_linear_dynamics_model import BubbleLinearDynamicsModel
+from bubble_control.bubble_learning.models.bubble_dynamics_end2end_model import BubbleEnd2EndDynamicsModel
+from bubble_control.bubble_learning.datasets.task_combined_dataset import TaskCombinedDataset
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 
 from bubble_control.bubble_learning.train_files.parsed_trainer import ParsedTrainer
@@ -42,7 +35,7 @@ if __name__ == '__main__':
         # 'fc_h_dim' : 100,
         # 'skip_layers' : None,
         # 'num_workers' : 8,
-        'model': BubbleDynamicsResidualModel.get_name(),
+        'model': BubbleDynamicsModel.get_name(),
         'wrench_frame' : 'med_base',
         'tf_frame' : 'grasp_frame',
         'dtype' : torch.float32,
@@ -56,8 +49,8 @@ if __name__ == '__main__':
         'batch_size': int,
         'val_batch_size': int
     }
-    Model = [BubbleDynamicsResidualModel, BubbleAutoEncoderModel, BubblePCADynamicsResidualModel, BubbleDynamicsPretrainedAEModel, BubbleFullDynamicsPretrainedAEModel]
-    Dataset = [BubbleDrawingDataset, FakeMNISTDataset, BubbleDrawingDownsampledDataset, BubbleDrawingDownsampledCombinedDataset]
+    Model = [BubbleAutoEncoderModel, BubbleDynamicsModel, BubbleLinearDynamicsModel, BubbleEnd2EndDynamicsModel]
+    Dataset = [BubbleDrawingDataset, TaskCombinedDataset]
     parsed_trainer = ParsedTrainer(Model, Dataset, default_args=default_params, default_types=default_types)
 
     parsed_trainer.train()

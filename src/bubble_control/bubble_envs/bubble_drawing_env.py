@@ -13,10 +13,11 @@ from geometry_msgs.msg import Pose, Point, Quaternion
 
 from mmint_camera_utils.recorders.data_recording_wrappers import DataSelfSavedWrapper
 from bubble_control.bubble_drawer.bubble_drawer import BubbleDrawer
-from bubble_control.aux.action_sapces import ConstantSpace, AxisBiasedDirectionSpace
+from bubble_control.aux.action_spaces import ConstantSpace, AxisBiasedDirectionSpace
 from bubble_control.bubble_envs.base_env import BubbleBaseEnv
 from victor_hardware_interface_msgs.msg import ControlMode
 from victor_hardware_interface.victor_utils import get_cartesian_impedance_params, send_new_control_mode
+from bubble_control.aux.load_confs import load_object_models
 
 
 class BubbleDrawingBaseEnv(BubbleBaseEnv):
@@ -32,7 +33,9 @@ class BubbleDrawingBaseEnv(BubbleBaseEnv):
         self.drawing_area_size = drawing_area_size
         self.drawing_length_limits = drawing_length_limits
         self.grasp_width_limits = grasp_width_limits
+        self.possible_marker_codes = load_object_models().keys()
         self.marker_code = marker_code
+        assert self.marker_code in self.possible_marker_codes, 'marker code {} not available. Please, select one among: {}'.format(self.marker_code, self.possible_marker_codes)
         self.previous_end_point = None
         self.previous_draw_height = None
         self.drawing_init = False
@@ -47,6 +50,8 @@ class BubbleDrawingBaseEnv(BubbleBaseEnv):
         return 'bubble_drawing_base_env'
 
     def reset(self):
+        self.med.set_control_mode(ControlMode.JOINT_POSITION, vel=0.1)
+        self.med.home_robot()
         self.med.set_grasp_pose()
         _ = input('Press enter to open the gripper and calibrate the bubbles')
         self.med.open_gripper()
@@ -196,7 +201,7 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         # self.med.rotation_along_axis_point_angle(axis=(0,0,1), angle=drawing_direction)
         rot_quat = tr.quaternion_about_axis(angle=drawing_direction, axis=(0, 0, 1))  # rotation about z
         draw_quat = tr.quaternion_multiply(rot_quat, self.med.draw_quat)
-        draw_height = self.med._init_drawing(start_point_i, draw_quat=draw_quat)
+        draw_height = self.med._init_drawing(start_point_i, draw_quat=draw_quat) # TODO: Consider do this in cartesian impedance mode
         # SET Cartesian Impedance
         self._set_cartesian_impedance()
         self.previous_draw_height = copy.deepcopy(draw_height)

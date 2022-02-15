@@ -8,7 +8,7 @@ import copy
 
 from bubble_utils.bubble_data_collection.bubble_data_collection_base import BubbleDataCollectionBase
 from bubble_control.bubble_drawer.bubble_drawer import BubbleDrawer
-from bubble_control.aux.action_sapces import ConstantSpace, AxisBiasedDirectionSpace
+from bubble_control.aux.action_spaces import ConstantSpace, AxisBiasedDirectionSpace
 
 
 class BubbleDrawingDataCollectionBase(BubbleDataCollectionBase):

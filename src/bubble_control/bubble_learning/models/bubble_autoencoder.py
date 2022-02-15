@@ -1,16 +1,7 @@
 import torch
 import torch.nn as nn
-import pytorch_lightning as pl
-import torchvision
-import numpy as np
-import os
-import sys
 
-from bubble_control.bubble_learning.models.aux.fc_module import FCModule
-from bubble_control.bubble_learning.models.aux.img_encoder import ImageEncoder
-from bubble_control.bubble_learning.models.aux.img_decoder import ImageDecoder
-
-from bubble_control.bubble_learning.models.bubble_dynamics_residual_model import BubbleDynamicsResidualModel
+from bubble_control.bubble_learning.models.old.bubble_dynamics_residual_model import BubbleDynamicsResidualModel
 
 
 class BubbleAutoEncoderModel(BubbleDynamicsResidualModel):
