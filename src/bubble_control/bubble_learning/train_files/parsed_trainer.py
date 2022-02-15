@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import random_split
 
-from bubble_utils.bubble_datasets.bubble_dataset_base import DatasetBase, BubbleDatasetBase
+from bubble_utils.bubble_datasets.dataset_base import DatasetBase
 from bubble_utils.bubble_datasets.dataset_transformed import transform_dataset
 from bubble_control.bubble_learning.aux.dataframe_tr import SplitDataFramesTr
 from bubble_control.bubble_learning.aux.remove_nontensor_elements_tr import RemoveNonTensorElementsTr

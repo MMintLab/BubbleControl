@@ -33,9 +33,9 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         # fc: index of the line in the datalegend (self.dl) of the sample
         dl_line = self.dl.iloc[fc]
         scene_name = dl_line['Scene']
-        undef_fc = dl_line['UndeformedFC']
-        init_fc = dl_line['InitialStateFC']
-        final_fc = dl_line['FinalStateFC']
+        undef_fc = int(dl_line['UndeformedFC'])
+        init_fc = int(dl_line['InitialStateFC'])
+        final_fc = int(dl_line['FinalStateFC'])
         # Load initial state:
         init_imprint_r = self._get_depth_imprint(undef_fc=undef_fc, def_fc=init_fc, scene_name=scene_name, camera_name='right')
         init_imprint_l = self._get_depth_imprint(undef_fc=undef_fc, def_fc=init_fc, scene_name=scene_name, camera_name='left')

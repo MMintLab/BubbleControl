@@ -2,7 +2,7 @@ import os
 
 from bubble_utils.bubble_datasets.combined_dataset import CombinedDataset
 from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
-from bubble_pivoting.datasets.bubble_pivoting_dataset import BubblePivotingDataset, BubblePivotingDownsampledCombinedDataset, BubblePivotingDownsampledDataset
+from bubble_pivoting.datasets.bubble_pivoting_dataset import BubblePivotingDataset, BubblePivotingDownsampledDataset
 from bubble_control.bubble_learning.datasets.dataset_wrappers import BubbleImprintCombinedDatasetWrapper
 
 
@@ -40,7 +40,6 @@ class TaskCombinedDataset(CombinedDataset):
         # Make them combined datasets:
         combined_datasets = [BubbleImprintCombinedDatasetWrapper(dataset) for dataset in datasets]
         return combined_datasets
-
 
 
 if __name__ == '__main__':
