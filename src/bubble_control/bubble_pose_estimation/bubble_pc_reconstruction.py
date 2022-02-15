@@ -371,7 +371,7 @@ class BubblePCReconstructorOfflineDepth(BubblePCReconstructorBase):
         imprint_r = self._tr_pc(filtered_imprint_r, frame_r, self.reconstruction_frame)
         imprint_l = self._tr_pc(filtered_imprint_l, frame_l, self.reconstruction_frame)
 
-        if True:
+        if view:
             print('visualizing the imprint on green')
             # view
             imprint_r[:, 3] = 1  # paint it red

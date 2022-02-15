@@ -67,7 +67,6 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         # Action:
         action_fc = fc
         action = self._get_action(action_fc)
-        print(action)
 
         # camera info
         camera_info_r = self._load_camera_info_depth(scene_name=scene_name, camera_name='right', fc=undef_fc)
@@ -173,8 +172,10 @@ class BubbleDrawingDataset(BubbleDatasetBase):
                                                                                        type(kwargs['transformation'])))
         else:
             kwargs['transformation'] = [tr]
+        return kwargs
 
 
+# DEBUG
 if __name__ == '__main__':
     # data_name = '/home/mmint/Desktop/drawing_data_cartesian'
     data_name = '/home/mmint/Desktop/test_drawing_data'

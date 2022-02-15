@@ -3,7 +3,7 @@ import os
 from bubble_utils.bubble_datasets.combined_dataset import CombinedDataset
 from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
 from bubble_pivoting.datasets.bubble_pivoting_dataset import BubblePivotingDataset, BubblePivotingDownsampledCombinedDataset, BubblePivotingDownsampledDataset
-from bubble_control.bubble_learning.datasets.bubble_imprint_combined_wrapper import BubbleImprintCombinedDatasetWrapper
+from bubble_control.bubble_learning.datasets.dataset_wrappers import BubbleImprintCombinedDatasetWrapper
 
 
 class TaskCombinedDataset(CombinedDataset):

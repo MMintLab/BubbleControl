@@ -1,7 +1,7 @@
 import torch
 
 from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoEncoderModel
-from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset, BubbleDrawingDownsampledDataset, BubbleDrawingDownsampledCombinedDataset
+from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
 from bubble_control.bubble_learning.models.bubble_dynamics_model import BubbleDynamicsModel
 from bubble_control.bubble_learning.models.bubble_linear_dynamics_model import BubbleLinearDynamicsModel
 from bubble_control.bubble_learning.models.bubble_dynamics_end2end_model import BubbleEnd2EndDynamicsModel
@@ -50,7 +50,7 @@ if __name__ == '__main__':
         'val_batch_size': int
     }
     Model = [BubbleAutoEncoderModel, BubbleDynamicsModel, BubbleLinearDynamicsModel, BubbleEnd2EndDynamicsModel]
-    Dataset = [BubbleDrawingDataset, BubbleDrawingDownsampledDataset, BubbleDrawingDownsampledCombinedDataset, TaskCombinedDataset]
+    Dataset = [BubbleDrawingDataset, TaskCombinedDataset]
     parsed_trainer = ParsedTrainer(Model, Dataset, default_args=default_params, default_types=default_types)
 
     parsed_trainer.train()
