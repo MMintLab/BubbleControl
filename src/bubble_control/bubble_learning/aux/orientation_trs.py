@@ -64,8 +64,8 @@ class EulerToAxis(object):
         matrix = batched_trs.euler_angles_to_matrix(euler_reordered, 'ZYX')
         quaternion_wxyz = batched_trs.matrix_to_quaternion(matrix)
         quaternion = torch.index_select(quaternion_wxyz, dim=-1, index=torch.LongTensor([1, 2, 3, 0]))
-        axis_angle = self.quat_to_axis._tr(quaternion)
-        return axis_angle
+        axis_angle = self.quat_to_axis._tr(quaternion.numpy())
+        return torch.tensor(axis_angle)
 
     def axis_angle_to_euler_sxyz(self, axis_angle):
         matrix = batched_trs.axis_angle_to_matrix(axis_angle)
