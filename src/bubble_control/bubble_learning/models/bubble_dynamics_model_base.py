@@ -89,6 +89,60 @@ class BubbleDynamicsModelBase(pl.LightningModule):
                  }
         return sizes
 
+    def get_model_input(self, sample):
+        input_key = self.get_input_keys()
+        model_input = [sample[key] for key in input_key]
+        model_input = tuple(model_input)
+        return model_input
+
+    def get_model_output(self, sample):
+        output_keys = self.get_model_output_keys()
+        next_state_map = self.get_next_state_map()
+        model_output = [sample[next_state_map[key]] for key in output_keys]
+        model_output = tuple(model_output)
+        return model_output
+
+    def _get_dyn_model(self):
+        sizes = self._get_sizes()
+        dyn_input_size = sizes['dyn_input_size']
+        dyn_output_size = sizes['dyn_output_size']
+        dyn_model_sizes = [dyn_input_size] + [self.fc_h_dim]*self.num_fcs + [dyn_output_size]
+        dyn_model = FCModule(sizes=dyn_model_sizes, skip_layers=self.skip_layers, activation=self.activation)
+        return dyn_model
+    
+    
+    def _step(self, batch, batch_idx, phase='train'):
+        imprint_t = batch['init_imprint']
+        imprint_next = batch['final_imprint']
+        action = batch['action']
+
+        model_input = self.get_model_input(batch)
+        ground_truth = self.get_model_output(batch)
+
+        model_output = self.forward(*model_input, action)
+
+        loss = self._compute_loss(*model_output, *ground_truth)
+        
+
+        # Log the results: -------------------------
+        self.log('{}_batch'.format(phase), batch_idx)
+        self.log('{}_loss'.format(phase), loss)
+        # Log imprints
+        # TODO: Improve this --
+        imprint_indx = self.get_model_output_keys().index('init_imprint')
+        imprint_next_rec = model_output[imprint_indx]
+        predicted_grid = self._get_image_grid(imprint_next_rec * torch.max(imprint_next_rec) / torch.max(
+            imprint_next))  # trasform so they are in the same range
+        gth_grid = self._get_image_grid(imprint_next)
+        if batch_idx == 0:
+            if self.current_epoch == 0:
+                self.logger.experiment.add_image('init_imprint_{}'.format(phase), self._get_image_grid(imprint_t),
+                                                 self.global_step)
+                self.logger.experiment.add_image('next_imprint_gt_{}'.format(phase), gth_grid, self.global_step)
+            self.logger.experiment.add_image('next_imprint_predicted_{}'.format(phase), predicted_grid,
+                                             self.global_step)
+        return loss
+    
     # Loading Functionalities: -----------------------------------------------------------------------------------------
 
     def _load_autoencoder(self, load_version, data_path, load_epoch=None, load_step=None):

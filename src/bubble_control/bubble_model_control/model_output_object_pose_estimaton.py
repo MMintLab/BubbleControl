@@ -219,7 +219,7 @@ class ModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
         ref_depth_img_r = sample['undef_depth_r'].squeeze()
         ref_depth_img_l = sample['undef_depth_l'].squeeze()
 
-        predicted_imprint = sample['next_imprint']
+        predicted_imprint = sample['final_imprint']
         imprint_pred_r, imprint_pred_l = predicted_imprint
 
         # unprocess the imprints (add padding to move them back to the original shape)
@@ -250,5 +250,11 @@ class ModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
         estimated_pose = np.concatenate([estimated_pos, estimated_quat])
         return estimated_pose
 
+
+class End2EndModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
+    # TODO: Consdier getting rid of the upsampling transformation.
+    def _estimate_pose(self, sample):
+        estimated_pose = sample['final_object_pose'] # TODO: Test that this actually works
+        return estimated_pose
 
 

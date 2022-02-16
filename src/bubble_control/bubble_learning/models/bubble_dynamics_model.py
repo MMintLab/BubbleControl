@@ -29,14 +29,6 @@ class BubbleDynamicsModel(BubbleDynamicsModelBase):
     def get_name(cls):
         return 'bubble_dynamics_model'
 
-    def _get_dyn_model(self):
-        sizes = self._get_sizes()
-        dyn_input_size = sizes['dyn_input_size']
-        dyn_output_size = sizes['dyn_output_size']
-        dyn_model_sizes = [dyn_input_size] + [self.fc_h_dim] * self.num_fcs + [dyn_output_size]
-        dyn_model = FCModule(sizes=dyn_model_sizes, skip_layers=self.skip_layers, activation=self.activation)
-        return dyn_model
-
     def _get_sizes(self):
         sizes = super()._get_sizes()
         dyn_input_size = self.img_embedding_size + sizes['wrench'] + self.object_embedding_size + sizes['position'] + sizes['orientation'] + sizes['action']
@@ -45,41 +37,61 @@ class BubbleDynamicsModel(BubbleDynamicsModelBase):
         sizes['dyn_output_size'] = dyn_output_size
         return sizes
 
-    def forward(self, imprint, wrench, object_model, pos, ori, action):
+    def forward(self, imprint, wrench, pos, ori, object_model, action):
         sizes = self._get_sizes()
         imprint_input_emb = self.autoencoder.encode(imprint) # (B, imprint_emb_size)
         obj_model_emb = self.object_embedding_module(object_model) # (B, imprint_emb_size)
         state_dyn_input = torch.cat([imprint_input_emb, wrench], dim=-1)
-        dyn_input = torch.cat([state_dyn_input, obj_model_emb, pos, ori, action], dim=-1)
+        dyn_input = torch.cat([state_dyn_input, pos, ori, obj_model_emb, action], dim=-1)
         if self.input_batch_norm:
             dyn_input = self.dyn_input_batch_norm(dyn_input)
         state_dyn_output_delta = self.dyn_model(dyn_input)
         state_dyn_output = state_dyn_input + state_dyn_output_delta
         imprint_emb_next, wrench_next = torch.split(state_dyn_output, (self.img_embedding_size, sizes['wrench']), dim=-1)
-        imprint_next = self.autoencoder.decode(imprint)
+        imprint_next = self.autoencoder.decode(imprint_emb_next)
         return imprint_next, wrench_next
+
+    def get_state_keys(self):
+        state_keys = ['init_imprint', 'init_wrench', 'init_pos', 'init_quat',
+                      'object_model']
+        return state_keys
+    
+    def get_input_keys(self):
+        input_keys = ['init_imprint', 'init_wrench', 'init_pos', 'init_quat',
+                      'object_model']
+        return input_keys
+
+    def get_model_output_keys(self):
+        output_keys = ['init_imprint', 'init_wrench']
+        return output_keys
+
+    def get_next_state_map(self):
+        next_state_map = {
+            'init_imprint': 'final_imprint',
+            'init_wrench': 'final_wrench',
+
+        }
+        return next_state_map
 
     def _step(self, batch, batch_idx, phase='train'):
         imprint_t = batch['init_imprint']
-        wrench_t = batch['init_wrench']
-        pos_t = batch['init_pos']
-        ori_t = batch['init_quat']
-        object_model = batch['object_model']
         imprint_next = batch['final_imprint']
-        wrench_next = batch['final_wrench']
-        pos_next = batch['final_pos']
-        ori_next = batch['final_quat']
         action = batch['action']
 
-        imprint_next_rec, wrench_next_rec = self.forward(imprint_t, wrench_t, pos_t, ori_t, object_model, action)
+        model_input = self.get_model_input(batch)
+        ground_truth = self.get_model_output(batch)
 
-        loss = self._compute_loss(imprint_next_rec, wrench_next_rec, imprint_next, wrench_next)
+        model_output = self.forward(*model_input, action)
+
+        loss = self._compute_loss(*model_output, *ground_truth)
 
         # Log the results: -------------------------
         self.log('{}_batch'.format(phase), batch_idx)
         self.log('{}_loss'.format(phase), loss)
         # Log imprints
         # TODO: Improve this --
+        imprint_indx = self.get_model_output_keys().index('init_imprint')
+        imprint_next_rec = model_output[imprint_indx]
         predicted_grid = self._get_image_grid(imprint_next_rec * torch.max(imprint_next_rec) / torch.max(
             imprint_next))  # trasform so they are in the same range
         gth_grid = self._get_image_grid(imprint_next)

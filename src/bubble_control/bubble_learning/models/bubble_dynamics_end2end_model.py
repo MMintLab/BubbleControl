@@ -40,54 +40,54 @@ class BubbleEnd2EndDynamicsModel(BubbleDynamicsModelBase):
                                    activation=self.activation)
         return img_encoder
 
-    def _get_dyn_model(self):
-        sizes = self._get_sizes()
-        dyn_input_size = sizes['dyn_input_size']
-        dyn_output_size = sizes['dyn_output_size']
-        dyn_model_sizes = [dyn_input_size] + [self.fc_h_dim]*self.num_fcs + [dyn_output_size]
-        dyn_model = FCModule(sizes=dyn_model_sizes, skip_layers=self.skip_layers, activation=self.activation)
-        return dyn_model
-
     def _get_sizes(self):
         sizes = super()._get_sizes()
-        dyn_input_size = self.img_embedding_size + sizes['wrench'] + self.object_embedding_size + sizes['position'] + sizes['orientation'] + sizes['action']
-        dyn_output_size = sizes['position'] + sizes['orientation']
         obj_pos_size = np.prod(self.input_sizes['obj_pos'])
         obj_quat_size = np.prod(self.input_sizes['obj_quat'])
-        sizes['dyn_input_size'] = dyn_input_size
-        sizes['dyn_output_size'] = dyn_output_size
         sizes['object_position'] = obj_pos_size
         sizes['object_orientation'] = obj_quat_size
+        dyn_input_size = self.img_embedding_size + sizes['wrench'] + sizes['position'] + sizes['orientation'] + self.object_embedding_size + sizes['action']
+        dyn_output_size = self.img_embedding_size + sizes['wrench'] + sizes['object_position'] + sizes['object_orientation']
+        sizes['dyn_input_size'] = dyn_input_size
+        sizes['dyn_output_size'] = dyn_output_size
         return sizes
 
-    def forward(self, imprint, wrench, object_model, pos, ori, action):
+    def forward(self, imprint, wrench, pos, ori, object_model, action):
         sizes = self._get_sizes()
         obj_pos_size = sizes['object_position']
         obj_quat_size = sizes['object_orientation']
+        obj_pose_size = obj_pos_size + obj_quat_size
+        wrench_size = sizes['wrench']
         imprint_input_emb = self.img_encoder(imprint)
         obj_model_emb = self.object_embedding_module(object_model)  # (B, imprint_emb_size)
-        dyn_input = torch.cat([imprint_input_emb, wrench, obj_model_emb, pos, ori, action], dim=-1)
+        dyn_input = torch.cat([imprint_input_emb, wrench, pos, ori, obj_model_emb, action], dim=-1)
         dyn_output = self.dyn_model(dyn_input)
-        obj_pos, obj_quat = torch.split(dyn_output, [obj_pos_size, obj_quat_size], dim=-1)
-        return obj_pos, obj_quat
+        imprint_emb_next, wrench_next, obj_pose_next  = torch.split(dyn_output, [self.img_embedding_size, wrench_size, obj_pose_size], dim=-1)
+        imprint_next = self.autoencoder.decode(imprint_emb_next)        
+        return imprint_next, wrench_next, obj_pose_next
 
-    def _step(self, batch, batch_idx, phase='train'):
-        imprint_t = batch['init_imprint']
-        wrench_t = batch['init_wrench']
-        pos_t = batch['init_pos']
-        ori_t = batch['init_quat']
-        action = batch['action']
-        obj_pos_gth = batch['obj_pos']
-        obj_ori_gth = batch['obj_quat']
-        object_model = batch['object_model']
-        obj_pos, obj_ori = self.forward(imprint_t, wrench_t, pos_t, ori_t, object_model, action)
+    def get_state_keys(self):
+        state_keys = ['init_imprint', 'init_wrench', 'init_pos', 'init_quat',
+                      'object_model', 'init_object_pose']
+        return state_keys
+    
+    def get_input_keys(self):
+        input_keys = ['init_imprint', 'init_wrench', 'init_pos', 'init_quat',
+                      'object_model']
+        return input_keys
 
-        loss = self._compute_loss(obj_pos, obj_ori, obj_pos_gth, obj_ori_gth, object_model)
+    def get_model_output_keys(self):
+        output_keys = ['init_imprint', 'init_wrench', 'init_object_pose']
+        return output_keys
 
-        self.log('{}_batch'.format(phase), batch_idx)
-        self.log('{}_loss'.format(phase), loss)
+    def get_next_state_map(self):
+        next_state_map = {
+            'init_imprint': 'final_imprint',
+            'init_wrench': 'final_wrench',
+            'init_object_pose': 'final_object_pose'
 
-        return loss
+        }
+        return next_state_map
 
     def _compute_loss(self, obj_pos, obj_ori, obj_pos_gth, obj_ori_gth, obj_model):
         # TODO: Compute the loss based on the object model.

@@ -95,6 +95,12 @@ class BubbleDrawingBaseEnv(BubbleBaseEnv):
                         obs['{}_reference'.format(k)] = v
         return obs
 
+    def _get_object_model(self, object_code):
+        object_models = load_object_models()
+        object_model_pcd = object_models[object_code]
+        object_model = np.asarray(object_model_pcd.points)
+        return object_model
+
     def _get_observation(self):
         obs = {}
         bubble_obs = self._get_bubble_observation()
@@ -102,6 +108,7 @@ class BubbleDrawingBaseEnv(BubbleBaseEnv):
         obs['wrench'] = self._get_wrench()
         obs['tfs'] = self._get_tfs()
         obs['marker'] = self.marker_code
+        obs['object_model'] = self._get_object_model(self.tool)
         # add the reference state
         obs = self._add_bubble_reference_to_observation(obs)
         return obs
