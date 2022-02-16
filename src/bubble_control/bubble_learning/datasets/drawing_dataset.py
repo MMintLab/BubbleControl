@@ -13,7 +13,7 @@ class DrawingDataset(CombinedDataset):
         self.downsample_factor_y = downsample_factor_y
         self.downsample_reduction = downsample_reduction
         datasets = self._get_datasets()
-        super().__init__(datasets, data_name=os.path.join(self.data_dir, 'task_combined_dataset'), **kwargs)
+        super().__init__(datasets, data_name=os.path.join(self.data_dir, 'drawing_dataset'), **kwargs)
 
     @classmethod
     def get_name(self):
