@@ -59,27 +59,55 @@ class BubbleDynamicsModel(BubbleDynamicsModelBase):
         imprint_next = self.autoencoder.decode(imprint)
         return imprint_next, wrench_next
 
+    def get_state_keys(self):
+        state_keys = ['init_imprint', 'init_wrench', 'init_pos', 'init_quat',
+                      'object_model']
+        return state_keys
+
+    def get_model_output_keys(self):
+        output_keys = ['init_imprint', 'init_wrench']
+        return output_keys
+
+    def get_next_state_map(self):
+        next_state_map = {
+            'init_imprint': 'final_imprint',
+            'init_wrench': 'final_wrench',
+
+        }
+        return next_state_map
+
+    def get_model_input(self, sample):
+        state_key = self.get_state_keys()
+        model_input = [sample[key] for key in state_key]
+        model_input = tuple(model_input)
+        return model_input
+
+    def get_model_output(self, sample):
+        output_keys = self.get_model_output_keys()
+        next_state_map = self.get_next_state_map()
+        model_output = [sample[next_state_map[key]] for key in output_keys]
+        model_output = tuple(model_output)
+        return model_output
+
     def _step(self, batch, batch_idx, phase='train'):
         imprint_t = batch['init_imprint']
-        wrench_t = batch['init_wrench']
-        pos_t = batch['init_pos']
-        ori_t = batch['init_quat']
-        object_model = batch['object_model']
         imprint_next = batch['final_imprint']
-        wrench_next = batch['final_wrench']
-        pos_next = batch['final_pos']
-        ori_next = batch['final_quat']
         action = batch['action']
 
-        imprint_next_rec, wrench_next_rec = self.forward(imprint_t, wrench_t, pos_t, ori_t, object_model, action)
+        model_input = self.get_model_input(batch)
+        ground_truth = self.get_model_output(batch)
 
-        loss = self._compute_loss(imprint_next_rec, wrench_next_rec, imprint_next, wrench_next)
+        model_output = self.forward(*model_input, action)
+
+        loss = self._compute_loss(*model_output, *ground_truth)
 
         # Log the results: -------------------------
         self.log('{}_batch'.format(phase), batch_idx)
         self.log('{}_loss'.format(phase), loss)
         # Log imprints
         # TODO: Improve this --
+        imprint_indx = self.get_model_output_keys().index('init_imprint')
+        imprint_next_rec = model_output[imprint_indx]
         predicted_grid = self._get_image_grid(imprint_next_rec * torch.max(imprint_next_rec) / torch.max(
             imprint_next))  # trasform so they are in the same range
         gth_grid = self._get_image_grid(imprint_next)

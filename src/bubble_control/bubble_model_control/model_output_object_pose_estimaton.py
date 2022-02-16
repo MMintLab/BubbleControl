@@ -219,7 +219,7 @@ class ModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
         ref_depth_img_r = sample['undef_depth_r'].squeeze()
         ref_depth_img_l = sample['undef_depth_l'].squeeze()
 
-        predicted_imprint = sample['next_imprint']
+        predicted_imprint = sample['final_imprint']
         imprint_pred_r, imprint_pred_l = predicted_imprint
 
         # unprocess the imprints (add padding to move them back to the original shape)

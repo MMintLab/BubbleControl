@@ -71,6 +71,25 @@ class BubbleEnd2EndDynamicsModel(BubbleDynamicsModelBase):
         obj_pos, obj_quat = torch.split(dyn_output, [obj_pos_size, obj_quat_size], dim=-1)
         return obj_pos, obj_quat
 
+    def get_state_keys(self):
+        # TODO: Edit the correct keys
+        state_keys = ['init_imprint', 'init_wrench', 'init_pos', 'init_quat', 'object_model']
+        return state_keys
+
+    def get_model_output_keys(self):
+        # TODO: Edit the correct keys
+        output_keys = ['init_imprint', 'init_wrench']
+        return output_keys
+
+    def get_next_state_map(self):
+        # TODO: Edit the correct keys
+        next_state_map = {
+            'init_imprint': 'final_imprint',
+            'init_wrench': 'final_wrench',
+
+        }
+        return next_state_map
+
     def _step(self, batch, batch_idx, phase='train'):
         imprint_t = batch['init_imprint']
         wrench_t = batch['init_wrench']

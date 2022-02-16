@@ -16,7 +16,8 @@ class BubbleDynamicsFixedModel(nn.Module):
     def name(self):
         return self.get_name()
 
-    def forward(self, imprint, action):
+    def forward(self, imprint, wrench, object_model, pos, ori, action):
         imprint_next = imprint # Assume that the object will stay at the same place and therefore the imprint will be the same
-        return imprint_next
+        wrench_next = wrench
+        return imprint_next, wrench_next
 
