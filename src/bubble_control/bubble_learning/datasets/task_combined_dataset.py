@@ -41,7 +41,7 @@ class TaskCombinedDataset(CombinedDataset):
         combined_datasets = [BubbleImprintCombinedDatasetWrapper(dataset) for dataset in datasets]
         return combined_datasets
 
-
 if __name__ == '__main__':
     task_combined_dataset = TaskCombinedDataset('/home/mmint/bubble_datasets', only_keys=['imprint'])
-    print(task_combined_dataset[0])
+    d0 = task_combined_dataset[0]
+    print(d0)
