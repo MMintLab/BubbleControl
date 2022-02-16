@@ -67,6 +67,7 @@ class BubbleModelMPPIController(BubbleModelController):
         :param action: (K, action_size) tensor
         :return: cost: (K, 1) tensor
         """
+        # State_t is already next state but state_sample still has old tfs until we apply pack_state_to_sample and action_correction
         states = self._unpack_state_tensor(state_t)
         actions = self._unpack_action_tensor(action_t)
         state_samples = self._pack_state_to_sample(states, self.sample)
@@ -163,8 +164,8 @@ class BubbleModelMPPIController(BubbleModelController):
                 expanded_state.append(state[k])
         position_idx = self.state_keys.index('position')
         orientation_idx = self.state_keys.index('orientation')
-        expanded_state[position_idx], expanded_state[orientation_idx] = self.grasp_pose_correction(expanded_state['position'],
-                                                                                                expanded_state['orientation'],
+        expanded_state[position_idx], expanded_state[orientation_idx] = self.grasp_pose_correction(expanded_state[position_idx],
+                                                                                                expanded_state[orientation_idx],
                                                                                                 action)
         return tuple(expanded_state)
     

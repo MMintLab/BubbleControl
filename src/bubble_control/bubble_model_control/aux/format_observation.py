@@ -18,14 +18,14 @@ def format_observation_sample(obs_sample):
     quaternion = obs_sample['tfs'][obs_sample['tfs']['child_frame'] == 'grasp_frame'][['qx','qy','qz','qw']].values[0]
     quat_to_axis = QuaternionToAxis()
     formatted_obs_sample['init_quat'] = quat_to_axis._tr(quaternion)
+    formatted_obs_sample['init_object_pose'] = np.array([0, 0, 0, 0, 0, 0])
     key_map = {
         'tfs': 'all_tfs',
         'bubble_camera_info_depth_left': 'camera_info_l',
         'bubble_camera_info_depth_right': 'camera_info_r',
         'bubble_depth_img_right_reference': 'undef_depth_r',
         'bubble_depth_img_left_reference': 'undef_depth_l',
-        'object_model': 'object_model',
-        'init_object_pose': 'init_object_pose'
+        'object_model': 'object_model'
     }
     for k_old, k_new in key_map.items():
         formatted_obs_sample[k_new] = obs_sample[k_old]

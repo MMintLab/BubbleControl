@@ -29,14 +29,6 @@ class BubbleDynamicsModel(BubbleDynamicsModelBase):
     def get_name(cls):
         return 'bubble_dynamics_model'
 
-    def _get_dyn_model(self):
-        sizes = self._get_sizes()
-        dyn_input_size = sizes['dyn_input_size']
-        dyn_output_size = sizes['dyn_output_size']
-        dyn_model_sizes = [dyn_input_size] + [self.fc_h_dim] * self.num_fcs + [dyn_output_size]
-        dyn_model = FCModule(sizes=dyn_model_sizes, skip_layers=self.skip_layers, activation=self.activation)
-        return dyn_model
-
     def _get_sizes(self):
         sizes = super()._get_sizes()
         dyn_input_size = self.img_embedding_size + sizes['wrench'] + self.object_embedding_size + sizes['position'] + sizes['orientation'] + sizes['action']
@@ -45,18 +37,18 @@ class BubbleDynamicsModel(BubbleDynamicsModelBase):
         sizes['dyn_output_size'] = dyn_output_size
         return sizes
 
-    def forward(self, imprint, wrench, object_model, pos, ori, action):
+    def forward(self, imprint, wrench, pos, ori, object_model, action):
         sizes = self._get_sizes()
         imprint_input_emb = self.autoencoder.encode(imprint) # (B, imprint_emb_size)
         obj_model_emb = self.object_embedding_module(object_model) # (B, imprint_emb_size)
         state_dyn_input = torch.cat([imprint_input_emb, wrench], dim=-1)
-        dyn_input = torch.cat([state_dyn_input, obj_model_emb, pos, ori, action], dim=-1)
+        dyn_input = torch.cat([state_dyn_input, pos, ori, obj_model_emb, action], dim=-1)
         if self.input_batch_norm:
             dyn_input = self.dyn_input_batch_norm(dyn_input)
         state_dyn_output_delta = self.dyn_model(dyn_input)
         state_dyn_output = state_dyn_input + state_dyn_output_delta
         imprint_emb_next, wrench_next = torch.split(state_dyn_output, (self.img_embedding_size, sizes['wrench']), dim=-1)
-        imprint_next = self.autoencoder.decode(imprint)
+        imprint_next = self.autoencoder.decode(imprint_emb_next)
         return imprint_next, wrench_next
 
     def get_state_keys(self):
@@ -80,19 +72,6 @@ class BubbleDynamicsModel(BubbleDynamicsModelBase):
 
         }
         return next_state_map
-
-    def get_model_input(self, sample):
-        input_key = self.get_input_keys()
-        model_input = [sample[key] for key in input_key]
-        model_input = tuple(model_input)
-        return model_input
-
-    def get_model_output(self, sample):
-        output_keys = self.get_model_output_keys()
-        next_state_map = self.get_next_state_map()
-        model_output = [sample[next_state_map[key]] for key in output_keys]
-        model_output = tuple(model_output)
-        return model_output
 
     def _step(self, batch, batch_idx, phase='train'):
         imprint_t = batch['init_imprint']
