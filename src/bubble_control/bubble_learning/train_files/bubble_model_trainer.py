@@ -6,7 +6,7 @@ from bubble_control.bubble_learning.models.bubble_dynamics_model import BubbleDy
 from bubble_control.bubble_learning.models.bubble_linear_dynamics_model import BubbleLinearDynamicsModel
 from bubble_control.bubble_learning.models.bubble_dynamics_end2end_model import BubbleEnd2EndDynamicsModel
 from bubble_control.bubble_learning.datasets.task_combined_dataset import TaskCombinedDataset
-from bubble_control.bubble_learning.datasets.drawing_combined_dataset import DrawingCombinedDataset
+from bubble_control.bubble_learning.datasets.drawing_dataset import DrawingDataset
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 
 from bubble_control.bubble_learning.train_files.parsed_trainer import ParsedTrainer
@@ -51,7 +51,7 @@ if __name__ == '__main__':
         'val_batch_size': int
     }
     Model = [BubbleAutoEncoderModel, BubbleDynamicsModel, BubbleLinearDynamicsModel, BubbleEnd2EndDynamicsModel]
-    Dataset = [BubbleDrawingDataset, TaskCombinedDataset, DrawingCombinedDataset]
+    Dataset = [BubbleDrawingDataset, TaskCombinedDataset, DrawingDataset]
     parsed_trainer = ParsedTrainer(Model, Dataset, default_args=default_params, default_types=default_types)
 
     parsed_trainer.train()

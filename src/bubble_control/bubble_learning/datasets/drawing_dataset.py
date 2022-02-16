@@ -5,7 +5,7 @@ from bubble_control.bubble_learning.datasets.bubble_drawing_dataset import Bubbl
 from bubble_control.bubble_learning.datasets.dataset_wrappers import BubbleImprintCombinedDatasetWrapper
 
 
-class DrawingCombinedDataset(CombinedDataset):
+class DrawingDataset(CombinedDataset):
 
     def __init__(self, data_dir, downsample_factor_x=7, downsample_factor_y=7, downsample_reduction='mean', **kwargs):
         self.data_dir = data_dir # it assumes that all datasets are found at the same directory called data_dir
@@ -17,7 +17,7 @@ class DrawingCombinedDataset(CombinedDataset):
 
     @classmethod
     def get_name(self):
-        return 'drawing_combined_dataset'
+        return 'drawing_dataset'
 
     def _get_datasets(self):
         datasets = []
@@ -35,10 +35,9 @@ class DrawingCombinedDataset(CombinedDataset):
         datasets.append(drawing_dataset_one_dir)
 
         # Make them combined datasets:
-        combined_datasets = [BubbleImprintCombinedDatasetWrapper(dataset) for dataset in datasets]
-        return combined_datasets
+        return datasets
 
 if __name__ == '__main__':
-    drawing_combined_dataset = DrawingCombinedDataset('/home/mmint/bubble_datasets')
+    drawing_combined_dataset = DrawingDataset('/home/mik/Datasets/bubble_datasets')
     d0 = drawing_combined_dataset[0]
     print(d0)
