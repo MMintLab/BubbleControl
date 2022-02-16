@@ -251,4 +251,9 @@ class ModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
         return estimated_pose
 
 
+class End2EndModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
+    def _estimate_pose(self, sample):
+        estimated_pose = sample['final_object_pose'] # TODO: Test that this actually works
+        return estimated_pose
+
 
