@@ -5,7 +5,7 @@ import copy
 import tf.transformations as tr
 from pytorch_mppi import mppi
 import pytorch3d.transforms as batched_trs
-
+import pdb
 from bubble_control.bubble_model_control.controllers.bubble_controller_base import BubbleModelController
 from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample, get_transformation_matrix, tr_frame, convert_all_tfs_to_tensors
 
@@ -24,6 +24,7 @@ class BubbleModelMPPIController(BubbleModelController):
         self.state_size = None # To be filled with sample information or model information
         self.lambda_ = lambda_
         self.device = self.model.device
+        self.action_container = self._get_action_container()
         self.u_min, self.u_max = self._get_action_space_limits()
         self.U_init = None # Initial trajectory. We initialize it as the mean of the action space. Actions will be drawin as a gaussian noise added to this values.
 
@@ -31,7 +32,11 @@ class BubbleModelMPPIController(BubbleModelController):
         self.original_state_shape = None
         self.state_size = None
         self.controller = None # controller not initialized yet
-        self.action_container, _ = self.env.get_action()
+        self.action_space = self.env.action_space
+        
+    def _get_action_container(self):
+        action_container, _ = self.env.get_action()
+        return action_container
 
     def control(self, state_sample):
         # pack the action to the env format
@@ -86,7 +91,7 @@ class BubbleModelMPPIController(BubbleModelController):
         # Process the action space to get the u_min and u_max
         low_limits = []
         high_limits = []
-        for action_k, action_s in self.env.action_space.items():
+        for action_k, action_s in self.action_space.items():
             low_limits.append(action_s.low.flatten())
             high_limits.append(action_s.high.flatten())
         u_min = np.concatenate(low_limits)

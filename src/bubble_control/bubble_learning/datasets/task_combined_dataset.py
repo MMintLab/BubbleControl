@@ -16,6 +16,10 @@ class TaskCombinedDataset(CombinedDataset):
         datasets = self._get_datasets()
         super().__init__(datasets, data_name=os.path.join(self.data_dir, 'task_combined_dataset'), **kwargs)
 
+    @classmethod
+    def get_name(self):
+        return 'task_combined_dataset'
+
     def _get_datasets(self):
         datasets = []
         drawing_dataset_line = BubbleDrawingDataset(

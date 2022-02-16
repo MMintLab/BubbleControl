@@ -4,6 +4,7 @@ from collections import OrderedDict
 import gym
 import copy
 import tf.transformations as tr
+from bubble_pivoting.pivoting_model_control.aux.pivoting_geometry import get_angle_difference, get_tool_axis
 
 
 class AxisBiasedDirectionSpace(gym.spaces.Space):
@@ -94,6 +95,33 @@ class InitialPivotingPoseSpace(gym.spaces.Space):
         lower_bound = np.array([self.init_x_limits[0], self.init_y_limits[0], self.init_z_limits[0], self.roll_limits[0], 0, np.pi])
         upper_bound = np.array([self.init_x_limits[1], self.init_y_limits[1], self.init_z_limits[1], self.roll_limits[1], 0, np.pi])
         return lower_bound  <= pose <= upper_bound
+    
+class RollSpace(gym.spaces.Space):
+    """
+    Sample initial roll for pivoting
+    """
+    def __init__(self, seed=None):
+        self.high = None
+        self.low = None
+        self.seed = seed
+
+    
+    def sample(self, direction=None):
+        self.tool_axis_gf = get_tool_axis(ref_frame='grasp_frame')
+        tool_axis_wf = get_tool_axis(ref_frame='med_base')
+        if tool_axis_wf[2] > 0:
+            self.tool_axis_gf *= -1
+        self.tool_angle_gf = get_angle_difference(child_axis=self.tool_axis_gf, parent_axis=np.array([0, 0, 1]))
+        if direction is None:
+            direction = np.random.choice([-1,1], 1)
+            self.high = np.pi + np.pi/4 - self.tool_angle_gf
+            self.low = np.pi - np.pi/4 - self.tool_angle_gf
+            roll = np.pi + direction * np.pi/4 - self.tool_angle_gf
+        else:
+            roll = np.pi + direction * np.pi/4 - self.tool_angle_gf
+            self.high = roll
+            self.low = roll
+        return roll
 
 
 class ConstantSpace(gym.spaces.Space):

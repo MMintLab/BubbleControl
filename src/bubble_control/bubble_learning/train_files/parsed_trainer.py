@@ -255,7 +255,7 @@ class ParsedTrainer(object):
             gpu = not self.args['no_gpu']
         if torch.cuda.is_available() and gpu:
             gpus = 1
-        trainer = pl.Trainer(gpus=gpus, max_epochs=self.args['max_epochs'], logger=logger)
+        trainer = pl.Trainer(gpus=gpus, max_epochs=self.args['max_epochs'], logger=logger, log_every_n_steps=1)
         trainer.fit(self.model, self.train_loader, self.val_loader)
 
     def _get_dataset_constructor_arguments(self, Dataset):
