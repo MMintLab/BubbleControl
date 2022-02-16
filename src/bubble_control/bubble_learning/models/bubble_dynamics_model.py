@@ -63,6 +63,11 @@ class BubbleDynamicsModel(BubbleDynamicsModelBase):
         state_keys = ['init_imprint', 'init_wrench', 'init_pos', 'init_quat',
                       'object_model']
         return state_keys
+    
+    def get_input_keys(self):
+        input_keys = ['init_imprint', 'init_wrench', 'init_pos', 'init_quat',
+                      'object_model']
+        return input_keys
 
     def get_model_output_keys(self):
         output_keys = ['init_imprint', 'init_wrench']
@@ -77,8 +82,8 @@ class BubbleDynamicsModel(BubbleDynamicsModelBase):
         return next_state_map
 
     def get_model_input(self, sample):
-        state_key = self.get_state_keys()
-        model_input = [sample[key] for key in state_key]
+        input_key = self.get_input_keys()
+        model_input = [sample[key] for key in input_key]
         model_input = tuple(model_input)
         return model_input
 

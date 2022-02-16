@@ -17,13 +17,17 @@ def to_tensor(x, **kwargs):
         x_t = x
     return x_t
 
+def default_grasp_pose_correction(position, orientation, action):
+    return position, orientation
 
 class BubbleModelMPPIController(BubbleModelController):
     """
     Batched controller with a batched pose estimation
     """
-    def __init__(self, model, env, object_pose_estimator, cost_function, action_model, state_trs=None, num_samples=100, horizon=3, lambda_=0.01, noise_sigma=None, _noise_sigma_value=0.2):
+    def __init__(self, model, env, object_pose_estimator, cost_function, action_model, grasp_pose_correction=default_grasp_pose_correction, 
+                 state_trs=None, num_samples=100, horizon=3, lambda_=0.01, noise_sigma=None, _noise_sigma_value=0.2):
         self.action_model = action_model
+        self.grasp_pose_correction = grasp_pose_correction
         self.num_samples = num_samples
         self.horizon = horizon
         super().__init__(model, env, object_pose_estimator, cost_function, state_trs=state_trs)
@@ -34,9 +38,10 @@ class BubbleModelMPPIController(BubbleModelController):
         self.device = self.model.device
         self.u_min, self.u_max = self._get_action_space_limits()
         self.U_init = None # Initial trajectory. We initialize it as the mean of the action space. Actions will be drawin as a gaussian noise added to this values.
-        self.state_keys = self._get_state_keys()
-        self.model_output_keys = self._get_model_output_keys()
-        self.next_state_map = self._get_next_state_map()
+        self.input_keys = self.model.get_input_keys()
+        self.state_keys = self.model.get_state_keys()
+        self.model_output_keys = self.model.get_model_output_keys()
+        self.next_state_map = self.model.get_next_state_map()
         self.state_size = None
         self.original_state_shape = None
         self.sample = None # Container to share sample across functions
@@ -156,8 +161,24 @@ class BubbleModelMPPIController(BubbleModelController):
                 expanded_state.append(output[output_indx])
             else:
                 expanded_state.append(state[k])
-
-        return expanded_state
+        position_idx = self.state_keys.index('position')
+        orientation_idx = self.state_keys.index('orientation')
+        expanded_state[position_idx], expanded_state[orientation_idx] = self.grasp_pose_correction(expanded_state['position'],
+                                                                                                expanded_state['orientation'],
+                                                                                                action)
+        return tuple(expanded_state)
+    
+    def _extract_input_from_state(self, state):
+        """
+        Given
+        :param state: Input state
+        :return: model_input (state with just the input keys)
+        """
+        model_input = []
+        for i, k in enumerate(self.state_keys):
+            if k in self.input_keys:
+                model_input.append(state[i])
+        return tuple(model_input)
 
     def _unpack_action_tensor(self, action_t):
         action = action_t
@@ -181,6 +202,7 @@ class BubbleModelMPPIController(BubbleModelController):
         """
         state = self._unpack_state_tensor(state_t)
         action = self._unpack_action_tensor(action_t)
+        model_input = self._extract_input_from_state(state)
         output = self.model(*state, action)
         next_state = self._expand_output_to_state(output, state, action)
         next_state_t = self._pack_state_to_tensor(next_state)
