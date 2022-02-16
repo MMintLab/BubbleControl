@@ -252,6 +252,7 @@ class ModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
 
 
 class End2EndModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase):
+    # TODO: Consdier getting rid of the upsampling transformation.
     def _estimate_pose(self, sample):
         estimated_pose = sample['final_object_pose'] # TODO: Test that this actually works
         return estimated_pose
