@@ -32,7 +32,7 @@ class BubbleDynamicsModelBase(pl.LightningModule):
         self.load_norm = load_norm
         self.freeze_object_module = freeze_object_module
 
-        self.object_embedding_module = self._load_object_embedding_module(object_embedding_size=self.object_embedding_size, freeze=self.freeze_pointnet)
+        self.object_embedding_module = self._load_object_embedding_module(object_embedding_size=self.object_embedding_size, freeze=self.freeze_object_module)
         self.autoencoder = self._load_autoencoder(load_version=load_autoencoder_version, data_path=dataset_params['data_name'])
         self.autoencoder.freeze()
         self.img_embedding_size = self.autoencoder.img_embedding_size # load it from the autoencoder
