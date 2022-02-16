@@ -7,8 +7,8 @@ from bubble_control.bubble_learning.datasets.dataset_wrappers import BubbleImpri
 
 class DrawingDataset(CombinedDataset):
 
-    def __init__(self, data_dir, downsample_factor_x=7, downsample_factor_y=7, downsample_reduction='mean', **kwargs):
-        self.data_dir = data_dir # it assumes that all datasets are found at the same directory called data_dir
+    def __init__(self, data_name, downsample_factor_x=7, downsample_factor_y=7, downsample_reduction='mean', **kwargs):
+        self.data_dir = data_name # it assumes that all datasets are found at the same directory called data_dir
         self.downsample_factor_x = downsample_factor_x
         self.downsample_factor_y = downsample_factor_y
         self.downsample_reduction = downsample_reduction
