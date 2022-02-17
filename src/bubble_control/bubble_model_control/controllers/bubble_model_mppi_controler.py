@@ -20,6 +20,7 @@ def to_tensor(x, **kwargs):
 def default_grasp_pose_correction(position, orientation, action):
     return position, orientation
 
+
 class BubbleModelMPPIController(BubbleModelController):
     """
     Batched controller with a batched pose estimation
