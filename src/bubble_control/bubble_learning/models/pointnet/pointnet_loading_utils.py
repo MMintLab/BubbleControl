@@ -53,7 +53,7 @@ def get_pretrained_pointnet2_object_embeding(obj_embedding_size=10, freeze=False
     return model
 
 
-def get_pretrained_pointnet_classifier(freeze=False, partial_load=False):
+def get_pretrained_pointnet_classifier(freeze=False, partial_load=True):
     model = PointNetClassifier()
     model = load_pointnet_model(model, freeze=freeze, partial_load=partial_load)
     if freeze:
