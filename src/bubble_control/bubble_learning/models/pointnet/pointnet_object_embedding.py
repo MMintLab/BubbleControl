@@ -7,6 +7,7 @@ from bubble_control.bubble_learning.models.pointnet.pointnet_loading_utils impor
 
 class PointNetObjectEmbedding(nn.Module):
     def __init__(self, obj_embedding_size, freeze_pointnet=True):
+        super().__init__()
         self.obj_embedding_size = obj_embedding_size
         self.pointnet_classifier = get_pretrained_pointnet_classifier(freeze=freeze_pointnet)
         self.embedding_fc = nn.Linear(256, self.obj_embedding_size)
