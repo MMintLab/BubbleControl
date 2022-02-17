@@ -31,13 +31,12 @@ def load_pointnet_model(pointnet_model, freeze=False, partial_load=False, pretra
         # load all state_dict
         pointnet_model.load_state_dict(checkpoint)
     if freeze:
-        for name, param in pointnet_model.named_parameters():
+        for param_name, param in pointnet_model.named_parameters():
             if partial_load:
-                if name in checkpoint['model_state_dict']:
+                if param_name in checkpoint['model_state_dict']:
                     param.requires_grad = False
             else:
                 param.requires_grad = False
-
     return pointnet_model
 
 
