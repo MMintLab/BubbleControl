@@ -147,6 +147,6 @@ if __name__ == '__main__':
     height = 0.12
     models = create_object_models(radius=radius, height=height)
     # Add marker models
-    marker_models = create_marker_models(num_points=100)
+    marker_models = create_marker_models(num_points=150)
     models.update(marker_models)
     save_object_models(models)
