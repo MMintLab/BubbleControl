@@ -52,3 +52,7 @@ class PointNetClassifier(nn.Module):
     @classmethod
     def get_name(cls):
         return 'pointnet_classifier'
+
+    @property
+    def name(self):
+        return self.get_name()
