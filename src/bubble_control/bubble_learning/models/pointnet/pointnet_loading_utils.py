@@ -4,6 +4,7 @@ import torch
 
 import bubble_control.bubble_learning.models.pointnet as pointnet_pkg
 from bubble_control.bubble_learning.models.pointnet.pointnet2_cls_msg import PointNet2ClsMsg, PointNet2ObjectEmbedding
+from bubble_control.bubble_learning.models.pointnet.pointnet_classifier import PointNetClassifier
 
 
 pointnet_pkg_path = os.path.dirname(os.path.abspath(pointnet_pkg.__file__))
@@ -52,6 +53,12 @@ def get_pretrained_pointnet2_object_embeding(obj_embedding_size=10, freeze=False
     return model
 
 
+def get_pretrained_pointnet_classifier(freeze=False, partial_load=False):
+    model = PointNetClassifier()
+    model = load_pointnet_model(model, freeze=freeze, partial_load=partial_load)
+    if freeze:
+        model.eval()
+    return model
 
 # DEBUG:
 if __name__ == '__main__':
