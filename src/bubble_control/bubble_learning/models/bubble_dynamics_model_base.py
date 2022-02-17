@@ -16,7 +16,7 @@ from bubble_control.bubble_learning.models.aux.img_encoder import ImageEncoder
 from bubble_control.bubble_learning.models.aux.img_decoder import ImageDecoder
 from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoEncoderModel
 from bubble_control.bubble_learning.models.pointnet.pointnet_loading_utils import get_pretrained_pointnet2_object_embeding
-
+from bubble_control.bubble_learning.models.pointnet.pointnet_object_embedding import PointNetObjectEmbedding
 
 class BubbleDynamicsModelBase(pl.LightningModule):
     def __init__(self, input_sizes, load_autoencoder_version=31, object_embedding_size=10, num_fcs=2, fc_h_dim=100, skip_layers=None, lr=1e-4, dataset_params=None, load_norm=False, activation='relu', freeze_object_module=True):
@@ -164,7 +164,7 @@ class BubbleDynamicsModelBase(pl.LightningModule):
         return model
 
     def _load_object_embedding_module(self, object_embedding_size, freeze=True):
-        pointnet_model = get_pretrained_pointnet2_object_embeding(obj_embedding_size=object_embedding_size, freeze=freeze)
+        pointnet_model = PointNetObjectEmbedding(obj_embedding_size=object_embedding_size, freeze_pointnet=freeze)
         # Expected input shape (BatchSize, NumPoints, NumChannels), where NumChannels=3 (xyz)
         return pointnet_model
 

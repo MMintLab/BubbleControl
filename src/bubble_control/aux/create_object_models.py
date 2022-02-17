@@ -110,7 +110,7 @@ def create_object_models(radius=0.005, height=0.12):
 
 
 def generate_general_cylinder_marker_model(width_1, width_2, length, num_points=3000):
-    point_per_circle = int(num_points*0.02)
+    point_per_circle = int(num_points*0.08)
     num_circles = int(num_points/point_per_circle)
     # x axis is the tool axis
     diameters = np.linspace(width_1, width_2, num_circles)
@@ -127,7 +127,7 @@ def generate_general_cylinder_marker_model(width_1, width_2, length, num_points=
     return marker_cylinder_model
 
 
-def create_marker_models(num_points=3000):
+def create_marker_models(num_points=100):
     marker_models = {}
     marker_params_df = load_marker_params()
     for i, row_i in marker_params_df.iterrows():
@@ -147,6 +147,6 @@ if __name__ == '__main__':
     height = 0.12
     models = create_object_models(radius=radius, height=height)
     # Add marker models
-    marker_models = create_marker_models()
+    marker_models = create_marker_models(num_points=150)
     models.update(marker_models)
     save_object_models(models)

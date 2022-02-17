@@ -8,8 +8,8 @@ from bubble_control.bubble_learning.datasets.dataset_wrappers import BubbleImpri
 
 class TaskCombinedDataset(CombinedDataset):
 
-    def __init__(self, data_dir, downsample_factor_x=7, downsample_factor_y=7, downsample_reduction='mean', **kwargs):
-        self.data_dir = data_dir # it assumes that all datasets are found at the same directory called data_dir
+    def __init__(self, data_name, downsample_factor_x=7, downsample_factor_y=7, downsample_reduction='mean', **kwargs):
+        self.data_dir = data_name # it assumes that all datasets are found at the same directory called data_dir
         self.downsample_factor_x = downsample_factor_x
         self.downsample_factor_y = downsample_factor_y
         self.downsample_reduction = downsample_reduction
@@ -45,7 +45,7 @@ class TaskCombinedDataset(CombinedDataset):
         combined_datasets = [BubbleImprintCombinedDatasetWrapper(dataset) for dataset in datasets]
         return combined_datasets
 
-
 if __name__ == '__main__':
     task_combined_dataset = TaskCombinedDataset('/home/mmint/bubble_datasets', only_keys=['imprint'])
-    print(task_combined_dataset[0])
+    d0 = task_combined_dataset[0]
+    print(d0)
