@@ -21,8 +21,7 @@ class Transformer(nn.Module):
 
         # Initialize identity matrix on the GPU (do this here so it only
         # happens once)
-        self.identity = grad.Variable(
-            torch.eye(self.K).double().view(-1).cuda())
+        self.identity = nn.Parameter(torch.eye(self.K).double().view(-1), requires_grad=False)
 
         # First embedding block
         self.block1 = nn.Sequential(
