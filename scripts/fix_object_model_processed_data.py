@@ -14,11 +14,12 @@ class ReplaceObjectTr(object):
         self.new_object_models = new_object_models
 
     def __call__(self, sample):
-        object_code = sample['object_code']
+        sample_tr = sample.copy()
+        object_code = sample_tr['object_code']
         new_object_model_pcd = self.new_object_models[object_code]
         new_object_model = np.asarray(new_object_model_pcd.points)
-        sample['object_model'] = new_object_model
-        return sample
+        sample_tr['object_model'] = new_object_model
+        return sample_tr
 
 
 def replace_drawing_object_models(data_name):

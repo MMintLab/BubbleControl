@@ -110,7 +110,7 @@ def create_object_models(radius=0.005, height=0.12):
 
 
 def generate_general_cylinder_marker_model(width_1, width_2, length, num_points=3000):
-    point_per_circle = int(num_points*0.02)
+    point_per_circle = int(num_points*0.08)
     num_circles = int(num_points/point_per_circle)
     # x axis is the tool axis
     diameters = np.linspace(width_1, width_2, num_circles)
