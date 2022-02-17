@@ -1,5 +1,6 @@
 import torch
 import os
+import numpy as np
 from bubble_utils.bubble_datasets.transform_processed_dataset import transform_processed_dataset
 from bubble_control.aux.load_confs import load_object_models as load_object_models_drawing
 from bubble_pivoting.aux.load_confs import load_object_models as load_object_models_pivoting
@@ -14,7 +15,8 @@ class ReplaceObjectTr(object):
 
     def __call__(self, sample):
         object_code = sample['object_code']
-        new_object_model = self.new_object_models[object_code]
+        new_object_model_pcd = self.new_object_models[object_code]
+        new_object_model = np.asarray(new_object_model_pcd.points)
         sample['object_model'] = new_object_model
         return sample
 
