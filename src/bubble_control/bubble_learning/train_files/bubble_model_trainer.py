@@ -8,8 +8,9 @@ from bubble_control.bubble_learning.models.bubble_dynamics_end2end_model import 
 from bubble_control.bubble_learning.datasets.task_combined_dataset import TaskCombinedDataset
 from bubble_control.bubble_learning.datasets.drawing_dataset import DrawingDataset
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
+from bubble_control.bubble_learning.datasets.fixing_datasets.fix_object_pose_encoding_processed_data import EncodeObjectPoseAsAxisAngleTr
 from bubble_pivoting.datasets.bubble_pivoting_dataset import BubblePivotingDownsampledDataset
-
+from bubble_control.bubble_learning.models.object_pose_dynamics_model import ObjectPoseDynamicsModel
 
 from bubble_control.bubble_learning.train_files.parsed_trainer import ParsedTrainer
 
@@ -17,7 +18,7 @@ from bubble_control.bubble_learning.train_files.parsed_trainer import ParsedTrai
 if __name__ == '__main__':
 
     # params:
-    trs = [QuaternionToAxis()]
+    trs = [QuaternionToAxis(), EncodeObjectPoseAsAxisAngleTr()]
     default_params = {
         'data_name' : '/home/mmint/Desktop/drawing_data_cartesian',
         # 'batch_size' : None,
@@ -53,7 +54,7 @@ if __name__ == '__main__':
         'batch_size': int,
         'val_batch_size': int
     }
-    Model = [BubbleAutoEncoderModel, BubbleDynamicsModel, BubbleLinearDynamicsModel, BubbleEnd2EndDynamicsModel]
+    Model = [BubbleAutoEncoderModel, BubbleDynamicsModel, BubbleLinearDynamicsModel, BubbleEnd2EndDynamicsModel, ObjectPoseDynamicsModel]
     Dataset = [BubbleDrawingDataset, TaskCombinedDataset, DrawingDataset, BubblePivotingDownsampledDataset]
     parsed_trainer = ParsedTrainer(Model, Dataset, default_args=default_params, default_types=default_types)
 

@@ -24,7 +24,7 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
 
     @classmethod
     def get_name(cls):
-        return 'bubble_end2end_dynamics_model'
+        return 'object_pose_dynamics_model'
 
     def _get_img_encoder(self):
         sizes = self._get_sizes()
