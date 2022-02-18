@@ -67,7 +67,7 @@ class SplitPoseTr(object):
 
     def _tr_inv(self, pos, quat):
         if torch.is_tensor(pos) and torch.is_tensor(quat):
-            pose = torch.cat([pos, quat], dim=-2)
+            pose = torch.cat([pos, quat], dim=-1)
         else:
             pose = np.concatenate([pos, quat], axis=-1)
         return pose
