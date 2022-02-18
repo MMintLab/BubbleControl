@@ -21,7 +21,8 @@ from bubble_control.bubble_learning.models.dynamics_model_base import DynamicsMo
 
 
 class BubbleDynamicsModelBase(DynamicsModelBase):
-    def __init__(self, *args, load_autoencoder_version=31, num_imprints_to_log=25, **kwargs):
+    def __init__(self, *args, load_autoencoder_version=31, num_imprints_to_log=40, **kwargs):
+        # Note: the imprints to log are in rows of 8
         self.num_imprints_to_log = num_imprints_to_log
         super().__init__(*args, **kwargs)
 
