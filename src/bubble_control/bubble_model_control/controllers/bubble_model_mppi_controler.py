@@ -5,10 +5,13 @@ import copy
 import tf.transformations as tr
 from pytorch_mppi import mppi
 import pytorch3d.transforms as batched_trs
+import matplotlib
+matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
 import pdb
 from bubble_control.bubble_model_control.controllers.bubble_controller_base import BubbleModelController
 from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample, get_transformation_matrix, tr_frame, convert_all_tfs_to_tensors
-
+from bubble_pivoting.pivoting_model_control.aux.pivoting_geometry import get_angle_difference, check_goal_position, get_tool_axis, get_tool_angle_gf
 import pdb
 def to_tensor(x, **kwargs):
     if not torch.is_tensor(x):
@@ -26,7 +29,7 @@ class BubbleModelMPPIController(BubbleModelController):
     Batched controller with a batched pose estimation
     """
     def __init__(self, model, env, object_pose_estimator, cost_function, action_model, grasp_pose_correction=default_grasp_pose_correction, 
-                 state_trs=None, num_samples=100, horizon=3, lambda_=0.01, noise_sigma=None, _noise_sigma_value=0.2):
+                 state_trs=None, num_samples=100, horizon=3, lambda_=0.01, noise_sigma=None, _noise_sigma_value=0.2, debug=False):
         self.action_model = action_model
         self.grasp_pose_correction = grasp_pose_correction
         self.num_samples = num_samples
@@ -37,6 +40,7 @@ class BubbleModelMPPIController(BubbleModelController):
         self._noise_sigma_value = _noise_sigma_value
         self.lambda_ = lambda_
         self.device = self.model.device
+        self.debug = debug
         self.action_container = self._get_action_container()
         self.u_min, self.u_max = self._get_action_space_limits()
         self.U_init = None # Initial trajectory. We initialize it as the mean of the action space. Actions will be drawin as a gaussian noise added to this values.
@@ -156,7 +160,7 @@ class BubbleModelMPPIController(BubbleModelController):
                 output_indx = self.model_output_keys.index(k)
                 expanded_state.append(output[output_indx])
             else:
-                expanded_state.append(state[k])
+                expanded_state.append(state[i])
         position_idx = self.state_keys.index('init_pos')
         orientation_idx = self.state_keys.index('init_quat')
         expanded_state[position_idx], expanded_state[orientation_idx] = self.grasp_pose_correction(expanded_state[position_idx],
@@ -199,7 +203,12 @@ class BubbleModelMPPIController(BubbleModelController):
         state = self._unpack_state_tensor(state_t)
         action = self._unpack_action_tensor(action_t)
         model_input = self._extract_input_from_state(state)
+        if len(action.shape) < 2:
+            action = action.unsqueeze(0)
         output = self.model(*model_input, action)
+        if self.debug and action.shape[0] < 2:
+            self.state_prev = state
+            self.prediction = output
         next_state = self._expand_output_to_state(output, state, action)
         next_state_t = self._pack_state_to_tensor(next_state)
         return next_state_t
@@ -252,8 +261,34 @@ class BubbleModelMPPIController(BubbleModelController):
         state = self._unpack_state_sample(state_sample)
         state_t = self._pack_state_to_tensor(state)
         action = self.controller.command(state_t)
+        if self.debug:
+            self._check_prediction(state_t, action)
         return action
 
+    def _check_prediction(self, state_t, action):
+        next_state_t = self.dynamics(state_t.type(torch.float), action)
+        next_state = self._unpack_state_tensor(next_state_t)
+        next_state_sample = self._pack_state_to_sample(next_state, self.sample)
+        next_state_sample = self._action_correction(next_state_sample, action)
+        estimated_pose = self.object_pose_estimator.estimate_pose(next_state_sample)
+        tool_angle_gf = get_tool_angle_gf(estimated_pose, next_state_sample)
+        print('Predicted tool angle gf after action: ', tool_angle_gf)
+
+    def visualize_prediction(self, obs_sample_next):
+        formatted_obs_sample = self.get_downsampled_obs(obs_sample_next)
+        state_next = self._unpack_state_sample(formatted_obs_sample)
+        fig, axes = plt.subplots(nrows=2, ncols=3)
+        axes[0][0].imshow(self.state_prev[0][0,0], cmap='jet')
+        axes[1][0].imshow(self.state_prev[0][0,1], cmap='jet')
+        axes[0][1].imshow(self.prediction[0][0,0].detach().numpy(), cmap='jet')
+        axes[1][1].imshow(self.prediction[0][0,1].detach().numpy(), cmap='jet')
+        axes[0][2].imshow(state_next[0][0], cmap='jet')
+        axes[1][2].imshow(state_next[0][1], cmap='jet')
+        axes[0][0].set_title('Previus imprint')
+        axes[0][1].set_title('Predicted next imprint')
+        axes[0][2].set_title('Gth next imprint')
+        plt.show()     
+        
     def _action_correction(self, state_samples, actions):
         # actions: tensor of shape (N, action_dim)
         state_samples_corrected = self.action_model(state_samples, actions)

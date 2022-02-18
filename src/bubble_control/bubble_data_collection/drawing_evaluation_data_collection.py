@@ -10,7 +10,7 @@ from victor_hardware_interface_msgs.msg import ControlMode
 
 from bubble_control.bubble_model_control.model_output_object_pose_estimaton import \
     BatchedModelOutputObjectPoseEstimation
-from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIBatchedController
+from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIController
 from bubble_control.bubble_envs.bubble_drawing_env import BubbleOneDirectionDrawingEnv
 
 from bubble_control.bubble_model_control.drawing_action_models import drawing_action_model_one_dir
@@ -29,7 +29,7 @@ from mmint_camera_utils.recorders.recording_utils import record_image_color
 class DrawingEvaluationDataCollection(DataCollectorBase):
 
     def __init__(self, *args, scene_name='drawing_evaluation', random_action=False, fixed_model=False, imprint_selection='percentile',
-                                                     imprint_percentile=0.005, **kwargs):
+                                                     imprint_percentile=0.005, debug=False, **kwargs):
         self.scene_name = scene_name
         self.object_name = 'marker'
         self.num_samples = 100
@@ -42,6 +42,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.random_action = random_action
         self.imprint_selection = imprint_selection
         self.imprint_percentile = imprint_percentile
+        self.debug = debug
         self.data_name = '/home/mmint/Desktop/drawing_data_one_direction'
         self.load_version = 0
         self.model = self._get_model()
@@ -125,6 +126,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             model = load_model_version(Model, self.data_name, self.load_version)
         else:
             model = BubbleDynamicsFixedModel()
+        model.eval()
 
         return model
 
@@ -146,10 +148,10 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         return env
 
     def _get_controller(self):
-        controller = BubbleModelMPPIBatchedController(self.model, self.env, self.ope, vertical_tool_cost_function,
-                                                      action_model=drawing_action_model_one_dir,
-                                                      num_samples=self.num_samples, horizon=self.horizon, noise_sigma=None,
-                                                      _noise_sigma_value=.3)
+        controller = BubbleModelMPPIController(self.model, self.env, self.ope, vertical_tool_cost_function,
+                                                action_model=drawing_action_model_one_dir, 
+                                                num_samples=self.num_samples, horizon=self.horizon, noise_sigma=None,
+                                                _noise_sigma_value=.3, debug=self.debug)
         return controller
 
     def _get_controller_name(self):
@@ -189,6 +191,8 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
                     action[k] = action_raw[i]
             # print('Action:', action)
             obs_sample_raw, reward, done, info = self.env.step(action)
+            if self.debug:
+                self.controller.visualize_prediction(obs_sample_raw)
             if done:
                 return step_i
         return num_steps

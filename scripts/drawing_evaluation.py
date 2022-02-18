@@ -12,6 +12,7 @@ if __name__ == '__main__':
     parser.add_argument('--scene_name', type=str, default='drawing_data', help='scene name for the data. For organization purposes')
     parser.add_argument('--random_action', action='store_true', help='impedance mode')
     parser.add_argument('--fixed_model', action='store_true', help='reactive mode -- adjust tool position to be straight when we start drawing')
+    parser.add_argument('--debug', type=bool, default=False, help='Whether or not to visualize model predictions')
     # TODO: Add more parameters if needed
 
     args = parser.parse_args()
@@ -21,8 +22,9 @@ if __name__ == '__main__':
     num_data = args.num_data
     random_action = args.random_action
     fixed_model = args.fixed_model
+    debug = args.debug
 
     rospy.init_node('test_evaluation_drawing')
 
-    dc = DrawingEvaluationDataCollection(data_path=save_path, scene_name=scene_name, fixed_model=fixed_model, random_action=random_action)
+    dc = DrawingEvaluationDataCollection(data_path=save_path, scene_name=scene_name, fixed_model=fixed_model, random_action=random_action, debug=debug)
     dc.collect_data(num_data=num_data)

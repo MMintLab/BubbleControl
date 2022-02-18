@@ -59,12 +59,14 @@ class EulerToAxis(object):
         self.quat_to_axis = QuaternionToAxis()
 
     def euler_sxyz_to_axis_angle(self, euler_sxyz):
-        # transform an euler encoded rotation to an axis one with 3 values representing the axis of rotation where the modulus is the angle magnitude       
-        euler_reordered = torch.index_select(torch.tensor(euler_sxyz), dim=-1, index=torch.LongTensor([2, 1, 0]))
+        # transform an euler encoded rotation to an axis one with 3 values representing the axis of rotation where the modulus is the angle magnitude
+        if euler_sxyz.type == np.ndarray:
+            euler_sxyz = torch.from_numpy(euler_sxyz, requires_grad=False)
+        euler_reordered = torch.index_select(euler_sxyz, dim=-1, index=torch.LongTensor([2, 1, 0]))
         matrix = batched_trs.euler_angles_to_matrix(euler_reordered, 'ZYX')
         quaternion_wxyz = batched_trs.matrix_to_quaternion(matrix)
         quaternion = torch.index_select(quaternion_wxyz, dim=-1, index=torch.LongTensor([1, 2, 3, 0]))
-        axis_angle = torch.tensor(self.quat_to_axis._tr(quaternion.numpy()))
+        axis_angle = torch.from_numpy(self.quat_to_axis._tr(quaternion.detach().numpy()))
         return axis_angle
 
     def axis_angle_to_euler_sxyz(self, axis_angle):
