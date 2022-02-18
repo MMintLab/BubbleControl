@@ -29,13 +29,14 @@ class BubbleDynamicsModel(BubbleDynamicsModelBase):
     def get_name(cls):
         return 'bubble_dynamics_model'
 
-    def _get_sizes(self):
-        sizes = super()._get_sizes()
-        dyn_input_size = self.img_embedding_size + sizes['wrench'] + self.object_embedding_size + sizes['position'] + sizes['orientation'] + sizes['action']
-        dyn_output_size = self.img_embedding_size + sizes['wrench']
-        sizes['dyn_input_size'] = dyn_input_size
-        sizes['dyn_output_size'] = dyn_output_size
-        return sizes
+    def _get_dyn_input_size(self, sizes):
+        dyn_input_size = self.img_embedding_size + sizes['init_wrench'] + sizes['init_pos'] + sizes[
+            'init_quat'] + self.object_embedding_size + sizes['action']
+        return dyn_input_size
+
+    def _get_dyn_output_size(self, sizes):
+        dyn_output_size = self.img_embedding_size + sizes['init_wrench']
+        return dyn_output_size
 
     def forward(self, imprint, wrench, pos, ori, object_model, action):
         sizes = self._get_sizes()
@@ -47,7 +48,7 @@ class BubbleDynamicsModel(BubbleDynamicsModelBase):
             dyn_input = self.dyn_input_batch_norm(dyn_input)
         state_dyn_output_delta = self.dyn_model(dyn_input)
         state_dyn_output = state_dyn_input + state_dyn_output_delta
-        imprint_emb_next, wrench_next = torch.split(state_dyn_output, (self.img_embedding_size, sizes['wrench']), dim=-1)
+        imprint_emb_next, wrench_next = torch.split(state_dyn_output, (self.img_embedding_size, sizes['init_wrench']), dim=-1)
         imprint_next = self.autoencoder.decode(imprint_emb_next)
         return imprint_next, wrench_next
 
