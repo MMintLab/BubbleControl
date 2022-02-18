@@ -80,8 +80,8 @@ class EncodeObjectPoseAsAxisAngleTr(object):
         self.quat_to_axis_tr = QuaternionToAxis(keys_to_tr=['{}_quat'.format(k) for k in self.keys_to_tr])
 
     def __call__(self, sample):
-        # sample = self.split_pose_tr(sample) # split pose into pos and quat
-        # sample = self.quat_to_axis_tr(sample) # encode only the quaternion part
+        sample = self.split_pose_tr(sample) # split pose into pos and quat
+        sample = self.quat_to_axis_tr(sample) # encode only the quaternion part
         sample = self.split_pose_tr.inverse(sample, replace=True) # restore the pose from pos and quat
         return sample
 
