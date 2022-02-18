@@ -157,7 +157,7 @@ class BubbleModelMPPIController(BubbleModelController):
                 expanded_state.append(output[output_indx])
             else:
                 expanded_state.append(state[k])
-        position_idx = self.state_keys.index('init_pos')
+        position_idx = self.state_keys.index('init_pos') # TODO: Consider moving this to the function call expanded_state = action_model(expanded_state, keys)
         orientation_idx = self.state_keys.index('init_quat')
         expanded_state[position_idx], expanded_state[orientation_idx] = self.grasp_pose_correction(expanded_state[position_idx],
                                                                                                 expanded_state[orientation_idx],
