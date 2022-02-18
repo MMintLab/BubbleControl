@@ -58,7 +58,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         Return a list containing the column names of the datalegend
         Returns:
         """
-        # TODO: REcord also all the information like states and observations.
+        # TODO: Record also all the information like states and observations.
         column_names = ['FileCode', 'SceneName', 'ControllerMethod', 'Score', 'NumSteps', 'NumStepsExpected']
         return column_names
 

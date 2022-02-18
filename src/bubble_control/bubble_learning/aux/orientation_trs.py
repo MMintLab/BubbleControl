@@ -54,6 +54,7 @@ class QuaternionToAxis(object):
         x = np.append(qxyz, qw, axis=-1)
         return x
 
+
 class EulerToAxis(object):
     def __init__(self):
         self.quat_to_axis = QuaternionToAxis()
