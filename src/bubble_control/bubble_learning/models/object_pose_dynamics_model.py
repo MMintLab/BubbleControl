@@ -20,6 +20,7 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.dyn_model = self._get_dyn_model()
         self.save_hyperparameters()
 
     @classmethod
