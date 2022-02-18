@@ -10,9 +10,8 @@ class BubbleLinearDynamicsModel(BubbleDynamicsModel):
 
     def _get_dyn_model(self):
         sizes = self._get_sizes()
-        action_size = sizes['action']
-        dyn_input_size = self.img_embedding_size + action_size + sizes['wrench'] + sizes['position'] + sizes['orientation']
-        dyn_output_size = self.img_embedding_size + sizes['wrench'] + sizes['position'] + sizes['orientation']
+        dyn_input_size = sizes['dyn_input_size']
+        dyn_output_size = sizes['dyn_output_size']
         dyn_model = nn.Linear(in_features=dyn_input_size, out_features=dyn_output_size, bias=False)
         return dyn_model
 
