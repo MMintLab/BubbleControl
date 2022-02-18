@@ -18,8 +18,9 @@ from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoE
 from bubble_control.bubble_learning.models.pointnet.pointnet_loading_utils import get_pretrained_pointnet2_object_embeding
 from bubble_control.bubble_learning.models.pointnet.pointnet_object_embedding import PointNetObjectEmbedding
 
+
 class BubbleDynamicsModelBase(pl.LightningModule):
-    def __init__(self, input_sizes, load_autoencoder_version=31, object_embedding_size=10, num_fcs=2, fc_h_dim=100, skip_layers=None, lr=1e-4, dataset_params=None, load_norm=False, activation='relu', freeze_object_module=True):
+    def __init__(self, input_sizes, load_autoencoder_version=31, object_embedding_size=10, num_fcs=2, fc_h_dim=100, skip_layers=None, lr=1e-4, dataset_params=None, load_norm=False, activation='relu', freeze_object_module=True, num_imprints_to_log=25):
         super().__init__()
         self.input_sizes = input_sizes
         self.object_embedding_size = object_embedding_size
@@ -31,6 +32,7 @@ class BubbleDynamicsModelBase(pl.LightningModule):
         self.activation = activation
         self.load_norm = load_norm
         self.freeze_object_module = freeze_object_module
+        self.num_imprints_to_log = num_imprints_to_log
 
         self.object_embedding_module = self._load_object_embedding_module(object_embedding_size=self.object_embedding_size, freeze=self.freeze_object_module)
         self.autoencoder = self._load_autoencoder(load_version=load_autoencoder_version, data_path=dataset_params['data_name'])
@@ -109,11 +111,8 @@ class BubbleDynamicsModelBase(pl.LightningModule):
         dyn_model_sizes = [dyn_input_size] + [self.fc_h_dim]*self.num_fcs + [dyn_output_size]
         dyn_model = FCModule(sizes=dyn_model_sizes, skip_layers=self.skip_layers, activation=self.activation)
         return dyn_model
-    
-    
+
     def _step(self, batch, batch_idx, phase='train'):
-        imprint_t = batch['init_imprint']
-        imprint_next = batch['final_imprint']
         action = batch['action']
 
         model_input = self.get_model_input(batch)
@@ -122,25 +121,12 @@ class BubbleDynamicsModelBase(pl.LightningModule):
         model_output = self.forward(*model_input, action)
 
         loss = self._compute_loss(*model_output, *ground_truth)
-        
 
         # Log the results: -------------------------
         self.log('{}_batch'.format(phase), batch_idx)
         self.log('{}_loss'.format(phase), loss)
         # Log imprints
-        # TODO: Improve this --
-        imprint_indx = self.get_model_output_keys().index('init_imprint')
-        imprint_next_rec = model_output[imprint_indx]
-        predicted_grid = self._get_image_grid(imprint_next_rec * torch.max(imprint_next_rec) / torch.max(
-            imprint_next))  # trasform so they are in the same range
-        gth_grid = self._get_image_grid(imprint_next)
-        if batch_idx == 0:
-            if self.current_epoch == 0:
-                self.logger.experiment.add_image('init_imprint_{}'.format(phase), self._get_image_grid(imprint_t),
-                                                 self.global_step)
-                self.logger.experiment.add_image('next_imprint_gt_{}'.format(phase), gth_grid, self.global_step)
-            self.logger.experiment.add_image('next_imprint_predicted_{}'.format(phase), predicted_grid,
-                                             self.global_step)
+        self._log_imprints(batch=batch, model_output=model_output, batch_idx=batch_idx, phase=phase)
         return loss
     
     # Loading Functionalities: -----------------------------------------------------------------------------------------
@@ -170,6 +156,23 @@ class BubbleDynamicsModelBase(pl.LightningModule):
 
 
     # AUX Functions: ---------------------------------------------------------------------------------------------------
+
+    def _log_imprints(self, batch, model_output, batch_idx, phase):
+        imprint_t = batch['init_imprint'][:self.num_imprints_to_log]
+        imprint_next = batch['final_imprint'][:self.num_imprints_to_log]
+        imprint_indx = self.get_model_output_keys().index('init_imprint')
+        imprint_next_rec = model_output[imprint_indx][:self.num_imprints_to_log]
+        predicted_grid = self._get_image_grid(imprint_next_rec * torch.max(imprint_next_rec) / torch.max(
+            imprint_next))  # trasform so they are in the same range
+        gth_grid = self._get_image_grid(imprint_next)
+        if batch_idx == 0:
+            if self.current_epoch == 0:
+                self.logger.experiment.add_image('init_imprint_{}'.format(phase), self._get_image_grid(imprint_t),
+                                                 self.global_step)
+                self.logger.experiment.add_image('next_imprint_gt_{}'.format(phase), gth_grid, self.global_step)
+            self.logger.experiment.add_image('next_imprint_predicted_{}'.format(phase), predicted_grid,
+                                             self.global_step)
+
 
     def _get_image_grid(self, batched_img, cmap='jet'):
         # reshape the batched_img to have the same imprints one above the other
