@@ -85,16 +85,13 @@ class BubbleEnd2EndDynamicsModel(BubbleDynamicsModelBase):
             'init_imprint': 'final_imprint',
             'init_wrench': 'final_wrench',
             'init_object_pose': 'final_object_pose'
-
         }
         return next_state_map
 
-    def _compute_loss(self, obj_pos, obj_ori, obj_pos_gth, obj_ori_gth, obj_model):
-        # TODO: Compute the loss based on the object model.
-        # self.pose_loss.model = obj_model
-        # R_pred =
-        # R_gth =
-        # pose_loss = self.pose_loss(R_pred, obj_pos, R_gth, obj_pos_gth)
+    def _compute_loss(self, imprint_pred, wrench_pred, obj_pose_pred, imprint_gth, wrench_gth, obj_pose_gth):
         # MSE Loss on position and orientation (encoded as aixis-angle 3 values)
-        pose_loss = self.mse_loss(obj_pos, obj_pos_gth) + self.mse_loss(obj_ori, obj_ori_gth)
-        return pose_loss
+        pose_loss = self.mse_loss(obj_pose_pred, obj_pose_gth)
+        imprint_loss = self.mse_loss(imprint_pred, imprint_gth)
+        wrench_loss = self.mse_loss(wrench_pred, wrench_gth)
+        loss = imprint_loss + wrench_loss + pose_loss # TODO: Consider adding different weights
+        return loss
