@@ -23,8 +23,8 @@ def fix_wrench(dataset, wrench_frame=None, init_indx=0, last_indx=0, indxs=None)
         final_fc = dl_line['FinalStateFC']
         init_wrench = dataset._get_wrench(fc=init_fc, scene_name=scene_name, frame_id=wrench_frame)
         final_wrench = dataset._get_wrench(fc=final_fc, scene_name=scene_name, frame_id=wrench_frame)
-        sample_i['init_wrench'] = init_wrench
-        sample_i['final_wrench'] = final_wrench
+        sample_i['init_wrench'] = init_wrench.flatten()
+        sample_i['final_wrench'] = final_wrench.flatten()
         # save
         save_path_i = os.path.join(dataset.processed_data_path, 'data_{}.pt'.format(indx))
         torch.save(sample_i, save_path_i)
@@ -39,7 +39,6 @@ def fix_wench_and_ori_drawing_data(data_name):
         downsample_factor_y=7,
         downsample_reduction='mean')
     # fix wrench
-    import pdb; pdb.set_trace()
     fix_wrench(dataset, wrench_frame='med_base')
     trs = [quat_to_axis_tr, tensor_type_tr]
     transform_processed_dataset(dataset, trs)
@@ -48,7 +47,7 @@ def fix_wench_and_ori_drawing_data(data_name):
 def fix_wench_and_ori_pivoting_data(data_name):
     tensor_type_tr = TensorTypeTr(dtype=torch.float32)
     quat_to_axis_tr = QuaternionToAxis()
-    dataset = BubbleDrawingDataset(
+    dataset = BubblePivotingDownsampledDataset(
         data_name=data_name,
         downsample_factor_x=7,
         downsample_factor_y=7,
