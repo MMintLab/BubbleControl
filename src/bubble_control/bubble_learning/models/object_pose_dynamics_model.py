@@ -57,7 +57,7 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
         dyn_input = torch.cat([obj_pose, pos, ori, obj_model_emb, action], dim=-1)
         dyn_output = self.dyn_model(dyn_input)
         obj_pose_next = dyn_output # we only predict object_pose
-        return obj_pose_next
+        return (obj_pose_next,)
 
     def get_state_keys(self):
         state_keys = ['init_object_pose', 'init_pos', 'init_quat', 'object_model']
