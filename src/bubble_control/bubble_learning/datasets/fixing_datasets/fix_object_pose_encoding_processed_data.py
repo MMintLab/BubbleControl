@@ -28,17 +28,18 @@ class SplitPoseTr(object):
     def __init__(self, keys_to_tr=None):
         self.keys_to_tr = keys_to_tr
 
-    def __call__(self, sample):
+    def __call__(self, sample, replace=False):
         keys_to_tr = self._get_keys_to_tr(sample)
         for key in keys_to_tr:
             value = sample[key]
             pos, quat = self._tr(value)
             sample['{}_pos'.format(key)] = pos
             sample['{}_quat'.format(key)] = quat
-            sample.pop(key)
+            if replace:
+                sample.pop(key)
         return sample
 
-    def inverse(self, sample):
+    def inverse(self, sample, replace=False):
         keys_to_tr = self._get_keys_to_tr(sample)
         for key in keys_to_tr:
             pos_key = '{}_pos'.format(key)
@@ -46,15 +47,16 @@ class SplitPoseTr(object):
             if pos_key in sample and quat_key in sample:
                 pose = self._tr_inv(sample[pos_key], sample[quat_key])
                 sample[key] = pose
-                sample.pop(pos_key)
-                sample.pop(quat_key)
+                if replace:
+                    sample.pop(pos_key)
+                    sample.pop(quat_key)
         return sample
 
     def _get_keys_to_tr(self, sample):
         if self.keys_to_tr is None:
             keys_to_tr = [key for key in sample.keys() if 'pose' in key]
         else:
-            keys_to_tr = [k for k in self.keys_to_tr if k in sample]
+            keys_to_tr = [k for k in self.keys_to_tr if ((k in sample) or ('{}_pos'.format(k) in sample) or ('{}_quat'.format(k) in sample))]
         return keys_to_tr
 
     def _tr(self, pose):
@@ -65,7 +67,7 @@ class SplitPoseTr(object):
 
     def _tr_inv(self, pos, quat):
         if torch.is_tensor(pos) and torch.is_tensor(quat):
-            pose = torch.cat([pos,quat], dim=-2)
+            pose = torch.cat([pos, quat], dim=-2)
         else:
             pose = np.concatenate([pos, quat], axis=-1)
         return pose
@@ -78,15 +80,15 @@ class EncodeObjectPoseAsAxisAngleTr(object):
         self.quat_to_axis_tr = QuaternionToAxis(keys_to_tr=['{}_quat'.format(k) for k in self.keys_to_tr])
 
     def __call__(self, sample):
-        sample = self.split_pose_tr(sample) # split pose into pos and quat
-        sample = self.quat_to_axis_tr(sample) # encode only the quaternion part
-        sample = self.split_pose_tr.inverse(sample) # restore the pose from pos and quat
+        # sample = self.split_pose_tr(sample) # split pose into pos and quat
+        # sample = self.quat_to_axis_tr(sample) # encode only the quaternion part
+        sample = self.split_pose_tr.inverse(sample, replace=True) # restore the pose from pos and quat
         return sample
 
     def inverse(self, sample):
         sample = self.split_pose_tr(sample) # split pose into pos and quat
         sample = self.quat_to_axis_tr.inverse(sample) # encode only the quaternion part
-        sample = self.split_pose_tr.inverse(sample) # restore the pose from pos and quat
+        sample = self.split_pose_tr.inverse(sample, replace=True) # restore the pose from pos and quat
         return sample
 
 
