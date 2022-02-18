@@ -9,7 +9,7 @@ import pdb
 from bubble_control.bubble_model_control.controllers.bubble_controller_base import BubbleModelController
 from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample, get_transformation_matrix, tr_frame, convert_all_tfs_to_tensors
 
-
+import pdb
 def to_tensor(x, **kwargs):
     if not torch.is_tensor(x):
         x_t = torch.tensor(x, **kwargs)
@@ -54,18 +54,6 @@ class BubbleModelMPPIController(BubbleModelController):
         action_container, _ = self.env.get_action()
         return action_container
 
-    @abc.abstractmethod
-    def _get_state_keys(self):
-        pass
-
-    @abc.abstractmethod
-    def _get_model_output_keys(self):
-        pass
-
-    @abc.abstractmethod
-    def _get_next_state_map(self):
-        pass
-
     def compute_cost(self, state_t, action_t):
         """
         Compute the dynamics
@@ -77,7 +65,7 @@ class BubbleModelMPPIController(BubbleModelController):
         states = self._unpack_state_tensor(state_t)
         actions = self._unpack_action_tensor(action_t)
         state_samples = self._pack_state_to_sample(states, self.sample)
-        prev_state_samples = state_samples.copy()
+        prev_state_samples = copy.deepcopy(state_samples['all_tfs'])
         state_samples = self._action_correction(state_samples, actions) # apply the action model
         estimated_poses = self._estimate_poses(state_samples, actions)
         costs = self.cost_function(estimated_poses, state_samples, prev_state_samples, actions)
@@ -95,7 +83,8 @@ class BubbleModelMPPIController(BubbleModelController):
         :param state: tuple of tensors representing the state (expected input to the model)
         :return: state tensor
         """
-        state_t = [to_tensor(s).flatten(start_dim=1) for s in state]
+        flattened_state_shapes = self._get_flattened_state_sizes()
+        state_t = [to_tensor(s).reshape(-1,flattened_state_shapes[i]) for i, s in enumerate(state)]
         state_t = torch.cat(state_t, dim=-1)
         return state_t
 
@@ -168,8 +157,8 @@ class BubbleModelMPPIController(BubbleModelController):
                 expanded_state.append(output[output_indx])
             else:
                 expanded_state.append(state[k])
-        position_idx = self.state_keys.index('position')
-        orientation_idx = self.state_keys.index('orientation')
+        position_idx = self.state_keys.index('init_pos')
+        orientation_idx = self.state_keys.index('init_quat')
         expanded_state[position_idx], expanded_state[orientation_idx] = self.grasp_pose_correction(expanded_state[position_idx],
                                                                                                 expanded_state[orientation_idx],
                                                                                                 action)
@@ -210,7 +199,7 @@ class BubbleModelMPPIController(BubbleModelController):
         state = self._unpack_state_tensor(state_t)
         action = self._unpack_action_tensor(action_t)
         model_input = self._extract_input_from_state(state)
-        output = self.model(*state, action)
+        output = self.model(*model_input, action)
         next_state = self._expand_output_to_state(output, state, action)
         next_state_t = self._pack_state_to_tensor(next_state)
         return next_state_t
@@ -238,7 +227,7 @@ class BubbleModelMPPIController(BubbleModelController):
         if self.noise_sigma is None or self.noise_sigma.shape[0] != self.u_max.shape[0]:
             eps = 1e-7
             self.noise_sigma = self._noise_sigma_value * torch.diag(self.u_max - self.u_min + eps)
-        else:
+        elif len(self.noise_sigma.shape) < 2:
             # convert it to a square tensor
             self.noise_sigma = torch.diag(torch.tensor(self.noise_sigma, device=self.device, dtype=torch.float))
         if self.u_mu is None or self.u_mu.shape[-1] != self.u_max.shape[0]:
@@ -282,7 +271,7 @@ class BubbleModelMPPIController(BubbleModelController):
         original_state_shape = {}
         for key in self.state_keys:
             state_k = state_sample[key]
-            original_state_shape[key] = state_k.shape[1:] # remove the batch size
+            original_state_shape[key] = state_k.shape # No batch in state_sample when we call this
         return original_state_shape
 
     def _get_state_size(self):

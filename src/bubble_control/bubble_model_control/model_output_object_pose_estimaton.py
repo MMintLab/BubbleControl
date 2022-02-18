@@ -24,7 +24,7 @@ class ModelOutputObjectPoseEstimationBase(object):
         self.imprint_threshold = self.object_params['imprint_th']['depth']
         self.icp_threshold = self.object_params['icp_th']
         self.block_upsample_tr = BlockUpSamplingTr(factor_x=factor_x, factor_y=factor_y, method=method,
-                                                   keys_to_tr=['next_imprint'])
+                                                   keys_to_tr=['final_imprint'])
 
     def estimate_pose(self, sample):
         # upsample the imprints
@@ -62,7 +62,7 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         all_tfs = batched_sample['all_tfs']
 
         # Get imprints from sample
-        predicted_imprint = batched_sample['next_imprint']
+        predicted_imprint = batched_sample['final_imprint']
         imprint_pred_r = predicted_imprint[:, 0]
         imprint_pred_l = predicted_imprint[:, 1]
 
