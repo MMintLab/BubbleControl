@@ -38,9 +38,11 @@ class QuaternionToAxis(object):
         # q = [qx, qy, qz, qw] where qw = cos(theta/2); qx = a1*sin(theta/2),...
         qw = x[..., -1]
         theta = 2 * np.arccos(qw)
+        eps = np.array([1e-7], dtype=x.dtype)
         if len(x.shape) == 2:
-            theta = np.expand_dims(theta, axis=1)        
-        axis = x[..., :3] / np.sin(theta/2) # should be a unit vector
+            theta = np.expand_dims(theta, axis=1) 
+            eps = np.expand_dims(eps, axis=-1)       
+        axis = x[..., :3] / (np.sin(theta/2) + eps) # should be a unit vector
         x_tr = theta * axis
         return x_tr
 
