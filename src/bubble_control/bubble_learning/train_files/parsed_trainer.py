@@ -318,6 +318,8 @@ class ParsedTrainer(object):
             ckpt_path = os.path.join(checkpoints_path, ckpt)
             if not os.path.isfile(ckpt_path):
                 raise AttributeError('Checkpoint Not Found -- {}'.format(ckpt_path))
+        if ckpt_path is None:
+            print('\n-- Resuming training from {} -- \n'.format(ckpt_path))
         return ckpt_path
 
     def train(self, gpu=None):
