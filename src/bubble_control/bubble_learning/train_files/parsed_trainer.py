@@ -328,7 +328,7 @@ class ParsedTrainer(object):
             gpus = 1
         callbacks = self._get_callbacks()
         trainer = pl.Trainer(gpus=gpus, max_epochs=self.args['max_epochs'], logger=logger, log_every_n_steps=1, callbacks=callbacks)
-        load_ckpt_path = self._get_load_ckpt_path()
+        load_ckpt_path = self._get_ckpt_path()
         trainer.fit(self.model, self.train_loader, self.val_loader, ckpt_path=load_ckpt_path)
 
     def _get_dataset_constructor_arguments(self, Dataset):
