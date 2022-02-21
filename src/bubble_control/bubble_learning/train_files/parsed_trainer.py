@@ -274,7 +274,7 @@ class ParsedTrainer(object):
         ckpt_path = None
         if self.args['resume_version'] is not None:
             logging_path = self._get_logging_path()
-            checkpoints_path = os.path.join(logging_path, 'version_{}'.format(self.args['resume_version']), 'checkpoints')
+            checkpoints_path = os.path.join(logging_path, self.model.name, 'version_{}'.format(self.args['resume_version']), 'checkpoints')
             # read all files there:
             all_ckpts = [f for f in os.listdir(checkpoints_path) if os.path.isfile(os.path.join(checkpoints_path, f))]
             #expected format: 'epoch={epoch_value}-step={step_value}.ckpt'
