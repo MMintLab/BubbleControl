@@ -22,7 +22,8 @@ from bubble_control.bubble_learning.aux.pose_loss import ModelPoseLoss
 
 class ObjectPoseDynamicsModel(DynamicsModelBase):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, num_to_log=40, **kwargs):
+        self.num_to_log = num_to_log
         super().__init__(*args, **kwargs)
         self.dyn_model = self._get_dyn_model()
         self.pose_loss = ModelPoseLoss()
@@ -117,7 +118,7 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
         obj_rot_angle_gth = self.get_angle_from_axis_angle(obj_rot_gth, self.plane_normal)
         images = self.get_pose_images(obj_trans_pred, obj_rot_angle_pred, obj_trans_gth, obj_rot_angle_gth)
         import pdb; pdb.set_trace()
-        grid = torchvision.utils.make_grid(images)
+        grid = torchvision.utils.make_grid(images[:self.num_to_log])
         self.logger.experiment.add_image('pose_estimation_{}'.format(phase), grid, self.global_step)
         return loss
 
@@ -136,7 +137,7 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
     def get_pose_images(self, trans_pred, rot_angle_pred, trans_gth, rot_angle_gth):
         images = []
         for i in np.arange(32):
-            img = np.zeros([100, 100, 3],dtype=np.uint8)
+            img = np.zeros([100, 100, 3], dtype=np.uint8)
             img.fill(100)
             pred_param = self.find_rect_param(trans_pred[i], rot_angle_pred[i], img)
             color_p = (255, 0, 0)

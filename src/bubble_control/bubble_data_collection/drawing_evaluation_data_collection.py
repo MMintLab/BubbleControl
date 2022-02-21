@@ -45,6 +45,9 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.debug = debug
         self.data_name = '/home/mmint/Desktop/drawing_data_one_direction'
         self.load_version = 0
+        self.data_save_params = {'save_path': self.data_path, 'scene_name': self.scene_name}
+        self.reference_fc = None
+        self.bubble_ref_obs = None
         self.model = self._get_model()
         self.block_downsample_tr = BlockDownSamplingTr(factor_x=7, factor_y=7, reduction='mean', keys_to_tr=['init_imprint'])
         self.ope = self._get_object_pose_estimation()
@@ -59,7 +62,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         Returns:
         """
         # TODO: Record also all the information like states and observations.
-        column_names = ['FileCode', 'SceneName', 'ControllerMethod', 'Score', 'NumSteps', 'NumStepsExpected']
+        column_names = ['EvaluationFileCode', 'ObservationFileCodes', 'ReferenceFileCode', 'SceneName', 'ControllerMethod', 'Score', 'NumSteps', 'Actions', 'NumStepsExpected']
         return column_names
 
     def _get_legend_lines(self, data_params):
@@ -83,11 +86,15 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
 
         self._init_collection_sample()
 
+        if self.bubble_ref_obs is not self.env.bubble_ref_obs:
+            # record the reference
+            self._record_reference_state()
+
         # Draw
         num_steps = 40
         num_steps_done = 40
         self.env.do_init_action(self.init_action)
-        num_steps_done = self.draw_steps(num_steps=num_steps)
+        num_steps_done, obs_fcs, actions = self.draw_steps(num_steps=num_steps)
 
         fc = self.get_new_filecode()
 
@@ -106,9 +113,12 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
 
         # pack the score and other significant data (num_steps, ...
         data_params = {
-            'FileCode': fc,
+            'EvaluationFileCode': fc,
+            'ObservationFileCodes': obs_fcs,
+            'ReferenceFileCode': self.reference_fc,
             'SceneName': self.scene_name,
             'NumSteps': num_steps_done,
+            'Actions': actions,
             'NumStepsExpected': num_steps,
             'ControllerMethod': self._get_controller_name(),
             'Score': score,
@@ -173,14 +183,20 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         return expected_drawing_cooridnates
 
     def draw_steps(self, num_steps):
+        obs_fcs = []
+        actions = []
         init_obs_sample = self.env.get_observation()
+        init_obs_sample.modify_data_params(self.data_save_params)
+        fc_init = self.get_new_filecode()
+        init_obs_sample.save_fc(fc_init)
+        obs_fcs.append(fc_init)
         obs_sample_raw = init_obs_sample.copy()
+        step_i = 0
         for step_i in tqdm(range(num_steps)):
             # Downsample the sample
             action, valid_action = self.env.get_action()  # this is a
             obs_sample = format_observation_sample(obs_sample_raw)
             obs_sample = self.block_downsample_tr(obs_sample)
-
             if not self.random_action:
                 action_raw = self.controller.control(obs_sample).detach().cpu().numpy()
                 # print(action_raw)
@@ -190,9 +206,20 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
                 for i, (k, v) in enumerate(action.items()):
                     action[k] = action_raw[i]
             # print('Action:', action)
+            actions.append(action)
             obs_sample_raw, reward, done, info = self.env.step(action)
+            fc_i = self.get_new_filecode()
+            obs_sample_raw.modify_data_params(self.data_save_params)
+            obs_sample_raw.save_fc(fc_i)
+            obs_fcs.append(fc_i)
             if self.debug:
                 self.controller.visualize_prediction(obs_sample_raw)
             if done:
-                return step_i
-        return num_steps
+                break
+        return step_i+1, obs_fcs, actions
+
+    def _record_reference_state(self):
+        self.bubble_ref_obs = self.env.bubble_ref_obs
+        self.reference_fc = self.get_new_filecode()
+        self.env.bubble_ref_obs.modify_data_params(self.data_save_params)
+        self.env.bubble_ref_obs.save_fc(self.reference_fc)
