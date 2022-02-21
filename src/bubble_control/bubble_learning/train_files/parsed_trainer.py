@@ -309,7 +309,7 @@ class ParsedTrainer(object):
                     raise AttributeError('Checkpoint for resume_epoch {} Not Found -- We found {}'.format(self.args['resume_epoch'], all_ckpts))
                 elif self.args['resume_step'] is None:
                     # get the desired epoch with the highest step
-                    epoch_step_values_desired_sorted = epoch_step_values_sorted[np.where(epoch_step_values_sorted[:,1] == self.args['resume_step'])]
+                    epoch_step_values_desired_sorted = epoch_step_values_sorted[np.where(epoch_step_values_sorted[:,1] == self.args['resume_epoch'])]
                     indx = epoch_step_values_desired_sorted[-1, 0]
                     ckpt = all_ckpts[indx]
                 else:
@@ -318,7 +318,7 @@ class ParsedTrainer(object):
             ckpt_path = os.path.join(checkpoints_path, ckpt)
             if not os.path.isfile(ckpt_path):
                 raise AttributeError('Checkpoint Not Found -- {}'.format(ckpt_path))
-        if ckpt_path is None:
+        if ckpt_path is not None:
             print('\n-- Resuming training from {} -- \n'.format(ckpt_path))
         return ckpt_path
 
