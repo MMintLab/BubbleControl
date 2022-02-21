@@ -82,6 +82,7 @@ class ParsedTrainer(object):
         default_types_base = {
             'batch_size': int,
             'val_batch_size': int,
+            'save_top_k': int,
             'resume_version': int,
             'resume_epoch': int,
             'resume_step': int,
