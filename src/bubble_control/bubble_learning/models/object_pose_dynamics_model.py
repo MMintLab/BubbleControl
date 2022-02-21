@@ -26,6 +26,7 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
         super().__init__(*args, **kwargs)
         self.dyn_model = self._get_dyn_model()
         self.pose_loss = ModelPoseLoss()
+        self.plane_normal = nn.Parameter(torch.tensor([1, 0, 0], dtype=torch.float), requires_grad=False)
         self.save_hyperparameters()
 
     @classmethod
@@ -108,13 +109,12 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
         self.log('{}_batch'.format(phase), batch_idx)
         self.log('{}_loss'.format(phase), loss)
         # Log the images: -------------------------
-        obj_trans_pred = model_output[0][...,:3]
-        obj_rot_pred = model_output[0][...,3:]
-        plane_normal = torch.tensor([1, 0, 0], dtype=torch.float)
-        obj_rot_angle_pred = self.get_angle_from_axis_angle(obj_rot_pred, plane_normal)
-        obj_trans_gth = ground_truth[0][...,:3]
-        obj_rot_gth = ground_truth[0][...,3:]
-        obj_rot_angle_gth = self.get_angle_from_axis_angle(obj_rot_gth, plane_normal)
+        obj_trans_pred = model_output[0][..., :3]
+        obj_rot_pred = model_output[0][..., 3:]
+        obj_rot_angle_pred = self.get_angle_from_axis_angle(obj_rot_pred, self.plane_normal)
+        obj_trans_gth = ground_truth[0][..., :3]
+        obj_rot_gth = ground_truth[0][..., 3:]
+        obj_rot_angle_gth = self.get_angle_from_axis_angle(obj_rot_gth, self.plane_normal)
         images = self.get_pose_images(obj_trans_pred, obj_rot_angle_pred, obj_trans_gth, obj_rot_angle_gth)
         import pdb; pdb.set_trace()
         grid = torchvision.utils.make_grid(images)
@@ -136,16 +136,16 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
     def get_pose_images(self, trans_pred, rot_angle_pred, trans_gth, rot_angle_gth):
         images = []
         for i in np.arange(32):
-            img = np.zeros([100,100,3],dtype=np.uint8)
+            img = np.zeros([100, 100, 3],dtype=np.uint8)
             img.fill(100)
             pred_param = self.find_rect_param(trans_pred[i], rot_angle_pred[i], img)
-            color_p = (255,0,0)
+            color_p = (255, 0, 0)
             self.draw_angled_rec(*pred_param, color_p, img)
             gth_param = self.find_rect_param(trans_gth[i], rot_angle_gth[i], img)
-            color_gth = (0,0,255)
+            color_gth = (0, 0, 255)
             self.draw_angled_rec(*gth_param, color_gth, img)
             img = torch.tensor(img)
-            img = img.permute(2,0,1)
+            img = img.permute(2, 0, 1)
             images.append(img)
         return images
 
