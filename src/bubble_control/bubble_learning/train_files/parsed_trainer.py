@@ -1,4 +1,5 @@
 import argparse
+import numpy as np
 import torch
 import inspect
 import copy
@@ -69,13 +70,21 @@ class ParsedTrainer(object):
             'lr': 1e-4,
             'seed': 0,
             'num_workers': 8,
+            # checkpoint params
+            'save_top_k': None,
+            'resume_version': None,
+            'resume_epoch': None, # If none, we will resume the last one (higher epoch)
+            'resume_step': None, # If none, we will resume the highest epoch with the highest step
         }
         return common_params
 
     def _get_default_types(self, default_types=None):
         default_types_base = {
             'batch_size': int,
-            'val_batch_size': int
+            'val_batch_size': int,
+            'resume_version': int,
+            'resume_epoch': int,
+            'resume_step': int,
         }
         default_types_out = copy.deepcopy(default_types_base)
         if default_types is not None:
@@ -244,9 +253,71 @@ class ParsedTrainer(object):
         print(model)
         return model
 
+    def _get_logging_path(self):
+        logging_path = os.path.join(self.args['data_name'], 'tb_logs')
+        return logging_path
+
     def _get_logger(self):
-        logger = TensorBoardLogger(os.path.join(self.args['data_name'], 'tb_logs'), name=self.model.name)
+        logging_path = self._get_logging_path()
+        logger = TensorBoardLogger(logging_path, name=self.model.name)
         return logger
+
+    def _get_callbacks(self):
+        callbacks = []
+        # checkpoint callback -- to save the top_k models
+        if self.args['save_top_k'] is not None:
+            checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor='val_loss', save_top_k=self.args['save_top_k'], save_last=True)
+            callbacks.append(checkpoint_callback)
+        return callbacks
+
+    def _get_ckpt_path(self):
+        ckpt_path = None
+        if self.args['resume_version'] is not None:
+            logging_path = self._get_logging_path()
+            checkpoints_path = os.path.join(logging_path, 'version_{}'.format(self.args['resume_version']), 'checkpoints')
+            # read all files there:
+            all_ckpts = [f for f in os.listdir(checkpoints_path) if os.path.isfile(os.path.join(checkpoints_path, f))]
+            #expected format: 'epoch={epoch_value}-step={step_value}.ckpt'
+            epoch_step_values = []
+            for i, ckpt_i in enumerate(all_ckpts):
+                if 'epoch' in ckpt_i and 'step' in ckpt_i:
+                    processed_ckpt_i = ckpt_i.replace('.ckpt', '')
+                    processed_ckpt_i = processed_ckpt_i.replace('epoch=', '')
+                    processed_ckpt_i = processed_ckpt_i.replace('step=', '')
+                    processed_ckpt_i = processed_ckpt_i.split('-')
+                    # TODO: we can make this more general
+                    epoch_value_i = int(processed_ckpt_i[0])
+                    step_value_i = int(processed_ckpt_i[1])
+                    epoch_step_values.append([i, epoch_value_i, step_value_i])
+            epoch_step_values = np.array(epoch_step_values)
+            epoch_step_values_sorted = epoch_step_values[np.argsort(epoch_step_values[:,2])] # sort by step
+            epoch_step_values_sorted = epoch_step_values_sorted[np.argsort(epoch_step_values_sorted[:,1])] # sort by epoch
+            ckpt = None
+            if self.args['resume_epoch'] is None:
+                if 'last.ckpt' in all_ckpts:
+                    ckpt = 'last.ckpt'
+                elif self.args['resume_step'] is None:
+                    # resume the highest epoch with highest step
+                    indx = epoch_step_values_sorted[-1,0]
+                    ckpt = all_ckpts[indx]
+                else:
+                    raise AttributeError('Please provide an resume_epoch, we currently do not support only resume_step. All available checkpoints: {}'.format(all_ckpts))
+            else:
+                # load the desired epoch
+                if not self.args['resume_epoch'] in epoch_step_values[:,1]:
+                    raise AttributeError('Checkpoint for resume_epoch {} Not Found -- We found {}'.format(self.args['resume_epoch'], all_ckpts))
+                elif self.args['resume_step'] is None:
+                    # get the desired epoch with the highest step
+                    epoch_step_values_desired_sorted = epoch_step_values_sorted[np.where(epoch_step_values_sorted[:,1] == self.args['resume_step'])]
+                    indx = epoch_step_values_desired_sorted[-1, 0]
+                    ckpt = all_ckpts[indx]
+                else:
+                    # load the desired epoch-step
+                    ckpt = 'epoch={}-step={}.ckpt'.format(self.args['resume_epoch'], self.args['resumte_step'])
+            ckpt_path = os.path.join(checkpoints_path, ckpt)
+            if not os.path.isfile(ckpt_path):
+                raise AttributeError('Checkpoint Not Found -- {}'.format(ckpt_path))
+        return ckpt_path
 
     def train(self, gpu=None):
         logger = self._get_logger()
@@ -255,8 +326,10 @@ class ParsedTrainer(object):
             gpu = not self.args['no_gpu']
         if torch.cuda.is_available() and gpu:
             gpus = 1
-        trainer = pl.Trainer(gpus=gpus, max_epochs=self.args['max_epochs'], logger=logger, log_every_n_steps=1)
-        trainer.fit(self.model, self.train_loader, self.val_loader)
+        callbacks = self._get_callbacks()
+        trainer = pl.Trainer(gpus=gpus, max_epochs=self.args['max_epochs'], logger=logger, log_every_n_steps=1, callbacks=callbacks)
+        load_ckpt_path = self._get_load_ckpt_path()
+        trainer.fit(self.model, self.train_loader, self.val_loader, ckpt_path=load_ckpt_path)
 
     def _get_dataset_constructor_arguments(self, Dataset):
         # It turns out that because Datasets inehrit from ABC, inspect does not have access to parents arguments.
