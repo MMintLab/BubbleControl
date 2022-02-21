@@ -9,6 +9,7 @@ import numpy as np
 import os
 import sys
 import cv2
+import pytorch3d.transforms as batched_trs
 
 from bubble_control.bubble_learning.models.aux.fc_module import FCModule
 from bubble_control.bubble_learning.models.aux.img_encoder import ImageEncoder
@@ -16,12 +17,15 @@ from bubble_control.bubble_learning.models.aux.img_decoder import ImageDecoder
 from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoEncoderModel
 from bubble_control.bubble_learning.models.dynamics_model_base import DynamicsModelBase
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
+from bubble_control.bubble_learning.aux.pose_loss import ModelPoseLoss
+
 
 class ObjectPoseDynamicsModel(DynamicsModelBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.dyn_model = self._get_dyn_model()
+        self.pose_loss = ModelPoseLoss()
         self.save_hyperparameters()
 
     @classmethod
@@ -78,20 +82,27 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
         }
         return next_state_map
 
-    def _compute_loss(self, obj_pose_pred, obj_pose_gth):
+    def _compute_loss(self, obj_pose_pred, obj_pose_gth, object_model):
         # MSE Loss on position and orientation (encoded as aixis-angle 3 values)
+        axis_angle_pred = obj_pose_pred[..., 3:]
+        R_pred = batched_trs.axis_angle_to_matrix(axis_angle_pred)
+        t_pred = obj_pose_pred[..., :3]
+        axis_angle_gth = obj_pose_gth[..., 3:]
+        R_gth = batched_trs.axis_angle_to_matrix(axis_angle_gth)
+        t_gth = obj_pose_gth[..., :3]
         pose_loss = self.mse_loss(obj_pose_pred, obj_pose_gth)
         loss = pose_loss
         return loss
 
     def _step(self, batch, batch_idx, phase='train'):
         action = batch['action']
+        object_model = batch['object_model']
 
         model_input = self.get_model_input(batch)
         ground_truth = self.get_model_output(batch)
 
         model_output = self.forward(*model_input, action)
-        loss = self._compute_loss(*model_output, *ground_truth)
+        loss = self._compute_loss(*model_output, *ground_truth, object_model)
 
         # Log the results: -------------------------
         self.log('{}_batch'.format(phase), batch_idx)
@@ -105,6 +116,7 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
         obj_rot_gth = ground_truth[0][...,3:]
         obj_rot_angle_gth = self.get_angle_from_axis_angle(obj_rot_gth, plane_normal)
         images = self.get_pose_images(obj_trans_pred, obj_rot_angle_pred, obj_trans_gth, obj_rot_angle_gth)
+        import pdb; pdb.set_trace()
         grid = torchvision.utils.make_grid(images)
         self.logger.experiment.add_image('pose_estimation_{}'.format(phase), grid, self.global_step)
         return loss

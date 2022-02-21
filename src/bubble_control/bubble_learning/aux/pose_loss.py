@@ -2,30 +2,48 @@ import numpy as np
 import torch
 
 
-class PoseLoss(torch.nn.Module):
-    def __init__(self, object_points, device=None, criterion=None):
+class ModelPoseLoss(torch.nn.Module):
+    def __init__(self, criterion=None):
         super().__init__()
-        if device is None:
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         if criterion is None:
             self.criterion = torch.nn.MSELoss()
+
+    def forward(self, R_1, t_1, R_2, t_2, model_points):
+        m_1 = self._transform_model_points(R_1, t_1, model_points)
+        m_2 = self._transform_model_points(R_2, t_2, model_points)
+        loss = 0.5 * self.criterion(m_1, m_2)
+        return loss
+
+    def _transform_model_points(self, R, t, model_points):
+        num_points = model_points.shape[-2] # (batch, num_points, space_size)
+        m_rot = torch.einsum('...jk,...mk->...mj', R, model_points)
+        m_tr = m_rot + t.unsqueeze(-2).repeat_interleave(num_points, dim=-2)
+        return m_tr
+
+
+class PoseLoss(ModelPoseLoss):
+    def __init__(self, object_points, device=None, criterion=None):
+        super().__init__(criterion=criterion)
+        if device is None:
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = torch.tensor(object_points, dtype=torch.float).to(self.device)
         self.num_points = self.model.shape[0]
 
     def forward(self, R_1, t_1, R_2, t_2):
         # import pdb; pdb.set_trace()
-        M_1 = self._transform_model(R_1, t_1)
-        M_2 = self._transform_model(R_2, t_2)
-        loss = 0.5 * self.criterion(M_1, M_2)
+        m_1 = self._transform_model(R_1, t_1)
+        m_2 = self._transform_model_points(R_2, t_2)
+        loss = 0.5 * self.criterion(m_1, m_2)
         return loss
 
     def _transform_model(self, R, t):
-        m_rot = torch.einsum('...jk,mk->...mj', R, self.model)
-        m_tr = m_rot + torch.stack(self.num_points * [t], dim=-2)
+        # keep it for compatibility
+        m_rot = torch.einsum('...jk,...mk->...mj', R, self.model)
+        m_tr = m_rot + t.unsqueeze(-2).repeat_interleave(self.num_points, dim=-2)
         return m_tr
 
 
-class BoxPoseLoss(PoseLoss):
+class BoxPoseLoss(ModelPoseLoss):
     pass
 
 

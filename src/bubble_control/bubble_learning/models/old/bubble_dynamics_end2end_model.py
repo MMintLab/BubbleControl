@@ -37,7 +37,7 @@ class BubbleEnd2EndModel(pl.LightningModule):
         self.dyn_model = self._get_dyn_model()
         self.loss = None  # TODO: Define the loss function
         self.mse_loss = nn.MSELoss()
-        self.pose_loss = PoseLoss(np.zeros(2,0), device=self.device)
+        self.pose_loss = PoseLoss(np.zeros(2, 0), device=self.device)
 
         self.save_hyperparameters()  # Important! Every model extension must add this line!
 
