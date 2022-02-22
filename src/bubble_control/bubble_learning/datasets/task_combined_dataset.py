@@ -37,7 +37,9 @@ class TaskCombinedDataset(CombinedDataset):
             wrench_frame=self.wrench_frame,
             dtype=self.dtype,
             transformation=self.transformation,
-            load_cache=self.load_cache
+            load_cache=self.load_cache,
+            contribute_mode=self.contribute_mode,
+            clean_if_error=self.clean_if_error,
         )
         datasets.append(drawing_dataset_line)
         drawing_dataset_one_dir = BubbleDrawingDataset(
@@ -48,7 +50,9 @@ class TaskCombinedDataset(CombinedDataset):
             wrench_frame=self.wrench_frame,
             dtype=self.dtype,
             transformation=self.transformation,
-            load_cache=self.load_cache
+            load_cache=self.load_cache,
+            contribute_mode=self.contribute_mode,
+            clean_if_error=self.clean_if_error,
         )
         datasets.append(drawing_dataset_one_dir)
         pivoting_dataset = BubblePivotingDownsampledDataset(
@@ -59,7 +63,9 @@ class TaskCombinedDataset(CombinedDataset):
             wrench_frame=self.wrench_frame,
             dtype=self.dtype,
             transformation=self.transformation,
-            load_cache=self.load_cache
+            load_cache=self.load_cache,
+            contribute_mode=self.contribute_mode,
+            clean_if_error=self.clean_if_error,
         )
         datasets.append(pivoting_dataset)
 

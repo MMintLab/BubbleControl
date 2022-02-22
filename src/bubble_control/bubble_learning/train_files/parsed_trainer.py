@@ -108,7 +108,7 @@ class ParsedTrainer(object):
         for k, v in common_params.items():
             self._add_argument(parser, arg_name=k, default_value=v)
         args = vars(parser.parse_known_args()[0])
-        for k,v in self.default_args.items():
+        for k, v in self.default_args.items():
             if k not in args:
                 self._add_argument(parser, k, v)
         # Add no_gpu option
