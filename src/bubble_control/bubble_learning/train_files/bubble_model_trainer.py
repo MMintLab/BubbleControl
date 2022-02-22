@@ -47,7 +47,7 @@ if __name__ == '__main__':
         'transformation' : trs,
         'downsample_factor_x': 7,
         'downsample_factor_y': 7,
-        'downsample_reduction': 'max',
+        'downsample_reduction': 'mean',
 
     }
     default_types = {
