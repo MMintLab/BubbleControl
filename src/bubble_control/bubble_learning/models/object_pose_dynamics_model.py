@@ -22,12 +22,16 @@ from bubble_control.bubble_learning.aux.pose_loss import ModelPoseLoss
 
 class ObjectPoseDynamicsModel(DynamicsModelBase):
 
-    def __init__(self, *args, num_to_log=40, **kwargs):
+    def __init__(self, *args, num_to_log=40, input_batch_norm=True, **kwargs):
         self.num_to_log = num_to_log
+        self.input_batch_norm = input_batch_norm
         super().__init__(*args, **kwargs)
         self.dyn_model = self._get_dyn_model()
         self.pose_loss = ModelPoseLoss()
         self.plane_normal = nn.Parameter(torch.tensor([1, 0, 0], dtype=torch.float), requires_grad=False)
+        sizes = self._get_sizes()
+        self.dyn_input_batch_norm = nn.BatchNorm1d(
+            num_features=sizes['dyn_input_size'])  # call eval() to freeze the mean and std estimation
         self.save_hyperparameters()
 
     @classmethod
@@ -62,6 +66,8 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
         # obj_pose_size = obj_pos_size + obj_quat_size
         obj_model_emb = self.object_embedding_module(object_model)  # (B, imprint_emb_size)
         dyn_input = torch.cat([obj_pose, pos, ori, obj_model_emb, action], dim=-1)
+        if self.input_batch_norm:
+            dyn_input = self.dyn_input_batch_norm(dyn_input)
         dyn_output = self.dyn_model(dyn_input)
         obj_pose_next = dyn_output # we only predict object_pose
         return (obj_pose_next,)
@@ -92,7 +98,8 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
         axis_angle_gth = obj_pose_gth[..., 3:]
         R_gth = batched_trs.axis_angle_to_matrix(axis_angle_gth)
         t_gth = obj_pose_gth[..., :3]
-        pose_loss = self.mse_loss(obj_pose_pred, obj_pose_gth)
+        pose_loss = self.pose_loss(R_1=R_pred, t_1=t_pred, R_2=R_gth, t_2=t_gth, model_points=object_model)
+        # pose_loss = self.mse_loss(obj_pose_pred, obj_pose_gth)
         loss = pose_loss
         return loss
 
