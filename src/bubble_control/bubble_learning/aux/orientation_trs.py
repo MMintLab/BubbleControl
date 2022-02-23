@@ -60,14 +60,14 @@ class QuaternionToAxis(object):
             theta = torch.norm(x_tr, dim=-1)
             theta = theta.unsqueeze(-1).repeat_interleave(3, axis=-1)
             axis = x_tr / theta
-            axis[theta==0] = 0
-            qw = torch.cos(theta[...,0] * 0.5).unsqueeze(-1)
+            axis[theta == 0] = 0
+            qw = torch.cos(theta[..., 0] * 0.5).unsqueeze(-1)
             qxyz = torch.sin(theta * 0.5) * axis
             x = torch.cat([qxyz, qw], dim=-1)
         else:
             theta = np.linalg.norm(x_tr, axis=-1)
             theta = np.expand_dims(theta, axis=-1).repeat(3, axis=-1)
-            axis = np.divide(x_tr,theta, out=np.zeros_like(theta), where=theta!=0)
+            axis = np.divide(x_tr, theta, out=np.zeros_like(theta), where=theta!=0)
             qw = np.cos(theta[..., 0:1]*0.5)
             qxyz = np.sin(theta*0.5)*axis
             x = np.concatenate([qxyz, qw], axis=-1)

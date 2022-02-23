@@ -108,7 +108,7 @@ class BubbleDrawingBaseEnv(BubbleBaseEnv):
         obs['wrench'] = self._get_wrench()
         obs['tfs'] = self._get_tfs()
         obs['marker'] = self.marker_code
-        obs['object_model'] = self._get_object_model(self.tool)
+        obs['object_model'] = self._get_object_model(self.marker_code)
         # add the reference state
         obs = self._add_bubble_reference_to_observation(obs)
         return obs

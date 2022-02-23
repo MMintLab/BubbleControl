@@ -20,25 +20,11 @@ class BubbleEnd2EndDynamicsModel(BubbleDynamicsModelBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.img_encoder = self._get_img_encoder()
         self.save_hyperparameters()
 
     @classmethod
     def get_name(cls):
         return 'bubble_end2end_dynamics_model'
-
-    def _get_img_encoder(self):
-        sizes = self._get_sizes()
-        img_size = sizes['imprint']# (C_in, W_in, H_in)
-        img_encoder = ImageEncoder(input_size=img_size,
-                                   latent_size=self.img_embedding_size,
-                                   num_convs=self.encoder_num_convs,
-                                   conv_h_sizes=self.encoder_conv_hidden_sizes,
-                                   ks=self.ks,
-                                   num_fcs=self.num_encoder_fcs,
-                                   fc_hidden_size=self.fc_h_dim,
-                                   activation=self.activation)
-        return img_encoder
 
     def _get_dyn_input_size(self, sizes):
         dyn_input_size = self.img_embedding_size + sizes['init_wrench'] + sizes['init_pos'] + sizes['init_quat'] + self.object_embedding_size + sizes['action']
@@ -50,7 +36,7 @@ class BubbleEnd2EndDynamicsModel(BubbleDynamicsModelBase):
 
     def forward(self, imprint, wrench, pos, ori, object_model, action):
         sizes = self._get_sizes()
-        imprint_input_emb = self.img_encoder(imprint)
+        imprint_input_emb = self.autoencoder.encode(imprint)
         obj_model_emb = self.object_embedding_module(object_model)  # (B, imprint_emb_size)
         dyn_input = torch.cat([imprint_input_emb, wrench, pos, ori, obj_model_emb, action], dim=-1)
         dyn_output = self.dyn_model(dyn_input)
