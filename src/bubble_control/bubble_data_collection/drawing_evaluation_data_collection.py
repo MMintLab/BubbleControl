@@ -4,12 +4,10 @@ import os
 from tqdm import tqdm
 
 from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
-from bubble_control.bubble_learning.models.old.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel
+from bubble_control.bubble_learning.models.bubble_dynamics_model import BubbleDynamicsModel
 from bubble_control.bubble_model_control.aux.bubble_dynamics_fixed_model import BubbleDynamicsFixedModel
 from victor_hardware_interface_msgs.msg import ControlMode
-
-from bubble_control.bubble_model_control.model_output_object_pose_estimaton import \
-    BatchedModelOutputObjectPoseEstimation
+from bubble_control.bubble_model_control.model_output_object_pose_estimaton import BatchedModelOutputObjectPoseEstimation
 from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIController
 from bubble_control.bubble_envs.bubble_drawing_env import BubbleOneDirectionDrawingEnv
 
@@ -23,15 +21,15 @@ from bubble_control.bubble_model_control.cost_functions import vertical_tool_cos
 from bubble_utils.bubble_data_collection.data_collector_base import DataCollectorBase
 
 from mmint_camera_utils.recorders.recording_utils import record_image_color
-
+from mmint_camera_utils.recorders.data_recording_wrappers import ActionSelfSavedWrapper
 
 
 class DrawingEvaluationDataCollection(DataCollectorBase):
 
     def __init__(self, *args, scene_name='drawing_evaluation', random_action=False, fixed_model=False, imprint_selection='percentile',
-                                                     imprint_percentile=0.005, debug=False, **kwargs):
+                                                     imprint_percentile=0.005, object_name='marker', debug=False, **kwargs):
         self.scene_name = scene_name
-        self.object_name = 'marker'
+        self.object_name = object_name
         self.num_samples = 100
         self.horizon = 2
         self.init_action = {
@@ -45,7 +43,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.debug = debug
         self.data_name = '/home/mmint/Desktop/drawing_data_one_direction'
         self.load_version = 0
-        self.data_save_params = {'save_path': self.data_path, 'scene_name': self.scene_name}
+
         self.reference_fc = None
         self.bubble_ref_obs = None
         self.model = self._get_model()
@@ -55,14 +53,14 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.env = None
         self.controller = None
         super().__init__(*args, **kwargs)
+        self.data_save_params = {'save_path': self.data_path, 'scene_name': self.scene_name}
 
     def _get_legend_column_names(self):
         """
         Return a list containing the column names of the datalegend
         Returns:
         """
-        # TODO: Record also all the information like states and observations.
-        column_names = ['EvaluationFileCode', 'ObservationFileCodes', 'ReferenceFileCode', 'SceneName', 'ControllerMethod', 'Score', 'NumSteps', 'Actions', 'NumStepsExpected']
+        column_names = ['EvaluationFileCode', 'ReferenceFileCode', 'ActionsFileCode', 'ObjectName', 'SceneName', 'ControllerMethod', 'Score', 'NumSteps', 'NumStepsExpected', 'ObservationFileCodes']
         return column_names
 
     def _get_legend_lines(self, data_params):
@@ -92,11 +90,14 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
 
         # Draw
         num_steps = 40
-        num_steps_done = 40
+        num_steps_done = 0
         self.env.do_init_action(self.init_action)
         num_steps_done, obs_fcs, actions = self.draw_steps(num_steps=num_steps)
 
         fc = self.get_new_filecode()
+
+        actions_self_saved = ActionSelfSavedWrapper(actions, data_params=self.data_save_params)
+        actions_self_saved.save_fc(fc)
 
         # Evaluate
         self.env.med.set_control_mode(ControlMode.JOINT_POSITION, vel=0.1)
@@ -118,9 +119,10 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             'ReferenceFileCode': self.reference_fc,
             'SceneName': self.scene_name,
             'NumSteps': num_steps_done,
-            'Actions': actions,
+            'ActionsFileCode': fc,
             'NumStepsExpected': num_steps,
             'ControllerMethod': self._get_controller_name(),
+            'ObjectName': self.object_name,
             'Score': score,
         }
 
@@ -131,13 +133,15 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.controller = self._get_controller() # Reset the controller every time
 
     def _get_model(self):
-        if not self.fixed_model:
-            Model = BubbleDynamicsPretrainedAEModel
-            model = load_model_version(Model, self.data_name, self.load_version)
-        else:
+        if self.random_action or self.fixed_model:
             model = BubbleDynamicsFixedModel()
-        model.eval()
-
+            model.eval()
+        else:
+            # load the model
+            #TODO: Replace the model
+            Model = BubbleDynamicsModel
+            model = load_model_version(Model, self.data_name, self.load_version)
+            model.eval()
         return model
 
     def _get_object_pose_estimation(self):
@@ -154,7 +158,8 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
                                            drawing_area_size=(0.15, 0.3),
                                            drawing_length_limits=(0.01, 0.02),
                                            wrap_data=True,
-                                           grasp_width_limits=(15, 25))
+                                           marker_code=self.object_name,
+                                           grasp_width_limits=(10, 35))
         return env
 
     def _get_controller(self):

@@ -13,6 +13,7 @@ if __name__ == '__main__':
     parser.add_argument('--random_action', action='store_true', help='impedance mode')
     parser.add_argument('--fixed_model', action='store_true', help='reactive mode -- adjust tool position to be straight when we start drawing')
     parser.add_argument('--debug', type=bool, default=False, help='Whether or not to visualize model predictions')
+    parser.add_argument('--object_name', type=str, default='marker', help='name of the object')
     # TODO: Add more parameters if needed
 
     args = parser.parse_args()

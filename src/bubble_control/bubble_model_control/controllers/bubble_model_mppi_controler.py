@@ -13,6 +13,8 @@ from bubble_control.bubble_model_control.controllers.bubble_controller_base impo
 from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample, get_transformation_matrix, tr_frame, convert_all_tfs_to_tensors
 from bubble_pivoting.pivoting_model_control.aux.pivoting_geometry import get_angle_difference, check_goal_position, get_tool_axis, get_tool_angle_gf
 import pdb
+
+
 def to_tensor(x, **kwargs):
     if not torch.is_tensor(x):
         x_t = torch.tensor(x, **kwargs)
@@ -35,6 +37,7 @@ class BubbleModelMPPIController(BubbleModelController):
         self.num_samples = num_samples
         self.horizon = horizon
         super().__init__(model, env, object_pose_estimator, cost_function, state_trs=state_trs)
+        self.action_space = self.env.action_space
         self.u_mu = None
         self.noise_sigma = noise_sigma
         self._noise_sigma_value = _noise_sigma_value
@@ -52,7 +55,7 @@ class BubbleModelMPPIController(BubbleModelController):
         self.original_state_shape = None
         self.sample = None # Container to share sample across functions
         self.controller = None # controller not initialized yet
-        self.action_space = self.env.action_space
+
         
     def _get_action_container(self):
         action_container, _ = self.env.get_action()
