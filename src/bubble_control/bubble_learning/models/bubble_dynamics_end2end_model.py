@@ -18,7 +18,11 @@ from bubble_control.bubble_learning.models.bubble_dynamics_model_base import Bub
 
 class BubbleEnd2EndDynamicsModel(BubbleDynamicsModelBase):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, encoder_num_convs=3, encoder_conv_hidden_sizes=None, ks=3, num_encoder_fcs=2, **kwargs):
+        self.encoder_num_convs = encoder_num_convs
+        self.encoder_conv_hidden_sizes = encoder_conv_hidden_sizes
+        self.ks = ks
+        self.num_encoder_fcs = num_encoder_fcs
         super().__init__(*args, **kwargs)
         self.img_encoder = self._get_img_encoder()
         self.save_hyperparameters()
