@@ -4,16 +4,18 @@ import os
 from tqdm import tqdm
 
 from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
-from bubble_control.bubble_learning.models.old.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel
+from bubble_control.bubble_learning.models.bubble_dynamics_model import BubbleDynamicsModel
+from bubble_control.bubble_learning.models.bubble_linear_dynamics_model import BubbleLinearDynamicsModel
+from bubble_control.bubble_learning.models.object_pose_dynamics_model import ObjectPoseDynamicsModel
 from bubble_control.bubble_model_control.aux.bubble_dynamics_fixed_model import BubbleDynamicsFixedModel
 from victor_hardware_interface_msgs.msg import ControlMode
 
 from bubble_control.bubble_model_control.model_output_object_pose_estimaton import \
-    BatchedModelOutputObjectPoseEstimation
-from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIController
+    BatchedModelOutputObjectPoseEstimation, End2EndModelOutputObjectPoseEstimation
+from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIController, default_grasp_pose_correction
 from bubble_control.bubble_envs.bubble_drawing_env import BubbleOneDirectionDrawingEnv
 
-from bubble_control.bubble_model_control.drawing_action_models import drawing_action_model_one_dir
+from bubble_control.bubble_model_control.drawing_action_models import drawing_action_model_one_dir, drawing_one_dir_grasp_pose_correction
 from bubble_control.bubble_learning.aux.load_model import load_model_version
 from bubble_control.aux.drawing_evaluator import DrawingEvaluator
 from bubble_control.bubble_model_control.aux.format_observation import format_observation_sample
@@ -25,10 +27,9 @@ from bubble_utils.bubble_data_collection.data_collector_base import DataCollecto
 from mmint_camera_utils.recorders.recording_utils import record_image_color
 
 
-
 class DrawingEvaluationDataCollection(DataCollectorBase):
 
-    def __init__(self, *args, scene_name='drawing_evaluation', random_action=False, fixed_model=False, imprint_selection='percentile',
+    def __init__(self, *args, model_name='random', load_version=0, scene_name='drawing_evaluation', imprint_selection='percentile',
                                                      imprint_percentile=0.005, debug=False, **kwargs):
         self.scene_name = scene_name
         self.object_name = 'marker'
@@ -38,13 +39,12 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             'start_point': np.array([0.55, 0.2]),
             'direction': np.deg2rad(270),
         }
-        self.fixed_model = fixed_model
-        self.random_action = random_action
+        self.model_name = model_name
+        self.load_version = load_version
         self.imprint_selection = imprint_selection
         self.imprint_percentile = imprint_percentile
         self.debug = debug
         self.data_name = '/home/mmint/Desktop/drawing_data_one_direction'
-        self.load_version = 0
         self.data_save_params = {'save_path': self.data_path, 'scene_name': self.scene_name}
         self.reference_fc = None
         self.bubble_ref_obs = None
@@ -85,7 +85,6 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         """
 
         self._init_collection_sample()
-
         if self.bubble_ref_obs is not self.env.bubble_ref_obs:
             # record the reference
             self._record_reference_state()
@@ -131,17 +130,26 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.controller = self._get_controller() # Reset the controller every time
 
     def _get_model(self):
-        if not self.fixed_model:
-            Model = BubbleDynamicsPretrainedAEModel
+        models = [BubbleDynamicsModel, BubbleLinearDynamicsModel, ObjectPoseDynamicsModel]
+        model_names = [m.get_name() for m in models]
+        if self.model_name in model_names:
+            Model = models[model_names.index(self.model_name)]
             model = load_model_version(Model, self.data_name, self.load_version)
+        elif self.model_name in ['random', 'fixed_model']:
+            model = BubbleDynamicsFixedModel() # TODO: Find another way to set the random without using the fixed model.
         else:
-            model = BubbleDynamicsFixedModel()
+            raise AttributeError('Model name provided {} not supported. We currently support {}. We also support "random" and "fixed_model"'.format(self.model_name, model_names))
+        print(' \n\n MODEL NAME: {}\n\n'.format(self.model_name))
         model.eval()
-
         return model
 
     def _get_object_pose_estimation(self):
-        ope = BatchedModelOutputObjectPoseEstimation(object_name=self.object_name, factor_x=7, factor_y=7, method='bilinear',
+        if self.model_name in ['object_pose_dynamics_model']:
+            # We do not need to estimate the pose from imprints since the model predicts directly the object pose.
+            ope = End2EndModelOutputObjectPoseEstimation()
+
+        else:
+            ope = BatchedModelOutputObjectPoseEstimation(object_name=self.object_name, factor_x=7, factor_y=7, method='bilinear',
                                                      device=torch.device('cuda'), imprint_selection=self.imprint_selection,
                                                      imprint_percentile=self.imprint_percentile)  # percentile
         return ope
@@ -158,14 +166,19 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         return env
 
     def _get_controller(self):
+        if isinstance(self.model, ObjectPoseDynamicsModel):
+            grasp_pose_correction = None # get default one which does not correct the pose since it is direclty predicted corrected.
+        else:
+            grasp_pose_correction = drawing_one_dir_grasp_pose_correction
         controller = BubbleModelMPPIController(self.model, self.env, self.ope, vertical_tool_cost_function,
-                                                action_model=drawing_action_model_one_dir, 
+                                                action_model=drawing_action_model_one_dir,
+                                                grasp_pose_correction=grasp_pose_correction,
                                                 num_samples=self.num_samples, horizon=self.horizon, noise_sigma=None,
                                                 _noise_sigma_value=.3, debug=self.debug)
         return controller
 
     def _get_controller_name(self):
-        if self.random_action:
+        if self.model_name == 'random':
             return 'random_action'
         else:
             return '{}_mppi'.format(self.model.name)
@@ -197,7 +210,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             action, valid_action = self.env.get_action()  # this is a
             obs_sample = format_observation_sample(obs_sample_raw)
             obs_sample = self.block_downsample_tr(obs_sample)
-            if not self.random_action:
+            if not self.model_name == 'random':
                 action_raw = self.controller.control(obs_sample).detach().cpu().numpy()
                 # print(action_raw)
                 if np.isnan(action_raw).any():

@@ -7,6 +7,19 @@ import pytorch3d.transforms as batched_trs
 
 from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample, get_transformation_matrix, tr_frame, convert_all_tfs_to_tensors
 
+def drawing_one_dir_grasp_pose_correction(position, orientation, action):
+    # NOTE: Orientations can either be quaternions or axis-angle
+    # position: 3d position with reference on the med_base of the grasp_frame
+    # orientation: orientation of the grasp_frame with respect to the med_base
+    # action: ['rotation', 'length', 'grasp_width'] to be commanded to the robot
+    #   - rotation: rotation along the gripper x axis in rad.
+    #   - length: movement along the drawing direction (intersection of the med_base_pane and the plane perpendicular to the grasp_frame x_axis.
+    #   - grasp_width: adjustement of the grasp width (no needed here)
+    action_names = ['rotation', 'length', 'grasp_width']
+    import pdb; pdb.set_trace()
+    return position_next, orientation_next
+
+
 
 def drawing_action_model_one_dir(state_samples, actions):
     """

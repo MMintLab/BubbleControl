@@ -145,7 +145,7 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
 
     def _get_pose_images(self, trans_pred, rot_angle_pred, trans_gth, rot_angle_gth):
         images = []
-        for i in np.arange(32):
+        for i in range(len(trans_pred)):
             img = np.zeros([100, 100, 3], dtype=np.uint8)
             img.fill(100)
             pred_param = self._find_rect_param(trans_pred[i], rot_angle_pred[i], img)
