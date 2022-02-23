@@ -29,7 +29,7 @@ class BubbleEnd2EndDynamicsModel(BubbleDynamicsModelBase):
 
     def _get_img_encoder(self):
         sizes = self._get_sizes()
-        img_size = sizes['imprint']# (C_in, W_in, H_in)
+        img_size = sizes['init_imprint']# (C_in, W_in, H_in)
         img_encoder = ImageEncoder(input_size=img_size,
                                    latent_size=self.img_embedding_size,
                                    num_convs=self.encoder_num_convs,
