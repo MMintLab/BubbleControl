@@ -34,7 +34,8 @@ class QuaternionToAxis(object):
                     sample[key] = self._tr_inv(sample[key])
         return sample
 
-    def _tr(self, x):
+    @classmethod
+    def _tr(cls, x):
         # transform a quaternion encoded rotation to an axis one with 3 values representing the axis of rotation where the modulus is the angle magnitude
         # q = [qx, qy, qz, qw] where qw = cos(theta/2); qx = a1*sin(theta/2),...
         if torch.is_tensor(x):
@@ -55,7 +56,8 @@ class QuaternionToAxis(object):
             x_tr = theta * axis
         return x_tr
 
-    def _tr_inv(self, x_tr):
+    @classmethod
+    def _tr_inv(cls, x_tr):
         if torch.is_tensor(x_tr):
             theta = torch.norm(x_tr, dim=-1)
             theta = theta.unsqueeze(-1).repeat_interleave(3, axis=-1)

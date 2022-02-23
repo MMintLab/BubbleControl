@@ -67,8 +67,8 @@ class BatchedModelOutputObjectPoseEstimation(ModelOutputObjectPoseEstimationBase
         imprint_pred_l = predicted_imprint[:, 1]
 
         # unprocess the imprints (add padding to move them back to the original shape)
-        imprint_pred_r = unprocess_bubble_img(imprint_pred_r.unsqueeze(-1), detach=True).squeeze(-1) # ref frame:  -- (N, w, h)
-        imprint_pred_l = unprocess_bubble_img(imprint_pred_l.unsqueeze(-1), detach=True).squeeze(-1) # ref frame:  -- (N, w, h)
+        imprint_pred_r = unprocess_bubble_img(imprint_pred_r.unsqueeze(-1)).squeeze(-1) # ref frame:  -- (N, w, h)
+        imprint_pred_l = unprocess_bubble_img(imprint_pred_l.unsqueeze(-1)).squeeze(-1) # ref frame:  -- (N, w, h)
         imprint_frame_r = 'pico_flexx_right_optical_frame'
         imprint_frame_l = 'pico_flexx_left_optical_frame'
 

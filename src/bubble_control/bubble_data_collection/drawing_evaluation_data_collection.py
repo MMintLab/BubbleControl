@@ -12,7 +12,7 @@ from victor_hardware_interface_msgs.msg import ControlMode
 
 from bubble_control.bubble_model_control.model_output_object_pose_estimaton import \
     BatchedModelOutputObjectPoseEstimation, End2EndModelOutputObjectPoseEstimation
-from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIController, default_grasp_pose_correction
+from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIController
 from bubble_control.bubble_envs.bubble_drawing_env import BubbleOneDirectionDrawingEnv
 
 from bubble_control.bubble_model_control.drawing_action_models import drawing_action_model_one_dir, drawing_one_dir_grasp_pose_correction
@@ -216,13 +216,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             obs_sample = format_observation_sample(obs_sample_raw)
             obs_sample = self.block_downsample_tr(obs_sample)
             if not self.model_name == 'random':
-                action_raw = self.controller.control(obs_sample).detach().cpu().numpy()
-                # print(action_raw)
-                if np.isnan(action_raw).any():
-                    # print('Nan Value --- {}'.format(action_raw))
-                    break
-                for i, (k, v) in enumerate(action.items()):
-                    action[k] = action_raw[i]
+                action = self.controller.control(obs_sample) # it is already an action dictionary
             # print('Action:', action)
             actions.append(action)
             obs_sample_raw, reward, done, info = self.env.step(action)
