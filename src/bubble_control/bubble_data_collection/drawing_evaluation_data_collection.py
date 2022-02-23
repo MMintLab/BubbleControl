@@ -5,21 +5,14 @@ from tqdm import tqdm
 
 from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
 from bubble_control.bubble_learning.models.bubble_dynamics_model import BubbleDynamicsModel
-<<<<<<< HEAD
 from bubble_control.bubble_model_control.aux.bubble_dynamics_fixed_model import BubbleDynamicsFixedModel
-from victor_hardware_interface_msgs.msg import ControlMode
-from bubble_control.bubble_model_control.model_output_object_pose_estimaton import BatchedModelOutputObjectPoseEstimation
-from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIController
-=======
 from bubble_control.bubble_learning.models.bubble_linear_dynamics_model import BubbleLinearDynamicsModel
 from bubble_control.bubble_learning.models.object_pose_dynamics_model import ObjectPoseDynamicsModel
-from bubble_control.bubble_model_control.aux.bubble_dynamics_fixed_model import BubbleDynamicsFixedModel
 from victor_hardware_interface_msgs.msg import ControlMode
 
 from bubble_control.bubble_model_control.model_output_object_pose_estimaton import \
     BatchedModelOutputObjectPoseEstimation, End2EndModelOutputObjectPoseEstimation
 from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIController, default_grasp_pose_correction
->>>>>>> 797b6554ec7aacf2f885805e8877a9e118c545f7
 from bubble_control.bubble_envs.bubble_drawing_env import BubbleOneDirectionDrawingEnv
 
 from bubble_control.bubble_model_control.drawing_action_models import drawing_action_model_one_dir, drawing_one_dir_grasp_pose_correction
@@ -33,6 +26,7 @@ from bubble_utils.bubble_data_collection.data_collector_base import DataCollecto
 
 from mmint_camera_utils.recorders.recording_utils import record_image_color
 from mmint_camera_utils.recorders.data_recording_wrappers import ActionSelfSavedWrapper
+
 
 class DrawingEvaluationDataCollection(DataCollectorBase):
 
@@ -52,7 +46,6 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.imprint_percentile = imprint_percentile
         self.debug = debug
         self.data_name = '/home/mmint/Desktop/drawing_data_one_direction'
-        self.data_save_params = {'save_path': self.data_path, 'scene_name': self.scene_name}
         self.reference_fc = None
         self.bubble_ref_obs = None
         self.model = self._get_model()
