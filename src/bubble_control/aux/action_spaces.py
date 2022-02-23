@@ -96,6 +96,31 @@ class InitialPivotingPoseSpace(gym.spaces.Space):
         upper_bound = np.array([self.init_x_limits[1], self.init_y_limits[1], self.init_z_limits[1], self.roll_limits[1], 0, np.pi])
         return lower_bound  <= pose <= upper_bound
     
+
+class DeltaRollSpace(gym.spaces.Space):
+    """
+    Sample initial pose for pivoting (with orientation as euler)
+    """
+    def __init__(self, delta_roll_limits, seed=None):
+        super().__init__((), np.float32, seed)
+        self.delta_roll_limits = delta_roll_limits
+        self.low = delta_roll_limits[0] #self.roll_limits[0] points away from user
+        self.high = delta_roll_limits[1]
+
+    def sample(self):
+        p_direction = self.np_random.random()
+        normal_d = np.random.normal(loc=0.0, scale=self.delta_roll_limits[1]/2)
+        if p_direction < 0.5:
+            delta_roll = self.delta_roll_limits[1] - normal_d
+        else:
+            delta_roll = self.delta_roll_limits[0] + normal_d                                        
+        return delta_roll
+
+    def contains(self, pose):
+        lower_bound = np.array([self.init_x_limits[0], self.init_y_limits[0], self.init_z_limits[0], self.roll_limits[0], 0, np.pi])
+        upper_bound = np.array([self.init_x_limits[1], self.init_y_limits[1], self.init_z_limits[1], self.roll_limits[1], 0, np.pi])
+        return lower_bound  <= pose <= upper_bound
+    
 class RollSpace(gym.spaces.Space):
     """
     Sample initial roll for pivoting

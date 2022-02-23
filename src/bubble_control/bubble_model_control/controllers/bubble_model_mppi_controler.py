@@ -53,6 +53,8 @@ class BubbleModelMPPIController(BubbleModelController):
         self.sample = None # Container to share sample across functions
         self.controller = None # controller not initialized yet
         self.action_space = self.env.action_space
+        self.actions = None
+        self.costs = None
         
     def _get_action_container(self):
         action_container, _ = self.env.get_action()
@@ -69,10 +71,17 @@ class BubbleModelMPPIController(BubbleModelController):
         states = self._unpack_state_tensor(state_t)
         actions = self._unpack_action_tensor(action_t)
         state_samples = self._pack_state_to_sample(states, self.sample)
-        prev_state_samples = copy.deepcopy(state_samples['all_tfs'])
+        prev_state_samples = {'all_tfs': copy.deepcopy(state_samples['all_tfs'])}
         state_samples = self._action_correction(state_samples, actions) # apply the action model
         estimated_poses = self._estimate_poses(state_samples, actions)
         costs = self.cost_function(estimated_poses, state_samples, prev_state_samples, actions)
+        if self.actions is None:
+            self.actions = actions
+            self.costs = costs
+        else:
+            self.actions = torch.cat((self.actions, actions), dim=0)
+            self.costs = torch.cat((self.costs, costs), dim=0)
+            
         costs_t = to_tensor(costs)
         costs_t = costs_t.flatten()  # This fixes the error on mppi _compute_rollout_costs, although the documentation says that cost should be a (K,1)
         return costs_t
@@ -206,7 +215,7 @@ class BubbleModelMPPIController(BubbleModelController):
         if len(action.shape) < 2:
             action = action.unsqueeze(0)
         output = self.model(*model_input, action)
-        if self.debug and action.shape[0] < 2:
+        if self.debug:
             self.state_prev = state
             self.prediction = output
         next_state = self._expand_output_to_state(output, state, action)
@@ -273,21 +282,27 @@ class BubbleModelMPPIController(BubbleModelController):
         estimated_pose = self.object_pose_estimator.estimate_pose(next_state_sample)
         tool_angle_gf = get_tool_angle_gf(estimated_pose, next_state_sample)
         print('Predicted tool angle gf after action: ', tool_angle_gf)
+        action_ind = (torch.norm(self.actions - action, dim=1) < 0.01).nonzero(as_tuple=True)[0]
+        if action_ind.shape[0] >= 1:
+            action_ind = action_ind[0].item()
+        action_cost = self.costs[action_ind]
+        print("Cost of action: ", action_cost)
 
     def visualize_prediction(self, obs_sample_next):
         formatted_obs_sample = self.get_downsampled_obs(obs_sample_next)
         state_next = self._unpack_state_sample(formatted_obs_sample)
         fig, axes = plt.subplots(nrows=2, ncols=3)
-        axes[0][0].imshow(self.state_prev[0][0,0], cmap='jet')
-        axes[1][0].imshow(self.state_prev[0][0,1], cmap='jet')
-        axes[0][1].imshow(self.prediction[0][0,0].detach().numpy(), cmap='jet')
-        axes[1][1].imshow(self.prediction[0][0,1].detach().numpy(), cmap='jet')
-        axes[0][2].imshow(state_next[0][0], cmap='jet')
-        axes[1][2].imshow(state_next[0][1], cmap='jet')
-        axes[0][0].set_title('Previus imprint')
-        axes[0][1].set_title('Predicted next imprint')
-        axes[0][2].set_title('Gth next imprint')
-        plt.show()     
+        for i,_ in enumerate(self.state_prev): 
+            axes[0][0].imshow(self.state_prev[i][0][0,0], cmap='jet')
+            axes[1][0].imshow(self.state_prev[i][0][0,1], cmap='jet')
+            axes[0][1].imshow(self.prediction[i][0][0,0].detach().numpy(), cmap='jet')
+            axes[1][1].imshow(self.prediction[i][0][0,1].detach().numpy(), cmap='jet')
+            axes[0][2].imshow(state_next[0][0], cmap='jet')
+            axes[1][2].imshow(state_next[0][1], cmap='jet')
+            axes[0][0].set_title('Previus imprint')
+            axes[0][1].set_title('Predicted next imprint')
+            axes[0][2].set_title('Gth next imprint')
+            plt.show()     
         
     def _action_correction(self, state_samples, actions):
         # actions: tensor of shape (N, action_dim)
