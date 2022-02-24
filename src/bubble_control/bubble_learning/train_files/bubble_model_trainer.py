@@ -48,7 +48,8 @@ if __name__ == '__main__':
         'downsample_factor_x': 7,
         'downsample_factor_y': 7,
         'downsample_reduction': 'mean',
-
+        'contribute_mode': True,
+        'clean_if_error': False,
     }
     default_types = {
         'batch_size': int,
