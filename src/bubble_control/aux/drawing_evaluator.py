@@ -63,11 +63,13 @@ class DrawingEvaluator(object):
 
     def _get_board_corners_bc(self):
         # return the board corner coordiantes in board coordinates
+        # Board coordinates are centered at tag_names[0] and with the same xy orientation of the plane coordinates
+        x_correction = 0.02
         board_corners_bc = np.array([
             [-0.5 * self.tag_size, 0.5 * self.tag_size, 0],
             [self.board_x_size - 0.5 * self.tag_size, 0.5 * self.tag_size, 0],
-            [self.board_x_size - 0.5 * self.tag_size, 0.5 * self.tag_size - self.board_y_size, 0],
-            [-0.5 * self.tag_size, 0.5 * self.tag_size - self.board_y_size, 0]
+            [self.board_x_size - 0.5 * self.tag_size, 0.5 * self.tag_size - self.board_y_size + x_correction, 0],
+            [-0.5 * self.tag_size, 0.5 * self.tag_size - self.board_y_size + x_correction, 0]
         ])
         return board_corners_bc
 
@@ -238,7 +240,24 @@ class DrawingEvaluator(object):
         return score, binarized_img, expected_img
 
 
+# DEBUG: --
 
+if __name__ == '__main__':
+    rospy.init_node('drawing_eval_testing')
+    evaluator = DrawingEvaluator()
 
+    # expected_drawing_coorinates:
+    num_points = 1000
+    start_point = [0.55, 0.2]
+    edc_x = start_point[0] * np.ones((num_points,))
+    edc_y = np.linspace(start_point[1] - 0.55, start_point[1], num=num_points)
+    edc_z = 0.01 * np.ones((num_points,))
+    expected_drawing_cooridnates = np.stack([edc_x, edc_y, edc_z], axis=-1)
+
+    # evaluate
+    score, actual_drawing, expected_drawing = evaluator.evaluate(expected_drawing_cooridnates,
+                                                                      frame='med_base',
+                                                                      save_path='/home/mmint/Desktop/eval_test')
+    print('SCORE: ', score)
 
 

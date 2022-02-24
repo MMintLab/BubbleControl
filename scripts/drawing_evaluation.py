@@ -13,6 +13,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_name', type=str, default='random', help='code for the model used. can also be "fixed_model" or "random"')
     parser.add_argument('--load_version', type=int, default=0, help='version f for the model used. can also be "fixed_model" or "random"')
     parser.add_argument('--debug', type=bool, default=False, help='Whether or not to visualize model predictions')
+    parser.add_argument('--object_name', type=str, default='marker', help='name of the object')
     # TODO: Add more parameters if needed
 
     args = parser.parse_args()
