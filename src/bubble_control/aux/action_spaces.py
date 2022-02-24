@@ -109,7 +109,7 @@ class DeltaRollSpace(gym.spaces.Space):
 
     def sample(self):
         p_direction = self.np_random.random()
-        normal_d = np.random.normal(loc=0.0, scale=self.delta_roll_limits[1]/2)
+        normal_d = np.random.normal(loc=0.0, scale=self.delta_roll_limits[1]/4)
         if p_direction < 0.5:
             delta_roll = self.delta_roll_limits[1] - normal_d
         else:

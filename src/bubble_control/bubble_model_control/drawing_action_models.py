@@ -6,6 +6,8 @@ import tf.transformations as tr
 import pytorch3d.transforms as batched_trs
 
 from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample, get_transformation_matrix, tr_frame, convert_all_tfs_to_tensors
+from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
+
 
 def drawing_one_dir_grasp_pose_correction(position, orientation, action):
     # NOTE: Orientations can either be quaternions or axis-angle
@@ -16,9 +18,20 @@ def drawing_one_dir_grasp_pose_correction(position, orientation, action):
     #   - length: movement along the drawing direction (intersection of the med_base_pane and the plane perpendicular to the grasp_frame x_axis.
     #   - grasp_width: adjustement of the grasp width (no needed here)
     action_names = ['rotation', 'length', 'grasp_width']
-    import pdb; pdb.set_trace()
+    ori_quat = QuaternionToAxis._tr_inv(orientation)
+    x_axis = torch.tensor([1,0,0], dtype=orientation.dtype, device=orientation.device).unsqueeze(0).repeat_interleave(orientation.shape[0], dim=0)
+    axis_rot = x_axis
+    axis_angle_rot = action[..., 0].unsqueeze(-1).repeat_interleave(3,dim=-1)*axis_rot
+    q_rot = QuaternionToAxis._tr_inv(axis_angle_rot)
+    q_next = batched_trs.quaternion_multiply(q_rot, ori_quat)
+    orientation_next = QuaternionToAxis._tr(q_next)
+    z_axis = torch.tensor([0,0,1], dtype=orientation.dtype, device=orientation.device).unsqueeze(0).repeat_interleave(orientation.shape[0], dim=0)
+    w_R_gf = batched_trs.axis_angle_to_matrix(orientation)
+    grasp_plane_normal_wf = torch.einsum('kij,kj->ki', w_R_gf, x_axis)
+    moving_axis = torch.cross(z_axis, grasp_plane_normal_wf)
+    position_delta = action[..., 1:2] * moving_axis
+    position_next = position + position_delta
     return position_next, orientation_next
-
 
 
 def drawing_action_model_one_dir(state_samples, actions):
