@@ -23,7 +23,7 @@ class PoseBuffer(object):
         self.quat = quat
         self.indx = 0
         self.indexing_order = None
-        self.poses_matrix = None
+        self.poses = None
         self.reset()
 
     def reset(self):
@@ -81,17 +81,20 @@ class PoseBuffer(object):
         return current_pose
 
     def get_current_indx(self):
-        current_indx = self.indexing_order[self.indx]
+        wrapped_indx = self._wrap_index(self.indx)
+        current_indx = self.indexing_order[wrapped_indx]
         return current_indx
 
     def _wrap_index(self, indx):
         run_length = self.__len__() *2 - 2 # do not repeat end points
         run_indx = indx // run_length
-        direction = (indx-run_length*run_indx) % run_length
+        w_indx = indx % run_length
+        direction = w_indx // self.__len__()
         if direction == 0:
-            wrapped_indx =  run_indx % run_length # between 0 and self.__len()-1
+            wrapped_indx =  w_indx
         else:
-            wrapped_indx = self.__len__() - 2 - run_length % run_length # between 0 and self.__len()-1
+            wrapped_indx = run_length - w_indx
+        # print('INDX: {}, wrapped_indx: {}, w_indx: {}, run_indx: {}, run_length: {}, direction: {}'.format(indx, wrapped_indx, w_indx, run_indx, run_length, direction))
         return wrapped_indx
 
     def __getitem__(self, item):
@@ -112,9 +115,11 @@ class ImpedanceWrenchDataCollection(MedDataCollectionBase):
         super().__init__(*args, **kwargs)
         self.grasp_width = 10
         self.pose_buffer = self._get_pose_buffer()
+        # test_x = [self.pose_buffer._wrap_index(i) for i in range(20)]
         self.joint_listener = Listener('/med/joint_states', JointState, wait_for_data=True)
         self.joint_sequence = None
         self.initialized = False
+        self.h = None
         self.med.home_robot()
 
     def _initialize_grasp(self):
@@ -130,31 +135,33 @@ class ImpedanceWrenchDataCollection(MedDataCollectionBase):
         self.med.home_robot()
 
     def _get_pose_buffer(self):
-        num_x = 3
-        num_y = 3
-        x_lims = np.array([0.45, 0.55])
-        y_lims = np.array([-0.05, 0.05])
+        num_x = 10
+        num_y = 10
+        x_lims = np.array([0.5, 0.7])
+        y_lims = np.array([-0.1, 0.1])
         limits = np.stack([x_lims, y_lims], axis=1)
-        h_value = 0.2
+        h_value = 0.1
         quat = np.array([-np.cos(np.pi / 4), np.cos(np.pi / 4), 0, 0])
         pose_buffer = PoseBuffer(num_x=num_x, num_y=num_y, limits=limits, h_value=h_value, quat=quat)
         return pose_buffer
 
     def _init_drawing(self, pose_i):
-        z_init = 0.25
+        z_init = 0.15
         self.med.set_joint_control(vel=0.1)
         self.med.home_robot()
         self._initialize_grasp()
         init_pose = pose_i.copy()
         init_pose[2] = z_init
         # set the initial position and orientation
-        self._plan_to_pose(init_pose, supervision=True)
+        self._plan_to_pose(init_pose, supervision=False)
 
         # start impedance mode and lower it down.
-        self.med.cartesian.timeout_per_m = 100
+        self.med.cartesian._timeout_per_m = 500
         self.med.set_cartesian_impedance(0.25, z_stiffnes=2000)
         reached = self.med.cartesian_move(pose_i[:3], quat=pose_i[3:])
         self.med.cartesian.timeout_per_m = 500
+        current_pose = self.med.get_current_pose()
+        self.h = current_pose[2]
         return reached
 
     # Add recording of joints
@@ -202,7 +209,10 @@ class ImpedanceWrenchDataCollection(MedDataCollectionBase):
             self.initialized = True
         else:
             # Move the robot to the desired pose
-            reached = self.med.cartesian_move(pose_i[:3], quat=pose_i[3:])
+            pose_x = pose_i.copy()
+            pose_x[2] = self.h -0.02
+            print(pose_x[:2])
+            reached = self.med.cartesian_move(pose_x[:3], quat=pose_x[3:])
             pass
 
         rospy.sleep(1.0)
