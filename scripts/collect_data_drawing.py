@@ -17,7 +17,7 @@ from bubble_utils.bubble_data_collection.env_data_collection import EnvDataColle
 from bubble_control.bubble_model_control.aux.bubble_dynamics_fixed_model import BubbleDynamicsFixedModel
 from bubble_control.bubble_model_control.aux.format_observation import format_observation_sample
 from bubble_control.bubble_model_control.cost_functions import vertical_tool_cost_function
-from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIBatchedController
+from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIController
 from bubble_control.bubble_model_control.model_output_object_pose_estimaton import BatchedModelOutputObjectPoseEstimation
 from bubble_control.bubble_model_control.drawing_action_models import drawing_action_model_one_dir
 from bubble_control.bubble_envs.controlled_env import ControlledEnvWrapper
@@ -81,7 +81,7 @@ def collect_data_drawing_env_jacobian_controller(save_path, scene_name, num_data
 
     block_downsample_tr = BlockDownSamplingTr(factor_x=7, factor_y=7, reduction='mean', keys_to_tr=['init_imprint'])
 
-    controller = BubbleModelMPPIBatchedController(model, env, ope, vertical_tool_cost_function,
+    controller = BubbleModelMPPIController(model, env, ope, vertical_tool_cost_function,
                                                   action_model=drawing_action_model_one_dir, num_samples=num_samples,
                                                   horizon=horizon, noise_sigma=None, _noise_sigma_value=.3, state_trs=(format_observation_sample, block_downsample_tr))
 

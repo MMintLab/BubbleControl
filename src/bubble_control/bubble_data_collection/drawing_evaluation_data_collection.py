@@ -26,6 +26,7 @@ from bubble_utils.bubble_data_collection.data_collector_base import DataCollecto
 
 from mmint_camera_utils.recorders.recording_utils import record_image_color
 from mmint_camera_utils.recorders.data_recording_wrappers import ActionSelfSavedWrapper
+from arc_utilities.tf2wrapper import TF2Wrapper
 
 
 class DrawingEvaluationDataCollection(DataCollectorBase):
@@ -152,7 +153,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             # We do not need to estimate the pose from imprints since the model predicts directly the object pose.
             ope = End2EndModelOutputObjectPoseEstimation()
         else:
-            ope = BatchedModelOutputObjectPoseEstimation(object_name=self.object_name, factor_x=7, factor_y=7, method='bilinear',
+            ope = BatchedModelOutputObjectPoseEstimation(object_name='marker', factor_x=7, factor_y=7, method='bilinear',
                                                      device=torch.device('cuda'), imprint_selection=self.imprint_selection,
                                                      imprint_percentile=self.imprint_percentile)  # percentile
         return ope
@@ -212,8 +213,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         for step_i in tqdm(range(num_steps)):
             # Downsample the sample
             action, valid_action = self.env.get_action()  # this is a
-            obs_sample = format_observation_sample(obs_sample_raw)
-            obs_sample = self.block_downsample_tr(obs_sample)
+            obs_sample = self.format_raw_observation(obs_sample_raw)
             if not self.model_name == 'random':
                 action = self.controller.control(obs_sample) # it is already an action dictionary
             # print('Action:', action)
@@ -224,7 +224,8 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             obs_sample_raw.save_fc(fc_i)
             obs_fcs.append(fc_i)
             if self.debug:
-                self.controller.visualize_prediction(obs_sample_raw)
+                downsampled_obs = self.format_raw_observation(obs_sample_raw)
+                self.controller.visualize_prediction(downsampled_obs)
             if done:
                 break
         return step_i+1, obs_fcs, actions
@@ -234,3 +235,10 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.reference_fc = self.get_new_filecode()
         self.env.bubble_ref_obs.modify_data_params(self.data_save_params)
         self.env.bubble_ref_obs.save_fc(self.reference_fc)
+
+    def format_raw_observation(self, obs_sample_raw=None):
+        if obs_sample_raw is None:
+            obs_sample_raw = self.env.get_observation()
+        format_obs = format_observation_sample(obs_sample_raw)
+        downsampled_obs = self.block_downsample_tr(format_obs)
+        return downsampled_obs

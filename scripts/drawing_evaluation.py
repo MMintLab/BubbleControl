@@ -27,5 +27,5 @@ if __name__ == '__main__':
 
     rospy.init_node('test_evaluation_drawing')
 
-    dc = DrawingEvaluationDataCollection(data_path=save_path, scene_name=scene_name, model_name=model_name, load_version=load_version, debug=debug)
+    dc = DrawingEvaluationDataCollection(data_path=save_path, scene_name=scene_name, model_name=model_name, load_version=load_version, debug=debug, object_name=args.object_name)
     dc.collect_data(num_data=num_data)
