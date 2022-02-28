@@ -45,7 +45,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.imprint_selection = imprint_selection
         self.imprint_percentile = imprint_percentile
         self.debug = debug
-        self.data_name = '/home/mmint/Desktop/drawing_data_one_direction'
+        self.model_data_path = '/home/mmint/Desktop/drawing_models' # THIS is the path where we expect to load the model. Inside contains tb_logs/{model_name}/version_{version}/....
         self.reference_fc = None
         self.bubble_ref_obs = None
         self.model = self._get_model()
@@ -138,7 +138,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         model_names = [m.get_name() for m in models]
         if self.model_name in model_names:
             Model = models[model_names.index(self.model_name)]
-            model = load_model_version(Model, self.data_name, self.load_version)
+            model = load_model_version(Model, self.model_data_path, self.load_version)
         elif self.model_name in ['random', 'fixed_model']:
             model = BubbleDynamicsFixedModel() # TODO: Find another way to set the random without using the fixed model.
         else:
@@ -151,7 +151,6 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         if self.model_name in ['object_pose_dynamics_model']:
             # We do not need to estimate the pose from imprints since the model predicts directly the object pose.
             ope = End2EndModelOutputObjectPoseEstimation()
-
         else:
             ope = BatchedModelOutputObjectPoseEstimation(object_name=self.object_name, factor_x=7, factor_y=7, method='bilinear',
                                                      device=torch.device('cuda'), imprint_selection=self.imprint_selection,
