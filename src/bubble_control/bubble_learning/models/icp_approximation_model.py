@@ -12,6 +12,7 @@ from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoE
 from bubble_control.bubble_learning.models.aux.fc_module import FCModule
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 from bubble_control.aux.load_confs import load_object_models
+from bubble_control.bubble_learning.aux.pose_loss import ModelPoseLoss
 
 
 class ICPApproximationModel(pl.LightningModule):
@@ -28,6 +29,7 @@ class ICPApproximationModel(pl.LightningModule):
         self.activation = activation
         self.object_name = object_name
         self.mse_loss = nn.MSELoss()
+        self.pose_loss = ModelPoseLoss()
         self.num_imprints_to_log = num_imprints_to_log
         self.autoencoder = self._load_autoencoder(load_version=load_autoencoder_version,
                                                   data_path=self.dataset_params['data_name'])
