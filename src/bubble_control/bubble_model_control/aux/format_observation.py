@@ -10,7 +10,6 @@ def format_observation_sample(obs_sample):
     formatted_obs_sample['init_imprint'] = process_bubble_img(np.stack([init_imprint_r, init_imprint_l], axis=0))[...,0]
     wrench_frames = [w.header.frame_id for w in obs_sample['wrench']]
     wrench_indx = wrench_frames.index('med_base')
-    import pdb; pdb.set_trace()
     formatted_obs_sample['init_wrench'] = np.array([obs_sample['wrench'][wrench_indx].wrench.force.x,
                                             obs_sample['wrench'][wrench_indx].wrench.force.y,
                                             obs_sample['wrench'][wrench_indx].wrench.force.z,
