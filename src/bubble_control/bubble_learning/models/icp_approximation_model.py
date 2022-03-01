@@ -2,6 +2,7 @@ import numpy as np
 import os
 import torch
 import torch.nn as nn
+import cv2
 import torch.nn.functional as F
 import pytorch_lightning as pl
 import abc
@@ -12,12 +13,13 @@ from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoE
 from bubble_control.bubble_learning.models.aux.fc_module import FCModule
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 from bubble_control.aux.load_confs import load_object_models
+from bubble_control.bubble_learning.aux.pose_loss import PoseLoss
 
 
 class ICPApproximationModel(pl.LightningModule):
 
     def __init__(self, input_sizes, num_fcs=2, fc_h_dim=100,
-                 skip_layers=None, lr=1e-4, dataset_params=None, activation='relu', load_autoencoder_version=0, object_name='marker', num_imprints_to_log=40):
+                 skip_layers=None, lr=1e-4, dataset_params=None, activation='relu', load_autoencoder_version=0, object_name='marker', num_to_log=40):
         super().__init__()
         self.input_sizes = input_sizes
         self.num_fcs = num_fcs
@@ -27,14 +29,17 @@ class ICPApproximationModel(pl.LightningModule):
         self.dataset_params = dataset_params
         self.activation = activation
         self.object_name = object_name
+        self.object_model = self._get_object_model()
         self.mse_loss = nn.MSELoss()
-        self.num_imprints_to_log = num_imprints_to_log
+        self.pose_loss = PoseLoss(self.object_model)
+        self.plane_normal = nn.Parameter(torch.tensor([1, 0, 0], dtype=torch.float), requires_grad=False)
+        self.num_to_log = num_to_log
         self.autoencoder = self._load_autoencoder(load_version=load_autoencoder_version,
                                                   data_path=self.dataset_params['data_name'])
         self.autoencoder.freeze()
         self.img_embedding_size = self.autoencoder.img_embedding_size  # load it from the autoencoder
         self.pose_estimation_network = self._get_pose_estimation_network()
-        self.object_model = self._get_object_model()
+
         self.save_hyperparameters()  # Important! Every model extension must add this line!
 
     @classmethod
@@ -55,8 +60,7 @@ class ICPApproximationModel(pl.LightningModule):
     def _get_object_model(self):
         model_pcs = load_object_models()
         object_model_ar = np.asarray(model_pcs[self.object_name].points)
-        object_model_t = torch.tensor(object_model_ar, device=self.device)
-        return object_model_t
+        return object_model_ar
 
     def forward(self, imprint):
         img_embedding = self.autoencoder.encode(imprint)
@@ -126,7 +130,7 @@ class ICPApproximationModel(pl.LightningModule):
         axis_angle_gth = obj_pose_gth[..., 3:]
         R_gth = batched_trs.axis_angle_to_matrix(axis_angle_gth)
         t_gth = obj_pose_gth[..., :3]
-        pose_loss = self.pose_loss(R_1=R_pred, t_1=t_pred, R_2=R_gth, t_2=t_gth, model_points=self.object_model)
+        pose_loss = self.pose_loss(R_1=R_pred, t_1=t_pred, R_2=R_gth, t_2=t_gth)
         # pose_loss = self.mse_loss(obj_pose_pred, obj_pose_gth)
         loss = pose_loss
         return loss
@@ -190,6 +194,28 @@ class ICPApproximationModel(pl.LightningModule):
             img = img.permute(2, 0, 1)
             images.append(img)
         return images
+
+    def _find_rect_param(self, trans, rot, img):
+        height = 0.06 * 100 / 0.15
+        width = 0.015 * 100 / 0.15
+        center_x = img.shape[0] / 2 + trans[0] * 10 / 0.15
+        center_y = img.shape[1] / 2 + trans[1] * 10 / 0.15
+        return center_x, center_y, width, height, rot.item()
+
+    def _draw_angled_rec(self, x0, y0, width, height, angle, color, img):
+        b = np.cos(angle) * 0.5
+        a = np.sin(angle) * 0.5
+        pt0 = (int(x0 - a * height - b * width),
+            int(y0 + b * height - a * width))
+        pt1 = (int(x0 + a * height - b * width),
+            int(y0 - b * height - a * width))
+        pt2 = (int(2 * x0 - pt0[0]), int(2 * y0 - pt0[1]))
+        pt3 = (int(2 * x0 - pt1[0]), int(2 * y0 - pt1[1]))
+
+        cv2.line(img, pt0, pt1, color, 3)
+        cv2.line(img, pt1, pt2, color, 3)
+        cv2.line(img, pt2, pt3, color, 3)
+        cv2.line(img, pt3, pt0, color, 3)
 
 
 class FakeICPApproximationModel(nn.Module):
