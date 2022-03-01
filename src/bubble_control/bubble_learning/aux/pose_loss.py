@@ -26,6 +26,8 @@ class PoseLoss(ModelPoseLoss):
         super().__init__(criterion=criterion)
         if device is None:
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        else:
+            self.device = device
         self.model = torch.tensor(object_points, dtype=torch.float).to(self.device)
         self.num_points = self.model.shape[0]
 
