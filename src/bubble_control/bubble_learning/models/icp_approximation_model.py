@@ -18,7 +18,7 @@ from bubble_control.bubble_learning.aux.pose_loss import PoseLoss
 class ICPApproximationModel(pl.LightningModule):
 
     def __init__(self, input_sizes, num_fcs=2, fc_h_dim=100,
-                 skip_layers=None, lr=1e-4, dataset_params=None, activation='relu', load_autoencoder_version=0, object_name='marker', num_imprints_to_log=40):
+                 skip_layers=None, lr=1e-4, dataset_params=None, activation='relu', load_autoencoder_version=0, object_name='marker', num_to_log=40):
         super().__init__()
         self.input_sizes = input_sizes
         self.num_fcs = num_fcs
@@ -31,7 +31,7 @@ class ICPApproximationModel(pl.LightningModule):
         self.object_model = self._get_object_model()
         self.mse_loss = nn.MSELoss()
         self.pose_loss = PoseLoss(self.object_model)
-        self.num_imprints_to_log = num_imprints_to_log
+        self.num_to_log = num_to_log
         self.autoencoder = self._load_autoencoder(load_version=load_autoencoder_version,
                                                   data_path=self.dataset_params['data_name'])
         self.autoencoder.freeze()
