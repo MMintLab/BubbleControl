@@ -31,6 +31,7 @@ class ICPApproximationModel(pl.LightningModule):
         self.object_model = self._get_object_model()
         self.mse_loss = nn.MSELoss()
         self.pose_loss = PoseLoss(self.object_model)
+        self.plane_normal = nn.Parameter(torch.tensor([1, 0, 0], dtype=torch.float), requires_grad=False)
         self.num_to_log = num_to_log
         self.autoencoder = self._load_autoencoder(load_version=load_autoencoder_version,
                                                   data_path=self.dataset_params['data_name'])
