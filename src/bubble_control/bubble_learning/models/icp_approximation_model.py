@@ -30,7 +30,7 @@ class ICPApproximationModel(pl.LightningModule):
         self.object_name = object_name
         self.object_model = self._get_object_model()
         self.mse_loss = nn.MSELoss()
-        self.pose_loss = PoseLoss(self.object_model, device=self.device)
+        self.pose_loss = PoseLoss(self.object_model)
         self.num_imprints_to_log = num_imprints_to_log
         self.autoencoder = self._load_autoencoder(load_version=load_autoencoder_version,
                                                   data_path=self.dataset_params['data_name'])
