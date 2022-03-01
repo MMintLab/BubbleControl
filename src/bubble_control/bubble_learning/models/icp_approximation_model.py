@@ -12,7 +12,7 @@ from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoE
 from bubble_control.bubble_learning.models.aux.fc_module import FCModule
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 from bubble_control.aux.load_confs import load_object_models
-from bubble_control.bubble_learning.aux.pose_loss import ModelPoseLoss
+from bubble_control.bubble_learning.aux.pose_loss import PoseLoss
 
 
 class ICPApproximationModel(pl.LightningModule):
@@ -28,15 +28,16 @@ class ICPApproximationModel(pl.LightningModule):
         self.dataset_params = dataset_params
         self.activation = activation
         self.object_name = object_name
+        self.object_model = self._get_object_model()
         self.mse_loss = nn.MSELoss()
-        self.pose_loss = ModelPoseLoss()
+        self.pose_loss = PoseLoss(self.object_model, device=self.device)
         self.num_imprints_to_log = num_imprints_to_log
         self.autoencoder = self._load_autoencoder(load_version=load_autoencoder_version,
                                                   data_path=self.dataset_params['data_name'])
         self.autoencoder.freeze()
         self.img_embedding_size = self.autoencoder.img_embedding_size  # load it from the autoencoder
         self.pose_estimation_network = self._get_pose_estimation_network()
-        self.object_model = self._get_object_model()
+
         self.save_hyperparameters()  # Important! Every model extension must add this line!
 
     @classmethod
@@ -57,8 +58,7 @@ class ICPApproximationModel(pl.LightningModule):
     def _get_object_model(self):
         model_pcs = load_object_models()
         object_model_ar = np.asarray(model_pcs[self.object_name].points)
-        object_model_t = torch.tensor(object_model_ar, device=self.device)
-        return object_model_t
+        return object_model_ar
 
     def forward(self, imprint):
         img_embedding = self.autoencoder.encode(imprint)
@@ -128,7 +128,7 @@ class ICPApproximationModel(pl.LightningModule):
         axis_angle_gth = obj_pose_gth[..., 3:]
         R_gth = batched_trs.axis_angle_to_matrix(axis_angle_gth)
         t_gth = obj_pose_gth[..., :3]
-        pose_loss = self.pose_loss(R_1=R_pred, t_1=t_pred, R_2=R_gth, t_2=t_gth, model_points=self.object_model)
+        pose_loss = self.pose_loss(R_1=R_pred, t_1=t_pred, R_2=R_gth, t_2=t_gth)
         # pose_loss = self.mse_loss(obj_pose_pred, obj_pose_gth)
         loss = pose_loss
         return loss
