@@ -14,6 +14,7 @@ if __name__ == '__main__':
     parser.add_argument('--load_version', type=int, default=0, help='version f for the model used. can also be "fixed_model" or "random"')
     parser.add_argument('--debug', action='store_true', help='Whether or not to visualize model predictions')
     parser.add_argument('--object_name', type=str, default='marker', help='name of the object')
+    parser.add_argument('--ope', type=str, default='icp', help='name of the object pose estimation algorithm')
     # TODO: Add more parameters if needed
 
     args = parser.parse_args()
@@ -27,5 +28,5 @@ if __name__ == '__main__':
 
     rospy.init_node('test_evaluation_drawing')
 
-    dc = DrawingEvaluationDataCollection(data_path=save_path, scene_name=scene_name, model_name=model_name, load_version=load_version, debug=debug, object_name=args.object_name)
+    dc = DrawingEvaluationDataCollection(data_path=save_path, scene_name=scene_name, model_name=model_name, load_version=load_version, debug=debug, object_name=args.object_name, ope=args.ope)
     dc.collect_data(num_data=num_data)

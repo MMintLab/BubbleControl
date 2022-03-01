@@ -11,7 +11,7 @@ from bubble_control.bubble_learning.models.object_pose_dynamics_model import Obj
 from victor_hardware_interface_msgs.msg import ControlMode
 
 from bubble_control.bubble_model_control.model_output_object_pose_estimaton import \
-    BatchedModelOutputObjectPoseEstimation, End2EndModelOutputObjectPoseEstimation
+    BatchedModelOutputObjectPoseEstimation, End2EndModelOutputObjectPoseEstimation, ICPApproximationModelOutputObjectPoseEstimation
 from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIController
 from bubble_control.bubble_envs.bubble_drawing_env import BubbleOneDirectionDrawingEnv
 
@@ -32,7 +32,7 @@ from arc_utilities.tf2wrapper import TF2Wrapper
 class DrawingEvaluationDataCollection(DataCollectorBase):
 
     def __init__(self, *args, model_name='random', load_version=0, scene_name='drawing_evaluation', imprint_selection='percentile',
-                                                     imprint_percentile=0.005,  object_name='marker', debug=False, **kwargs):
+                                                     imprint_percentile=0.005,  object_name='marker', debug=False, ope='icp', **kwargs):
         self.scene_name = scene_name
         self.object_name = object_name
         self.num_samples = 100
@@ -51,7 +51,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.bubble_ref_obs = None
         self.model = self._get_model()
         self.block_downsample_tr = BlockDownSamplingTr(factor_x=7, factor_y=7, reduction='mean', keys_to_tr=['init_imprint'])
-        self.ope = self._get_object_pose_estimation()
+        self.ope = self._get_object_pose_estimation(ope)
         self.evaluator = self._get_evaluator()
         self.env = None
         self.controller = None
@@ -148,14 +148,21 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         model.eval()
         return model
 
-    def _get_object_pose_estimation(self):
+    def _get_object_pose_estimation(self, ope_name):
         if self.model_name in ['object_pose_dynamics_model']:
             # We do not need to estimate the pose from imprints since the model predicts directly the object pose.
             ope = End2EndModelOutputObjectPoseEstimation()
         else:
-            ope = BatchedModelOutputObjectPoseEstimation(object_name='marker', factor_x=7, factor_y=7, method='bilinear',
+            ope_names = ['icp', 'icp_approx']
+            if ope_name == 'icp':
+                ope = BatchedModelOutputObjectPoseEstimation(object_name='marker', factor_x=7, factor_y=7, method='bilinear',
                                                      device=torch.device('cuda'), imprint_selection=self.imprint_selection,
                                                      imprint_percentile=self.imprint_percentile)  # percentile
+            elif ope_name == 'icp_approx':
+                ope = ICPApproximationModelOutputObjectPoseEstimation(model_name='icp_approximation_model', load_version=0, model_data_path=self.model_data_path) # TODO: Replace with the loading path
+            else:
+                raise NotImplementedError('Object pose estimation with name key {} NOT implemented yet. Available options: {}'.format(ope_name, ope_names))
+        print('USING Object Pose Estimation {}'.format(ope.__class__.__name__))
         return ope
 
     def _get_env(self):
