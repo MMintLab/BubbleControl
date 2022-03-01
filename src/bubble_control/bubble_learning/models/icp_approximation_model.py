@@ -2,6 +2,7 @@ import numpy as np
 import os
 import torch
 import torch.nn as nn
+import cv2
 import torch.nn.functional as F
 import pytorch_lightning as pl
 import abc
@@ -193,6 +194,28 @@ class ICPApproximationModel(pl.LightningModule):
             img = img.permute(2, 0, 1)
             images.append(img)
         return images
+
+    def _find_rect_param(self, trans, rot, img):
+        height = 0.06 * 100 / 0.15
+        width = 0.015 * 100 / 0.15
+        center_x = img.shape[0] / 2 + trans[0] * 10 / 0.15
+        center_y = img.shape[1] / 2 + trans[1] * 10 / 0.15
+        return center_x, center_y, width, height, rot.item()
+
+    def _draw_angled_rec(self, x0, y0, width, height, angle, color, img):
+        b = np.cos(angle) * 0.5
+        a = np.sin(angle) * 0.5
+        pt0 = (int(x0 - a * height - b * width),
+            int(y0 + b * height - a * width))
+        pt1 = (int(x0 + a * height - b * width),
+            int(y0 - b * height - a * width))
+        pt2 = (int(2 * x0 - pt0[0]), int(2 * y0 - pt0[1]))
+        pt3 = (int(2 * x0 - pt1[0]), int(2 * y0 - pt1[1]))
+
+        cv2.line(img, pt0, pt1, color, 3)
+        cv2.line(img, pt1, pt2, color, 3)
+        cv2.line(img, pt2, pt3, color, 3)
+        cv2.line(img, pt3, pt0, color, 3)
 
 
 class FakeICPApproximationModel(nn.Module):
