@@ -70,7 +70,7 @@ class ICPApproximationModel(pl.LightningModule):
 
         model_output = self.forward(*model_input)
 
-        loss = self._compute_loss(*model_output, *ground_truth)
+        loss = self._compute_loss(model_output, *ground_truth)
 
         # Log the results: -------------------------
         self.log('{}_batch'.format(phase), batch_idx)
