@@ -151,7 +151,6 @@ class ICPApproximationModel(pl.LightningModule):
         loss = pose_loss
         return loss
 
-
     # AUX FUCTIONS -----------------------------------------------------------------------------------------------------
 
     def _load_autoencoder(self, load_version, data_path, load_epoch=None, load_step=None):
@@ -167,21 +166,19 @@ class ICPApproximationModel(pl.LightningModule):
             checkpoint_path = os.path.join(data_path, 'tb_logs', '{}'.format(model_name),
                                            'version_{}'.format(load_version), 'checkpoints',
                                            'epoch={}-step={}.ckpt'.format(load_epoch, load_step))
-
         model = Model.load_from_checkpoint(checkpoint_path)
 
         return model
 
     def _log_imprint(self, batch, batch_idx, phase):
         if self.current_epoch == 0 and batch_idx == 0:
-            imprint_t = batch['imprint'][:self.num_imprints_to_log]
+            imprint_t = batch['imprint'][:self.num_to_log]
             self.logger.experiment.add_image('imprint_{}'.format(phase), self._get_image_grid(imprint_t),
                                              self.global_step)
             if self.autoencoder_augmentation:
                 reconstructed_imprint_t = self.autoencoder.decode(self.autoencoder.encode(imprint_t))
                 self.logger.experiment.add_image('imprint_reconstructed_{}'.format(phase),
                                                  self._get_image_grid(reconstructed_imprint_t), self.global_step)
-
 
     def _log_object_pose_images(self, obj_pose_pred, obj_pose_gth, phase):
         obj_trans_pred = obj_pose_pred[..., :3]
