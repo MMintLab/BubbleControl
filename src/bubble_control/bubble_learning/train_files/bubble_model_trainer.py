@@ -56,7 +56,6 @@ if __name__ == '__main__':
         'batch_size': int,
         'val_batch_size': int
     }
-    
     Model = [BubbleAutoEncoderModel, BubbleDynamicsModel, BubbleLinearDynamicsModel, BubbleEnd2EndDynamicsModel, ObjectPoseDynamicsModel, ICPApproximationModel]
     Dataset = [BubbleDrawingDataset, TaskCombinedDataset, DrawingDataset, BubblePivotingDownsampledDataset]
     parsed_trainer = ParsedTrainer(Model, Dataset, default_args=default_params, default_types=default_types)

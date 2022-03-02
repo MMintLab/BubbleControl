@@ -159,7 +159,8 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
                                                      device=torch.device('cuda'), imprint_selection=self.imprint_selection,
                                                      imprint_percentile=self.imprint_percentile)  # percentile
             elif ope_name == 'icp_approx':
-                ope = ICPApproximationModelOutputObjectPoseEstimation(model_name='icp_approximation_model', load_version=0, model_data_path=self.model_data_path) # TODO: Replace with the loading path
+                # ope = ICPApproximationModelOutputObjectPoseEstimation(model_name='icp_approximation_model', load_version=0, model_data_path=self.model_data_path) # without data augmentation
+                ope = ICPApproximationModelOutputObjectPoseEstimation(model_name='icp_approximation_model', load_version=3, model_data_path=self.model_data_path) # adding data augmentation for encoding-decoding images
             else:
                 raise NotImplementedError('Object pose estimation with name key {} NOT implemented yet. Available options: {}'.format(ope_name, ope_names))
         print('USING Object Pose Estimation {}'.format(ope.__class__.__name__))
@@ -174,7 +175,8 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
                                            drawing_length_limits=(0.01, 0.02),
                                            wrap_data=True,
                                            marker_code=self.object_name,
-                                           grasp_width_limits=(10, 35))
+                                           # grasp_width_limits=(10, 35))
+                                           grasp_width_limits=(10, 45))
         return env
 
     def _get_controller(self):
@@ -218,11 +220,15 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         obs_sample_raw = init_obs_sample.copy()
         step_i = 0
         for step_i in tqdm(range(num_steps)):
-            # Downsample the sample
-            action, valid_action = self.env.get_action()  # this is a
-            obs_sample = self.format_raw_observation(obs_sample_raw)
+            random_action, valid_action = self.env.get_action()  # this is a
+            obs_sample = self.format_raw_observation(obs_sample_raw)    # Downsample the sample
             if not self.model_name == 'random':
                 action = self.controller.control(obs_sample) # it is already an action dictionary
+                # This is a test to see how random grasp width effect the performace.
+                if self.model_name == 'fixed_model':
+                    action['grasp_width'] = random_action['grasp_width']
+            else:
+                action = random_action
             # print('Action:', action)
             actions.append(action)
             obs_sample_raw, reward, done, info = self.env.step(action)
