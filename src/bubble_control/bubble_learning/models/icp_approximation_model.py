@@ -83,13 +83,16 @@ class ICPApproximationModel(pl.LightningModule):
         ground_truth = self.get_model_output(batch)
 
         model_output = self.forward(*model_input)
-        if self.autoencoder_augmentation:
-            # TODO: This maybe has a limit on memory allocation (we x2 the required memory). Consider adding losses up instead.
-            augmented_model_output = self.augmented_forward(*model_input)
-            model_output = torch.cat([model_output, augmented_model_output], dim=0)
-            ground_truth = tuple([torch.cat([ground_truth_i, ground_truth_i], dim=0) for ground_truth_i in ground_truth])
-
         loss = self._compute_loss(model_output, *ground_truth)
+
+        if self.autoencoder_augmentation:
+            augmented_model_output = self.augmented_forward(*model_input)
+            self._log_object_pose_images(obj_pose_pred=augmented_model_output[:self.num_to_log],
+                                         obj_pose_gth=ground_truth[0][:self.num_to_log], phase='augmented_{}'.format(phase))
+            augmented_loss = self._compute_loss(augmented_model_output, *ground_truth)
+            self.log('{}_loss_original'.format(phase), loss)
+            self.log('{}_loss_augmented'.format(phase), augmented_loss)
+            loss = loss + augmented_loss
 
         # Log the results: -------------------------
         self.log('{}_batch'.format(phase), batch_idx)
