@@ -8,6 +8,8 @@ import pytorch_lightning as pl
 import abc
 import torchvision
 import pytorch3d.transforms as batched_trs
+from matplotlib import cm
+
 
 from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoEncoderModel
 from bubble_control.bubble_learning.models.aux.fc_module import FCModule
@@ -19,7 +21,7 @@ from bubble_control.bubble_learning.aux.pose_loss import PoseLoss
 class ICPApproximationModel(pl.LightningModule):
 
     def __init__(self, input_sizes, num_fcs=2, fc_h_dim=100,
-                 skip_layers=None, lr=1e-4, dataset_params=None, activation='relu', load_autoencoder_version=0, object_name='marker', num_to_log=40):
+                 skip_layers=None, lr=1e-4, dataset_params=None, activation='relu', load_autoencoder_version=0, object_name='marker', num_to_log=40, autoencoder_augmentation=False):
         super().__init__()
         self.input_sizes = input_sizes
         self.num_fcs = num_fcs
@@ -29,6 +31,7 @@ class ICPApproximationModel(pl.LightningModule):
         self.dataset_params = dataset_params
         self.activation = activation
         self.object_name = object_name
+        self.autoencoder_augmentation = autoencoder_augmentation
         self.object_model = self._get_object_model()
         self.mse_loss = nn.MSELoss()
         self.pose_loss = PoseLoss(self.object_model)
@@ -67,12 +70,24 @@ class ICPApproximationModel(pl.LightningModule):
         predicted_pose = self.pose_estimation_network(img_embedding)
         return predicted_pose
 
+    def augmented_forward(self, imprint):
+        # Augment the forward by using the reconstructed imprint instead.
+        img_embedding = self.autoencoder.encode(imprint)
+        imprint_reconstructed = self.autoencoder.decode(img_embedding)
+        predicted_pose = self.forward(imprint_reconstructed)
+        return predicted_pose
+
     def _step(self, batch, batch_idx, phase='train'):
 
         model_input = self.get_model_input(batch)
         ground_truth = self.get_model_output(batch)
 
         model_output = self.forward(*model_input)
+        if self.autoencoder_augmentation:
+            # TODO: This maybe has a limit on memory allocation (we x2 the required memory). Consider adding losses up instead.
+            augmented_model_output = self.augmented_forward(*model_input)
+            model_output = torch.cat([model_output, augmented_model_output], dim=0)
+            ground_truth = tuple([torch.cat([ground_truth_i, ground_truth_i], dim=0) for ground_truth_i in ground_truth])
 
         loss = self._compute_loss(model_output, *ground_truth)
 
@@ -80,6 +95,7 @@ class ICPApproximationModel(pl.LightningModule):
         self.log('{}_batch'.format(phase), batch_idx)
         self.log('{}_loss'.format(phase), loss)
         self._log_object_pose_images(obj_pose_pred=model_output[:self.num_to_log], obj_pose_gth=ground_truth[0][:self.num_to_log], phase=phase)
+        self._log_imprint(batch, batch_idx=batch_idx, phase=phase)
         return loss
 
     def _get_sizes(self):
@@ -156,6 +172,17 @@ class ICPApproximationModel(pl.LightningModule):
 
         return model
 
+    def _log_imprint(self, batch, batch_idx, phase):
+        if self.current_epoch == 0 and batch_idx == 0:
+            imprint_t = batch['imprint'][:self.num_imprints_to_log]
+            self.logger.experiment.add_image('imprint_{}'.format(phase), self._get_image_grid(imprint_t),
+                                             self.global_step)
+            if self.autoencoder_augmentation:
+                reconstructed_imprint_t = self.autoencoder.decode(self.autoencoder.encode(imprint_t))
+                self.logger.experiment.add_image('imprint_reconstructed_{}'.format(phase),
+                                                 self._get_image_grid(reconstructed_imprint_t), self.global_step)
+
+
     def _log_object_pose_images(self, obj_pose_pred, obj_pose_gth, phase):
         obj_trans_pred = obj_pose_pred[..., :3]
         obj_rot_pred = obj_pose_pred[..., 3:]
@@ -216,6 +243,29 @@ class ICPApproximationModel(pl.LightningModule):
         cv2.line(img, pt1, pt2, color, 3)
         cv2.line(img, pt2, pt3, color, 3)
         cv2.line(img, pt3, pt0, color, 3)
+
+    def _get_image_grid(self, batched_img, cmap='jet'):
+        # reshape the batched_img to have the same imprints one above the other
+        batched_img = batched_img.detach().cpu()
+        batched_img_r = batched_img.reshape(*batched_img.shape[:1], -1, *batched_img.shape[3:]) # (batch_size, 2*W, H)
+        # Add padding
+        padding_pixels = 5
+        batched_img_padded = F.pad(input=batched_img_r,
+                                   pad=(padding_pixels, padding_pixels, padding_pixels, padding_pixels),
+                                   mode='constant',
+                                   value=0)
+        batched_img_cmap = self._cmap_tensor(batched_img_padded, cmap=cmap) # size (..., w,h, 3)
+        num_dims = len(batched_img_cmap.shape)
+        grid_input = batched_img_cmap.permute(*np.arange(num_dims-3), -1, -3, -2)
+        grid_img = torchvision.utils.make_grid(grid_input)
+        return grid_img
+
+    def _cmap_tensor(self, img_tensor, cmap='jet'):
+        cmap = cm.get_cmap(cmap)
+        mapped_img_ar = cmap(img_tensor/torch.max(img_tensor)) # (..,w,h,4)
+        mapped_img_ar = mapped_img_ar[..., :3] # (..,w,h,3) -- get rid of the alpha value
+        mapped_img = torch.tensor(mapped_img_ar).to(self.device)
+        return mapped_img
 
 
 class FakeICPApproximationModel(nn.Module):
