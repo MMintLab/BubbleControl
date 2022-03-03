@@ -215,11 +215,7 @@ class BubbleOneDirectionDrawingEnv(BubbleDrawingBaseEnv):
         self.drawing_init = True
 
     def _set_cartesian_impedance(self):
-        cartesian_impedance_params = get_cartesian_impedance_params(
-            velocity=self.drawing_vel * 40)  # we multiply by 40 because in get_control_mode they do the same...
-        cartesian_impedance_params.cartesian_impedance_params.cartesian_stiffness.z = self.z_stiffness  # by default is 5000
-        send_new_control_mode(arm='med', msg=cartesian_impedance_params)
-        # self.med.set_control_mode(control_mode=ControlMode.CARTESIAN_IMPEDANCE, vel=0.25)
+        self.med.set_cartesian_impedance(velocity=self.drawing_vel, z_stiffnes=self.z_stiffness)
 
     @classmethod
     def get_name(cls):

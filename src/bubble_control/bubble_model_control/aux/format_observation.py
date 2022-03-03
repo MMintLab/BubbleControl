@@ -8,12 +8,15 @@ def format_observation_sample(obs_sample):
     init_imprint_r = obs_sample['bubble_depth_img_right_reference'] - obs_sample['bubble_depth_img_right']
     init_imprint_l = obs_sample['bubble_depth_img_left_reference'] - obs_sample['bubble_depth_img_left']
     formatted_obs_sample['init_imprint'] = process_bubble_img(np.stack([init_imprint_r, init_imprint_l], axis=0))[...,0]
-    formatted_obs_sample['init_wrench'] = np.array([obs_sample['wrench'][0].wrench.force.x,
-                                            obs_sample['wrench'][0].wrench.force.y,
-                                            obs_sample['wrench'][0].wrench.force.z,
-                                            obs_sample['wrench'][0].wrench.torque.x,
-                                            obs_sample['wrench'][0].wrench.torque.y,
-                                            obs_sample['wrench'][0].wrench.torque.z])
+    wrench_frames = [w.header.frame_id for w in obs_sample['wrench']]
+    wrench_indx = wrench_frames.index('med_base')
+    import pdb; pdb.set_trace()
+    formatted_obs_sample['init_wrench'] = np.array([obs_sample['wrench'][wrench_indx].wrench.force.x,
+                                            obs_sample['wrench'][wrench_indx].wrench.force.y,
+                                            obs_sample['wrench'][wrench_indx].wrench.force.z,
+                                            obs_sample['wrench'][wrench_indx].wrench.torque.x,
+                                            obs_sample['wrench'][wrench_indx].wrench.torque.y,
+                                            obs_sample['wrench'][wrench_indx].wrench.torque.z])
     formatted_obs_sample['init_pos'] = obs_sample['tfs'][obs_sample['tfs']['child_frame'] == 'grasp_frame'][['x','y','z']].values[0]
     quaternion = obs_sample['tfs'][obs_sample['tfs']['child_frame'] == 'grasp_frame'][['qx','qy','qz','qw']].values[0]
     quat_to_axis = QuaternionToAxis()

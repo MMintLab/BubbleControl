@@ -26,6 +26,7 @@ from bubble_utils.bubble_data_collection.data_collector_base import DataCollecto
 
 from mmint_camera_utils.recorders.recording_utils import record_image_color
 from mmint_camera_utils.recorders.data_recording_wrappers import ActionSelfSavedWrapper
+from arc_utilities.tf2wrapper import TF2Wrapper
 
 
 class DrawingEvaluationDataCollection(DataCollectorBase):
@@ -45,7 +46,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.imprint_selection = imprint_selection
         self.imprint_percentile = imprint_percentile
         self.debug = debug
-        self.data_name = '/home/mmint/Desktop/drawing_data_one_direction'
+        self.model_data_path = '/home/mmint/Desktop/drawing_models' # THIS is the path where we expect to load the model. Inside contains tb_logs/{model_name}/version_{version}/....
         self.reference_fc = None
         self.bubble_ref_obs = None
         self.model = self._get_model()
@@ -138,7 +139,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         model_names = [m.get_name() for m in models]
         if self.model_name in model_names:
             Model = models[model_names.index(self.model_name)]
-            model = load_model_version(Model, self.data_name, self.load_version)
+            model = load_model_version(Model, self.model_data_path, self.load_version)
         elif self.model_name in ['random', 'fixed_model']:
             model = BubbleDynamicsFixedModel() # TODO: Find another way to set the random without using the fixed model.
         else:
@@ -151,9 +152,8 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         if self.model_name in ['object_pose_dynamics_model']:
             # We do not need to estimate the pose from imprints since the model predicts directly the object pose.
             ope = End2EndModelOutputObjectPoseEstimation()
-
         else:
-            ope = BatchedModelOutputObjectPoseEstimation(object_name=self.object_name, factor_x=7, factor_y=7, method='bilinear',
+            ope = BatchedModelOutputObjectPoseEstimation(object_name='marker', factor_x=7, factor_y=7, method='bilinear',
                                                      device=torch.device('cuda'), imprint_selection=self.imprint_selection,
                                                      imprint_percentile=self.imprint_percentile)  # percentile
         return ope
@@ -213,8 +213,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         for step_i in tqdm(range(num_steps)):
             # Downsample the sample
             action, valid_action = self.env.get_action()  # this is a
-            obs_sample = format_observation_sample(obs_sample_raw)
-            obs_sample = self.block_downsample_tr(obs_sample)
+            obs_sample = self.format_raw_observation(obs_sample_raw)
             if not self.model_name == 'random':
                 action = self.controller.control(obs_sample) # it is already an action dictionary
             # print('Action:', action)
@@ -225,7 +224,8 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             obs_sample_raw.save_fc(fc_i)
             obs_fcs.append(fc_i)
             if self.debug:
-                self.controller.visualize_prediction(obs_sample_raw)
+                downsampled_obs = self.format_raw_observation(obs_sample_raw)
+                self.controller.visualize_prediction(downsampled_obs)
             if done:
                 break
         return step_i+1, obs_fcs, actions
@@ -235,3 +235,10 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.reference_fc = self.get_new_filecode()
         self.env.bubble_ref_obs.modify_data_params(self.data_save_params)
         self.env.bubble_ref_obs.save_fc(self.reference_fc)
+
+    def format_raw_observation(self, obs_sample_raw=None):
+        if obs_sample_raw is None:
+            obs_sample_raw = self.env.get_observation()
+        format_obs = format_observation_sample(obs_sample_raw)
+        downsampled_obs = self.block_downsample_tr(format_obs)
+        return downsampled_obs

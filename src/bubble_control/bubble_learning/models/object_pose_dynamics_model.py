@@ -136,8 +136,9 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
             axis_angle = torch.from_numpy(q_to_ax._tr(orientation.detach().numpy()))
         else:
             axis_angle = orientation
-        normal_axis_angle = torch.einsum('bi,i->b', axis_angle, plane_normal).unsqueeze(-1) * plane_normal.unsqueeze(0)
-        angle = torch.norm(normal_axis_angle, dim=-1)
+        projection = torch.einsum('bi,i->b', axis_angle, plane_normal)
+        normal_axis_angle = projection.unsqueeze(-1) * plane_normal.unsqueeze(0)
+        angle = torch.norm(normal_axis_angle, dim=-1) * torch.sign(projection)
         return angle
 
     def _get_pose_images(self, trans_pred, rot_angle_pred, trans_gth, rot_angle_gth):

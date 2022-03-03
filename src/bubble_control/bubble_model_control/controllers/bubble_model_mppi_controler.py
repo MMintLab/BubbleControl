@@ -12,6 +12,7 @@ import pdb
 from bubble_control.bubble_model_control.controllers.bubble_controller_base import BubbleModelController
 from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample, get_transformation_matrix, tr_frame, convert_all_tfs_to_tensors
 from bubble_pivoting.pivoting_model_control.aux.pivoting_geometry import get_angle_difference, check_goal_position, get_tool_axis, get_tool_angle_gf
+from bubble_control.bubble_model_control.aux.format_observation import format_observation_sample
 import pdb
 def to_tensor(x, **kwargs):
     if not torch.is_tensor(x):
@@ -56,10 +57,6 @@ class BubbleModelMPPIController(BubbleModelController):
         self.actions = None
         self.costs = None
         
-    def _get_action_container(self):
-        action_container, _ = self.env.get_action()
-        return action_container
-
     def compute_cost(self, state_t, action_t):
         """
         Compute the dynamics
@@ -212,13 +209,11 @@ class BubbleModelMPPIController(BubbleModelController):
         state = self._unpack_state_tensor(state_t)
         action = self._unpack_action_tensor(action_t)
         model_input = self._extract_input_from_state(state)
-        if len(action.shape) < 2:
-            action = action.unsqueeze(0)
-        import pdb; pdb.set_trace()
         output = self.model(*model_input, action)
         if self.debug and action.shape[0] < 2:
             self.state_prev = state
-            self.prediction = output
+            self.prediction = copy.deepcopy([o.detach() for o in output])
+            self.pred_input = copy.deepcopy([mi.detach() for mi in model_input])
         next_state = self._expand_output_to_state(output, state, action)
         next_state_t = self._pack_state_to_tensor(next_state)
         return next_state_t
@@ -276,10 +271,11 @@ class BubbleModelMPPIController(BubbleModelController):
         return action
 
     def _check_prediction(self, state_t, action):
-        next_state_t = self.dynamics(state_t.type(torch.float), action)
+        action_t = action.unsqueeze(0).repeat_interleave(state_t.shape[0], dim=0)
+        next_state_t = self.dynamics(state_t.type(torch.float), action_t)
         next_state = self._unpack_state_tensor(next_state_t)
         next_state_sample = self._pack_state_to_sample(next_state, self.sample)
-        next_state_sample = self._action_correction(next_state_sample, action)
+        next_state_sample = self._action_correction(next_state_sample, action_t)
         estimated_pose = self.object_pose_estimator.estimate_pose(next_state_sample)
         tool_angle_gf = get_tool_angle_gf(estimated_pose, next_state_sample)
         print('Predicted tool angle gf after action: ', tool_angle_gf)
@@ -290,19 +286,24 @@ class BubbleModelMPPIController(BubbleModelController):
         print("Cost of action: ", action_cost)
 
     def visualize_prediction(self, obs_sample_next):
-        formatted_obs_sample = self.get_downsampled_obs(obs_sample_next)
-        state_next = self._unpack_state_sample(formatted_obs_sample)
-        fig, axes = plt.subplots(nrows=2, ncols=3)
+        # formatted_obs_sample = self.get_downsampled_obs(obs_sample_next)
+        # state_next = self._unpack_state_sample(formatted_obs_sample)
+        state_next = self._unpack_state_sample(obs_sample_next)
+        fig, axes = plt.subplots(nrows=2, ncols=4)
         axes[0][0].imshow(self.state_prev[0][0,0], cmap='jet')
         axes[1][0].imshow(self.state_prev[0][0,1], cmap='jet')
-        axes[0][1].imshow(self.prediction[0][0,0].detach().numpy(), cmap='jet')
-        axes[1][1].imshow(self.prediction[0][0,1].detach().numpy(), cmap='jet')
-        axes[0][2].imshow(state_next[0][0], cmap='jet')
-        axes[1][2].imshow(state_next[0][1], cmap='jet')
-        axes[0][0].set_title('Previus imprint')
-        axes[0][1].set_title('Predicted next imprint')
-        axes[0][2].set_title('Gth next imprint')
-        plt.show()     
+        axes[0][2].imshow(self.prediction[0][0,0].detach().numpy(), cmap='jet') # WARNING: This is not really the true action prediction, just the first on the sample batch
+        axes[1][2].imshow(self.prediction[0][0,1].detach().numpy(), cmap='jet')
+        axes[0][3].imshow(state_next[0][0], cmap='jet')
+        axes[1][3].imshow(state_next[0][1], cmap='jet')
+        axes[0][1].imshow(self.pred_input[0][0, 0].detach().numpy(),
+                          cmap='jet')  # WARNING: This is not really the true action prediction, just the first on the sample batch
+        axes[1][1].imshow(self.pred_input[0][0, 1].detach().numpy(), cmap='jet')
+        axes[0][0].set_title('Previous imprint')
+        axes[0][2].set_title('Predicted next imprint')
+        axes[0][3].set_title('Gth next imprint')
+        axes[0][1].set_title('Input imprint')
+        plt.show()
         
         
         
