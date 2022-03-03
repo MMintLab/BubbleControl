@@ -73,15 +73,15 @@ class BatchedModelOutputObjectPoseEstimationBase(ModelOutputObjectPoseEstimation
 
 def axis_angle_pose_to_homogeneous_pose(axis_angle_pose):
     hom_pos = torch.zeros(axis_angle_pose.shape[:-1] + (4,4), dtype=axis_angle_pose.dtype, device=axis_angle_pose.device)
-    hom_pos[...,3,3] = 1
-    hom_pos[...,:3,3] = axis_angle_pose[...,:3]
-    hom_pos[...,:3,:3] = batched_trs.axis_angle_to_matrix(axis_angle_pose[...,3:])
+    hom_pos[..., 3, 3] = 1
+    hom_pos[..., :3, 3] = axis_angle_pose[...,:3]
+    hom_pos[..., :3, :3] = batched_trs.axis_angle_to_matrix(axis_angle_pose[...,3:])
     return hom_pos
 
 def homogeneous_pose_to_axis_angle(homogeneous_pose):
     pos = homogeneous_pose[..., :3, 3]
-    quat_wxyz = batched_trs.matrix_to_quaternion(homogeneous_pose[...,:3,:3])
-    quat_xyzw = torch.index_select(quat_wxyz, dim=-1, index=torch.LongTensor([1,2,3,0]))
+    quat_wxyz = batched_trs.matrix_to_quaternion(homogeneous_pose[..., :3, :3])
+    quat_xyzw = torch.index_select(quat_wxyz, dim=-1, index=torch.LongTensor([1, 2, 3, 0]))
     axis_angle = QuaternionToAxis._tr(quat_xyzw)
     axis_angle_pose = torch.cat([pos, axis_angle], dim=-1)
     return axis_angle_pose
@@ -149,18 +149,13 @@ class BatchedModelOutputObjectPoseEstimation(BatchedModelOutputObjectPoseEstimat
         super().__init__(*args, **kwargs)
         self.model_pcs = load_object_models()
 
-    def estimate_pose(self, sample):
-        # upsample the imprints
-        sample_up = self._upsample_sample(sample)
-        estimated_pose = super().estimate_pose(sample_up)
-        return estimated_pose
-
     def _upsample_sample(self, sample):
         # Upsample output
         sample_up = self.block_upsample_tr(sample)
         return sample_up
 
-    def _estimate_object_pose(self, batched_sample):
+    def _estimate_object_pose(self, batched_sample_raw):
+        batched_sample = self._upsample_sample(batched_sample_raw)
         all_tfs = batched_sample['all_tfs']
 
         # Get imprints from sample

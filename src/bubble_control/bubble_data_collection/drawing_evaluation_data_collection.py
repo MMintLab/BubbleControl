@@ -20,7 +20,7 @@ from bubble_control.bubble_learning.aux.load_model import load_model_version
 from bubble_control.aux.drawing_evaluator import DrawingEvaluator
 from bubble_control.bubble_model_control.aux.format_observation import format_observation_sample
 from bubble_control.bubble_model_control.cost_functions import vertical_tool_cost_function
-from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample
+from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample, convert_all_tfs_to_tensors
 
 
 from bubble_utils.bubble_data_collection.data_collector_base import DataCollectorBase
@@ -64,7 +64,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         Return a list containing the column names of the datalegend
         Returns:
         """
-        column_names = ['EvaluationFileCode', 'ReferenceFileCode', 'ActionsFileCode', 'ObjectName', 'SceneName', 'ControllerMethod', 'Score', 'NumSteps', 'NumStepsExpected', 'ObservationFileCodes']
+        column_names = ['EvaluationFileCode', 'ReferenceFileCode', 'ActionsFileCode', 'ObjectName', 'SceneName', 'ControllerMethod', 'ObjectPoseEstimator', 'Score', 'NumSteps', 'NumStepsExpected', 'ObservationFileCodes']
         return column_names
 
     def _get_legend_lines(self, data_params):
@@ -127,8 +127,8 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             'ControllerMethod': self._get_controller_name(),
             'ObjectName': self.object_name,
             'Score': score,
+            'ObjectPoseEstimator': self.ope.__class__.__name__,
         }
-
         return data_params
 
     def _init_collection_sample(self):
@@ -229,7 +229,9 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             obs_sample = self.format_raw_observation(obs_sample_raw)    # Downsample the sample
             if self.model_name in ['object_pose_dynamics_model']:
                 # NEED TO ESTIMATE THE INITIAL POSE:
-                batched_obs_sample = batched_tensor_sample(obs_sample, batch_size=1)
+                batched_obs_sample = obs_sample.copy()
+                batched_obs_sample['all_tfs'] = convert_all_tfs_to_tensors(batched_obs_sample['all_tfs'])
+                batched_obs_sample = batched_tensor_sample(batched_obs_sample, batch_size=1)
                 batched_obs_sample['final_imprint'] = batched_obs_sample['init_imprint']
                 gf_X_objpose = self.ope._estimate_object_pose(batched_obs_sample)
                 init_object_pose = homogeneous_pose_to_axis_angle(gf_X_objpose)[0].detach().cpu().numpy()
