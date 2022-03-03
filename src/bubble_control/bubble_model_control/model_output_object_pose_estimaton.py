@@ -16,6 +16,7 @@ from mmint_camera_utils.point_cloud_utils import project_pc, get_projection_tr
 from bubble_utils.bubble_tools.bubble_pc_tools import get_imprint_mask
 from bubble_control.bubble_learning.aux.load_model import load_model_version
 from bubble_control.bubble_learning.models.icp_approximation_model import ICPApproximationModel, FakeICPApproximationModel
+from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 
 
 class ModelOutputObjectPoseEstimationBase(object):
@@ -77,6 +78,13 @@ def axis_angle_pose_to_homogeneous_pose(axis_angle_pose):
     hom_pos[...,:3,:3] = batched_trs.axis_angle_to_matrix(axis_angle_pose[...,3:])
     return hom_pos
 
+def homogeneous_pose_to_axis_angle(homogeneous_pose):
+    pos = homogeneous_pose[..., :3, 3]
+    quat_wxyz = batched_trs.matrix_to_quaternion(homogeneous_pose[...,:3,:3])
+    quat_xyzw = torch.index_select(quat_wxyz, dim=-1, index=torch.LongTensor([1,2,3,0]))
+    axis_angle = QuaternionToAxis._tr(quat_xyzw)
+    axis_angle_pose = torch.cat([pos, axis_angle], dim=-1)
+    return axis_angle_pose
 
 class End2EndModelOutputObjectPoseEstimation(BatchedModelOutputObjectPoseEstimationBase):
     """

@@ -11,7 +11,7 @@ from bubble_control.bubble_learning.models.object_pose_dynamics_model import Obj
 from victor_hardware_interface_msgs.msg import ControlMode
 
 from bubble_control.bubble_model_control.model_output_object_pose_estimaton import \
-    BatchedModelOutputObjectPoseEstimation, End2EndModelOutputObjectPoseEstimation, ICPApproximationModelOutputObjectPoseEstimation
+    BatchedModelOutputObjectPoseEstimation, End2EndModelOutputObjectPoseEstimation, ICPApproximationModelOutputObjectPoseEstimation, homogeneous_pose_to_axis_angle
 from bubble_control.bubble_model_control.controllers.bubble_model_mppi_controler import BubbleModelMPPIController
 from bubble_control.bubble_envs.bubble_drawing_env import BubbleOneDirectionDrawingEnv
 
@@ -20,6 +20,7 @@ from bubble_control.bubble_learning.aux.load_model import load_model_version
 from bubble_control.aux.drawing_evaluator import DrawingEvaluator
 from bubble_control.bubble_model_control.aux.format_observation import format_observation_sample
 from bubble_control.bubble_model_control.cost_functions import vertical_tool_cost_function
+from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample
 
 
 from bubble_utils.bubble_data_collection.data_collector_base import DataCollectorBase
@@ -149,20 +150,16 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         return model
 
     def _get_object_pose_estimation(self, ope_name):
-        if self.model_name in ['object_pose_dynamics_model']:
-            # We do not need to estimate the pose from imprints since the model predicts directly the object pose.
-            ope = End2EndModelOutputObjectPoseEstimation()
+        ope_names = ['icp', 'icp_approx']
+        if ope_name == 'icp':
+            ope = BatchedModelOutputObjectPoseEstimation(object_name='marker', factor_x=7, factor_y=7, method='bilinear',
+                                                 device=torch.device('cuda'), imprint_selection=self.imprint_selection,
+                                                 imprint_percentile=self.imprint_percentile)  # percentile
+        elif ope_name == 'icp_approx':
+            # ope = ICPApproximationModelOutputObjectPoseEstimation(model_name='icp_approximation_model', load_version=0, model_data_path=self.model_data_path) # without data augmentation
+            ope = ICPApproximationModelOutputObjectPoseEstimation(model_name='icp_approximation_model', load_version=3, model_data_path=self.model_data_path) # adding data augmentation for encoding-decoding images
         else:
-            ope_names = ['icp', 'icp_approx']
-            if ope_name == 'icp':
-                ope = BatchedModelOutputObjectPoseEstimation(object_name='marker', factor_x=7, factor_y=7, method='bilinear',
-                                                     device=torch.device('cuda'), imprint_selection=self.imprint_selection,
-                                                     imprint_percentile=self.imprint_percentile)  # percentile
-            elif ope_name == 'icp_approx':
-                # ope = ICPApproximationModelOutputObjectPoseEstimation(model_name='icp_approximation_model', load_version=0, model_data_path=self.model_data_path) # without data augmentation
-                ope = ICPApproximationModelOutputObjectPoseEstimation(model_name='icp_approximation_model', load_version=3, model_data_path=self.model_data_path) # adding data augmentation for encoding-decoding images
-            else:
-                raise NotImplementedError('Object pose estimation with name key {} NOT implemented yet. Available options: {}'.format(ope_name, ope_names))
+            raise NotImplementedError('Object pose estimation with name key {} NOT implemented yet. Available options: {}'.format(ope_name, ope_names))
         print('USING Object Pose Estimation {}'.format(ope.__class__.__name__))
         return ope
 
@@ -184,7 +181,15 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             grasp_pose_correction = None # get default one which does not correct the pose since it is direclty predicted corrected.
         else:
             grasp_pose_correction = drawing_one_dir_grasp_pose_correction
-        controller = BubbleModelMPPIController(self.model, self.env, self.ope, vertical_tool_cost_function,
+
+        # SELECT THE End2EndModelOutputObjectPoseEstimation if we have object_pose_dynamics_model, since the MPPI does not need to estimate pose from imprints
+        if self.model_name in ['object_pose_dynamics_model']:
+            # We do not need to estimate the pose from imprints since the model predicts directly the object pose.
+            ope = End2EndModelOutputObjectPoseEstimation()
+        else:
+            ope = self.ope
+
+        controller = BubbleModelMPPIController(self.model, self.env, ope, vertical_tool_cost_function,
                                                 action_model=drawing_action_model_one_dir,
                                                 grasp_pose_correction=grasp_pose_correction,
                                                 num_samples=self.num_samples, horizon=self.horizon, noise_sigma=None,
@@ -222,6 +227,13 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         for step_i in tqdm(range(num_steps)):
             random_action, valid_action = self.env.get_action()  # this is a
             obs_sample = self.format_raw_observation(obs_sample_raw)    # Downsample the sample
+            if self.model_name in ['object_pose_dynamics_model']:
+                # NEED TO ESTIMATE THE INITIAL POSE:
+                batched_obs_sample = batched_tensor_sample(obs_sample, batch_size=1)
+                batched_obs_sample['final_imprint'] = batched_obs_sample['init_imprint']
+                gf_X_objpose = self.ope._estimate_object_pose(batched_obs_sample)
+                init_object_pose = homogeneous_pose_to_axis_angle(gf_X_objpose)[0].detach().cpu().numpy()
+                obs_sample['init_object_pose'] = init_object_pose
             if not self.model_name == 'random':
                 action = self.controller.control(obs_sample) # it is already an action dictionary
                 # This is a test to see how random grasp width effect the performace.
