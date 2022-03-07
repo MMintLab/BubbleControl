@@ -112,7 +112,7 @@ class BubblePCReconstructorBase(abc.ABC):
             imprint_pcd_l = pack_o3d_pcd(imprint_l)
             distance_bubbles = None
             if len(imprint_pcd_r.points) < 5 or len(imprint_pcd_l.points) < 5:
-                print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
+                print(f"{term_colors.WARNING}Warning: Not enough scene points provided (r: {len(imprint_pcd_r.points)}, l:{len(imprint_pcd_l.points)}){term_colors.ENDC}")
                 self.tool_detected_publisher.data = False
             else:
                 tree = KDTree(imprint_pcd_r.points)
@@ -126,12 +126,12 @@ class BubblePCReconstructorBase(abc.ABC):
                 imprint_r_array = imprint_r_array[np.where(np.abs(imprint_r_array[:, 0]) < 0.02)]
                 imprint_l_array = imprint_l_array[np.where(np.abs(imprint_l_array[:, 0]) < 0.02)]
                 if imprint_r_array.shape[0] == 0 or imprint_l_array.shape[0] == 0:
-                    print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
+                    print(f"{term_colors.WARNING}Warning: No scene points after filtering out outliers (r: {imprint_r_array.shape[0]}, l:{imprint_l_array.shape[0]}){term_colors.ENDC}")
                     self.tool_detected_publisher.data = False   
                 else:
                     # Find the two points further apart in the x axis                 
-                    x_max_r = np.max(imprint_r_array[:,0])
-                    x_min_l = np.min(imprint_l_array[:,0])
+                    x_max_r = np.max(imprint_r_array[:, 0])
+                    x_min_l = np.min(imprint_l_array[:, 0])
                     distance_bubbles_x = np.abs(x_max_r - x_min_l)
                     
                     #view_pointcloud([imprint_pcd_l,imprint_pcd_r], frame=True)

@@ -180,7 +180,7 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
         source_points = self._project_pc(np.asarray(source_pcd.points))
         target_points = self._project_pc(np.asarray(target_pcd.points))
         if len(target_points) < 4:
-            print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
+            print(f"{term_colors.WARNING}Warning: No scene points provided (we only have {len(target_points)} points){term_colors.ENDC}")
             if self.last_tr is not None:
                 return self.last_tr
             return init_tr
