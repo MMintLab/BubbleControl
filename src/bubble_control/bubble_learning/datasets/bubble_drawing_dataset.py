@@ -113,7 +113,7 @@ class BubbleDrawingDataset(BubbleDatasetBase):
 
     def _estimate_object_pose(self, def_r, def_l, ref_r, ref_l, camera_info_r, camera_info_l, all_tfs):
         reconstructor = BubblePCReconstructorOfflineDepth(object_name='marker', estimation_type='icp2d', view=self.view, percentile=0.005)
-        reconstructor.threshold = 0.0
+        reconstructor.threshold = 0.015
         reconstructor.references['left'] = ref_l
         reconstructor.references['right'] = ref_r
         reconstructor.references['left_frame'] = 'pico_flexx_left_optical_frame'

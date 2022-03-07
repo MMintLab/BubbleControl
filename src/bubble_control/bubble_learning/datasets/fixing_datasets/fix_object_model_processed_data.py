@@ -51,8 +51,8 @@ def replace_pivoting_object_models(data_name):
 
 
 if __name__ == '__main__':
-    data_path = '/home/mireiaplanaslisbona/Documents/research/'
+    data_path = '/home/mik/Datasets/bubble_datasets'
 
-    # replace_drawing_object_models(os.path.join(data_path, 'drawing_data_one_direction'))
-    # replace_drawing_object_models(os.path.join(data_path, 'drawing_data_line'))
+    replace_drawing_object_models(os.path.join(data_path, 'drawing_data_one_direction'))
+    replace_drawing_object_models(os.path.join(data_path, 'drawing_data_line'))
     replace_pivoting_object_models(os.path.join(data_path, 'bubble_pivoting_data'))

@@ -14,6 +14,7 @@ from bubble_control.bubble_model_control.aux.bubble_model_control_utils import b
 from bubble_pivoting.pivoting_model_control.aux.pivoting_geometry import get_angle_difference, check_goal_position, get_tool_axis, get_tool_angle_gf
 from bubble_control.bubble_model_control.aux.format_observation import format_observation_sample
 import pdb
+
 def to_tensor(x, **kwargs):
     if not torch.is_tensor(x):
         x_t = torch.tensor(x, **kwargs)
@@ -24,18 +25,35 @@ def to_tensor(x, **kwargs):
 def default_grasp_pose_correction(position, orientation, action):
     return position, orientation
 
-
 class BubbleModelMPPIController(BubbleModelController):
     """
     Batched controller with a batched pose estimation
     """
-    def __init__(self, model, env, object_pose_estimator, cost_function, action_model, grasp_pose_correction=default_grasp_pose_correction, 
+    def __init__(self, model, env, object_pose_estimator, cost_function, action_model, grasp_pose_correction=None, 
                  state_trs=None, num_samples=100, horizon=3, lambda_=0.01, noise_sigma=None, _noise_sigma_value=0.2, debug=False):
+        """
+        :param model:
+        :param env:
+        :param object_pose_estimator:
+        :param cost_function: function that computes the costs given (estimated_poses, state_samples, prev_state_samples, actions)
+        :param action_model: funciton that updates the frames given an action: state_samples_corrected = action_model(state_samples, actions)
+        :param grasp_pose_correction: function that corrects the pose when expandign the model output. position, orientation = grasp_pose_correction(position, orientation, action)
+        :param state_trs:
+        :param num_samples:
+        :param horizon:
+        :param lambda_:
+        :param noise_sigma:
+        :param _noise_sigma_value:
+        :param debug:
+        """
         self.action_model = action_model
         self.grasp_pose_correction = grasp_pose_correction
+        if self.grasp_pose_correction is None:
+            self.grasp_pose_correction = default_grasp_pose_correction
         self.num_samples = num_samples
         self.horizon = horizon
         super().__init__(model, env, object_pose_estimator, cost_function, state_trs=state_trs)
+        self.action_space = self.env.action_space
         self.u_mu = None
         self.noise_sigma = noise_sigma
         self._noise_sigma_value = _noise_sigma_value
@@ -53,7 +71,6 @@ class BubbleModelMPPIController(BubbleModelController):
         self.original_state_shape = None
         self.sample = None # Container to share sample across functions
         self.controller = None # controller not initialized yet
-        self.action_space = self.env.action_space
         self.actions = None
         self.costs = None
         
@@ -94,7 +111,7 @@ class BubbleModelMPPIController(BubbleModelController):
         :return: state tensor
         """
         flattened_state_shapes = self._get_flattened_state_sizes()
-        state_t = [to_tensor(s).reshape(-1,flattened_state_shapes[i]) for i, s in enumerate(state)]
+        state_t = [to_tensor(s).reshape(-1, flattened_state_shapes[i]) for i, s in enumerate(state)]
         state_t = torch.cat(state_t, dim=-1)
         return state_t
 
