@@ -77,7 +77,7 @@ class BubbleDynamicsModel(BubbleDynamicsModelBase):
     def _compute_loss(self, imprint_rec, wrench_rec, imprint_gth, wrench_gth):
         imprint_reconstruction_loss = self.mse_loss(imprint_rec, imprint_gth)
         wrench_reconstruction_loss = self.mse_loss(wrench_rec, wrench_gth)
-        loss = imprint_reconstruction_loss + 0.0000001 * wrench_reconstruction_loss
+        loss = imprint_reconstruction_loss + 0.000001 * wrench_reconstruction_loss
         return loss
 
 
