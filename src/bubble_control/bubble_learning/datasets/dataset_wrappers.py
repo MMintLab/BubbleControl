@@ -53,9 +53,14 @@ class BubbleImprintCombinedDatasetWrapper(BubbleDatasetBase):
         sample = self.dataset[true_fc]
         if fc % 2 == 0:
             # sample is the initial
-            sample['imprint'] = sample['init_imprint']
+            key = 'init'
         else:
-            sample['imprint'] = sample['final_imprint']
+            key = 'final'
+        sample['imprint'] = sample['{}_imprint'.format(key)]
+        sample['object_pose'] = sample['{}_object_pose'.format(key)]
+        sample['wrench'] = sample['{}_wrench'.format(key)]
+        sample['pos'] = sample['{}_pos'.format(key)]
+        sample['quat'] = sample['{}_quat'.format(key)]
         return sample
 
     def get_name(self):

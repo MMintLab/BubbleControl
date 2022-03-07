@@ -305,21 +305,6 @@ class BubbleModelMPPIController(BubbleModelController):
         axes[0][1].set_title('Input imprint')
         plt.show()
         
-        
-        
-        # for i,_ in enumerate(self.state_prev[0]): 
-        #     fig, axes = plt.subplots(nrows=2, ncols=3)
-        #     axes[0][0].imshow(self.state_prev[0][i][0].detach().numpy(), cmap='jet')
-        #     axes[1][0].imshow(self.state_prev[0][i][1].detach().numpy(), cmap='jet')
-        #     axes[0][1].imshow(self.prediction[0][i][0].detach().numpy(), cmap='jet')
-        #     axes[1][1].imshow(self.prediction[0][i][1].detach().numpy(), cmap='jet')
-        #     axes[0][2].imshow(state_next[0][0], cmap='jet')
-        #     axes[1][2].imshow(state_next[0][1], cmap='jet')
-        #     axes[0][0].set_title('Previus imprint')
-        #     axes[0][1].set_title('Predicted next imprint')
-        #     axes[0][2].set_title('Gth next imprint')
-        #     plt.show() 
-        
     def _action_correction(self, state_samples, actions):
         # actions: tensor of shape (N, action_dim)
         state_samples_corrected = self.action_model(state_samples, actions)

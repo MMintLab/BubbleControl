@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.nn as nn
 
 
 class ModelPoseLoss(torch.nn.Module):
@@ -22,17 +23,16 @@ class ModelPoseLoss(torch.nn.Module):
 
 
 class PoseLoss(ModelPoseLoss):
-    def __init__(self, object_points, device=None, criterion=None):
+    def __init__(self, object_points, criterion=None):
         super().__init__(criterion=criterion)
-        if device is None:
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = torch.tensor(object_points, dtype=torch.float).to(self.device)
+        model_t = torch.tensor(object_points, dtype=torch.float)
+        self.model = nn.Parameter(model_t, requires_grad=False)
         self.num_points = self.model.shape[0]
 
     def forward(self, R_1, t_1, R_2, t_2):
         # import pdb; pdb.set_trace()
         m_1 = self._transform_model(R_1, t_1)
-        m_2 = self._transform_model_points(R_2, t_2)
+        m_2 = self._transform_model(R_2, t_2)
         loss = 0.5 * self.criterion(m_1, m_2)
         return loss
 

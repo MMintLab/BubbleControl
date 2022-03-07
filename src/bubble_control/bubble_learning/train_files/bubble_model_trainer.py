@@ -12,6 +12,7 @@ from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 from bubble_control.bubble_learning.datasets.fixing_datasets.fix_object_pose_encoding_processed_data import EncodeObjectPoseAsAxisAngleTr
 from bubble_pivoting.datasets.bubble_pivoting_dataset import BubblePivotingDownsampledDataset
 from bubble_control.bubble_learning.models.object_pose_dynamics_model import ObjectPoseDynamicsModel
+from bubble_control.bubble_learning.models.icp_approximation_model import ICPApproximationModel
 
 from bubble_control.bubble_learning.train_files.parsed_trainer import ParsedTrainer
 
@@ -56,7 +57,7 @@ if __name__ == '__main__':
         'batch_size': int,
         'val_batch_size': int
     }
-    Model = [BubbleAutoEncoderModel, BubbleDynamicsModel, BubbleLinearDynamicsModel, BubbleEnd2EndDynamicsModel, ObjectPoseDynamicsModel]
+    Model = [BubbleAutoEncoderModel, BubbleDynamicsModel, BubbleLinearDynamicsModel, BubbleEnd2EndDynamicsModel, ObjectPoseDynamicsModel, ICPApproximationModel]
     Dataset = [BubbleDrawingDataset, TaskCombinedDataset, DrawingDataset, BubblePivotingDownsampledDataset, PivotingCombinedDataset]
     parsed_trainer = ParsedTrainer(Model, Dataset, default_args=default_params, default_types=default_types)
 

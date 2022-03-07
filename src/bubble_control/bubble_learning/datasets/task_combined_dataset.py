@@ -77,7 +77,7 @@ class TaskCombinedDataset(CombinedDataset):
 
 
 if __name__ == '__main__':
-    task_combined_dataset = TaskCombinedDataset('/home/mmint/bubble_datasets', only_keys=['imprint'])
+    task_combined_dataset = TaskCombinedDataset('/home/mmint/bubble_datasets', only_keys=['imprint', 'object_pose', 'wrench', 'pos', 'ori'])
     d0 = task_combined_dataset[0]
     print(d0)
 
