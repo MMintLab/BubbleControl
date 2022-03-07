@@ -61,10 +61,9 @@ def get_angle_from_axis_angle(orientation, plane_normal):
         axis_angle = torch.from_numpy(q_to_ax._tr(orientation.detach().numpy()))
     else:
         axis_angle = orientation
-    normal_axis_angle = torch.einsum('bi,i->b', axis_angle, plane_normal).unsqueeze(-1) * plane_normal.unsqueeze(0)
-    angle = torch.norm(normal_axis_angle, dim=-1)
-    if torch.sum(torch.isnan(angle)) != 0:
-        import pdb; pdb.set_trace()
+    projection = torch.einsum('bi,i->b', axis_angle, plane_normal)
+    normal_axis_angle = projection.unsqueeze(-1) * plane_normal.unsqueeze(0)
+    angle = torch.norm(normal_axis_angle, dim=-1) * torch.sign(projection)
     return angle
 
 

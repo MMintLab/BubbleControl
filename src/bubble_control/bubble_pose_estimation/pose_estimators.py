@@ -26,7 +26,8 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
         super().__init__()
         self.object_model = obj_model
         self.last_tr = None
-        self.threshold = None# TODO
+        if self.threshold is None:
+            self.threshold = 0.015
         self.view = view
         self.verbose = verbose
 
@@ -39,7 +40,7 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
             # Visualize the initial transofrm:
             print('visualizing ICP initial configuration')
             model_tr_pcd = copy.deepcopy(self.object_model)
-            # model_tr_pcd.transform(init_tr)
+            model_tr_pcd.transform(init_tr)
             view_pointcloud([target_pcd, model_tr_pcd], frame=True)
 
         # Estimate the transformation
@@ -235,6 +236,12 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
             view_pointcloud([target_pcd, model_tr_pcd], frame=True)
         return unprojected_icp_tr
 
+    def _filter_input_pc(self, input_pc):
+        input_mean = np.mean(input_pc[:, :2], axis=0)
+        dists = np.linalg.norm(input_pc[:, :2] - input_mean, axis=1)
+        d_th = 0.015
+        filtered_input = input_pc[np.where(dists <= d_th)]
+        return filtered_input
 
 # Debug 2D version:
 if __name__ == '__main__':

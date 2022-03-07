@@ -55,8 +55,8 @@ def create_object_models(radius=0.005, height=0.12):
     spatula_pl_pcd = pack_o3d_pcd(spatula_pl_pc)
 
     # MARKER ---- object model simplified by 2 planes
-    grid_y, grid_z = np.meshgrid(np.linspace(-0.0025, 0.0025, 30),
-                                 np.linspace(-height * 0.1, height * 0.1, 50))
+    grid_y, grid_z = np.meshgrid(np.linspace(-0.0025, 0.0025, 10),
+                                 np.linspace(-height * 0.1, height * 0.1, 15))
     points_y = grid_y.flatten()
     points_z = grid_z.flatten()
     plane_base = np.stack([np.zeros_like(points_y), points_y, points_z], axis=1)

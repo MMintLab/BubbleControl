@@ -110,7 +110,6 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
 
         model_input = self.get_model_input(batch)
         ground_truth = self.get_model_output(batch)
-
         model_output = self.forward(*model_input, action)
         loss = self._compute_loss(*model_output, *ground_truth, object_model)
 
