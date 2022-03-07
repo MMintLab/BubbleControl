@@ -26,8 +26,7 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
         super().__init__()
         self.object_model = obj_model
         self.last_tr = None
-        if self.threshold is None:
-            self.threshold = 0.015
+        self.threshold = None
         self.view = view
         self.verbose = verbose
 
@@ -44,6 +43,8 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
             view_pointcloud([target_pcd, model_tr_pcd], frame=True)
 
         # Estimate the transformation
+        if self.threshold is None:
+            self.threshold = 0.015
         icp_tr = self._icp(source_pcd=self.object_model, target_pcd=target_pcd, threshold=self.threshold, init_tr=init_tr)
 
         if self.view:
