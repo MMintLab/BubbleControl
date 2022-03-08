@@ -8,6 +8,7 @@ import pytorch_lightning as pl
 import abc
 import torchvision
 import pytorch3d.transforms as batched_trs
+import tf.transformations as tr
 from matplotlib import cm
 
 
@@ -65,7 +66,12 @@ class ICPApproximationModel(pl.LightningModule):
     def _get_object_model(self):
         model_pcs = load_object_models()
         object_model_ar = np.asarray(model_pcs[self.object_name].points)
-        return object_model_ar
+        # Transform object to be aligned with z axis in grasp frame
+        tr_matrix = tr.quaternion_matrix(tr.quaternion_from_euler(0, -np.pi / 2, 0))
+        object_model_H = np.concatenate([object_model_ar, np.ones(*object_model_ar.shape[:-1],1)], axis=-1)
+        object_model_tr = np.einsum('ij,kj->ki', tr_matrix, object_model_H)
+        object_model = object_model_tr[...,:3]
+        return object_model
 
     def forward(self, imprint):
         img_embedding = self.autoencoder.encode(imprint)
@@ -178,12 +184,12 @@ class ICPApproximationModel(pl.LightningModule):
     def _log_imprint(self, batch, batch_idx, phase):
         if self.current_epoch == 0 and batch_idx == 0:
             imprint_t = batch['imprint'][:self.num_to_log]
-            self.logger.experiment.add_image('imprint_{}'.format(phase), get_batched_image_grid(imprint_t),
+            self.logger.experiment.add_image('imprint_{}'.format(phase), get_imprint_grid(imprint_t),
                                              self.global_step)
             if self.autoencoder_augmentation:
                 reconstructed_imprint_t = self.autoencoder.decode(self.autoencoder.encode(imprint_t))
                 self.logger.experiment.add_image('imprint_reconstructed_{}'.format(phase),
-                                                 self._get_image_grid(reconstructed_imprint_t), self.global_step)
+                                                 get_imprint_grid(reconstructed_imprint_t), self.global_step)
 
     def _log_object_pose_images(self, obj_pose_pred, obj_pose_gth, phase):
         grid = get_object_pose_images_grid(obj_pose_pred, obj_pose_gth, self.plane_normal)

@@ -49,6 +49,7 @@ def get_object_pose_images_grid(obj_pose_pred, obj_pose_gth, plane_normal):
     obj_rot_gth = obj_pose_gth[..., 3:]
     obj_rot_angle_gth = get_angle_from_axis_angle(obj_rot_gth, plane_normal)
     pose_grid = get_pose_images_grid(obj_trans_pred, obj_rot_angle_pred, obj_trans_gth, obj_rot_angle_gth)
+    # they should match the bottom imprint (left one)
     return pose_grid
 
 
@@ -63,7 +64,7 @@ def get_angle_from_axis_angle(orientation, plane_normal):
         axis_angle = orientation
     projection = torch.einsum('bi,i->b', axis_angle, plane_normal)
     normal_axis_angle = projection.unsqueeze(-1) * plane_normal.unsqueeze(0)
-    angle = torch.norm(normal_axis_angle, dim=-1) * torch.sign(projection)
+    angle = torch.norm(normal_axis_angle, dim=-1) * torch.sign(projection) + np.pi*0.5
     return angle
 
 
