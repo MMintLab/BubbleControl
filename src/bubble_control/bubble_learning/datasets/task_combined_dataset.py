@@ -19,6 +19,8 @@ class TaskCombinedDataset(CombinedDataset):
         self.wrench_frame = wrench_frame
         self.dtype = dtype
         self.transformation = transformation
+        if self.transformation is None:
+            self.transformation = []
         self.load_cache = load_cache
         self.contribute_mode = contribute_mode
         self.clean_if_error = clean_if_error
