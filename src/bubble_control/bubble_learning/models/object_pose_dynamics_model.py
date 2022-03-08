@@ -18,7 +18,7 @@ from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoE
 from bubble_control.bubble_learning.models.dynamics_model_base import DynamicsModelBase
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 from bubble_control.bubble_learning.aux.pose_loss import ModelPoseLoss
-from bubble_control.bubble_learning.aux.visualization_utils.pose_visualization import get_object_pose_images_grid
+from bubble_control.bubble_learning.aux.visualization_utils.pose_visualization import get_object_pose_images_grid, get_angle_from_axis_angle
 
 
 class ObjectPoseDynamicsModel(DynamicsModelBase):
@@ -99,6 +99,12 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
         axis_angle_gth = obj_pose_gth[..., 3:]
         R_gth = batched_trs.axis_angle_to_matrix(axis_angle_gth)
         t_gth = obj_pose_gth[..., :3]
+        # Transform object to be aligned with z axis in grasp frame
+        frame_axis_angle = torch.tensor([0, -torch.pi/2, 0]).unsqueeze(0)
+        frame_rotation = batched_trs.axis_angle_to_matrix(frame_axis_angle)
+        frame_translation = torch.zeros(1,3)
+        object_model = self.pose_loss._transform_model_points(frame_rotation, frame_translation, object_model) 
+        #Compute loss
         pose_loss = self.pose_loss(R_1=R_pred, t_1=t_pred, R_2=R_gth, t_2=t_gth, model_points=object_model)
         # pose_loss = self.mse_loss(obj_pose_pred, obj_pose_gth)
         loss = pose_loss
