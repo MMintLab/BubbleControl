@@ -8,6 +8,7 @@ import pytorch_lightning as pl
 import abc
 import torchvision
 import pytorch3d.transforms as batched_trs
+import tf.transformations as tr
 from matplotlib import cm
 
 
@@ -65,7 +66,12 @@ class ICPApproximationModel(pl.LightningModule):
     def _get_object_model(self):
         model_pcs = load_object_models()
         object_model_ar = np.asarray(model_pcs[self.object_name].points)
-        return object_model_ar
+        # Transform object to be aligned with z axis in grasp frame
+        tr_matrix = tr.quaternion_matrix(tr.quaternion_from_euler(0, -np.pi / 2, 0))
+        object_model_H = np.concatenate([object_model_ar, np.ones(*object_model_ar.shape[:-1],1)], axis=-1)
+        object_model_tr = np.einsum('ij,kj->ki', tr_matrix, object_model_H)
+        object_model = object_model_tr[...,:3]
+        return object_model
 
     def forward(self, imprint):
         img_embedding = self.autoencoder.encode(imprint)
