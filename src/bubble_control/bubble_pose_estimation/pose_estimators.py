@@ -26,8 +26,7 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
         super().__init__()
         self.object_model = obj_model
         self.last_tr = None
-        if self.threshold is None:
-            self.threshold = 0.015
+        self.threshold = None
         self.view = view
         self.verbose = verbose
 
@@ -44,6 +43,8 @@ class ICPPoseEstimator(PCPoseEstimatorBase):
             view_pointcloud([target_pcd, model_tr_pcd], frame=True)
 
         # Estimate the transformation
+        if self.threshold is None:
+            self.threshold = 0.015
         icp_tr = self._icp(source_pcd=self.object_model, target_pcd=target_pcd, threshold=self.threshold, init_tr=init_tr)
 
         if self.view:
@@ -179,7 +180,7 @@ class ICP2DPoseEstimator(ICPPoseEstimator):
         source_points = self._project_pc(np.asarray(source_pcd.points))
         target_points = self._project_pc(np.asarray(target_pcd.points))
         if len(target_points) < 4:
-            print(f"{term_colors.WARNING}Warning: No scene points provided{term_colors.ENDC}")
+            print(f"{term_colors.WARNING}Warning: No scene points provided (we only have {len(target_points)} points){term_colors.ENDC}")
             if self.last_tr is not None:
                 return self.last_tr
             return init_tr

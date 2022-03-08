@@ -16,6 +16,8 @@ from bubble_control.bubble_learning.models.aux.fc_module import FCModule
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 from bubble_control.aux.load_confs import load_object_models
 from bubble_control.bubble_learning.aux.pose_loss import PoseLoss
+from bubble_control.bubble_learning.aux.visualization_utils.image_grid import get_imprint_grid, get_batched_image_grid
+from bubble_control.bubble_learning.aux.visualization_utils.pose_visualization import get_object_pose_images_grid
 
 
 class ICPApproximationModel(pl.LightningModule):
@@ -176,7 +178,7 @@ class ICPApproximationModel(pl.LightningModule):
     def _log_imprint(self, batch, batch_idx, phase):
         if self.current_epoch == 0 and batch_idx == 0:
             imprint_t = batch['imprint'][:self.num_to_log]
-            self.logger.experiment.add_image('imprint_{}'.format(phase), self._get_image_grid(imprint_t),
+            self.logger.experiment.add_image('imprint_{}'.format(phase), get_batched_image_grid(imprint_t),
                                              self.global_step)
             if self.autoencoder_augmentation:
                 reconstructed_imprint_t = self.autoencoder.decode(self.autoencoder.encode(imprint_t))
@@ -184,88 +186,8 @@ class ICPApproximationModel(pl.LightningModule):
                                                  self._get_image_grid(reconstructed_imprint_t), self.global_step)
 
     def _log_object_pose_images(self, obj_pose_pred, obj_pose_gth, phase):
-        obj_trans_pred = obj_pose_pred[..., :3]
-        obj_rot_pred = obj_pose_pred[..., 3:]
-        obj_rot_angle_pred = self._get_angle_from_axis_angle(obj_rot_pred, self.plane_normal)
-        obj_trans_gth = obj_pose_gth[..., :3]
-        obj_rot_gth = obj_pose_gth[..., 3:]
-        obj_rot_angle_gth = self._get_angle_from_axis_angle(obj_rot_gth, self.plane_normal)
-        images = self._get_pose_images(obj_trans_pred, obj_rot_angle_pred, obj_trans_gth, obj_rot_angle_gth)
-        grid = torchvision.utils.make_grid(images)
+        grid = get_object_pose_images_grid(obj_pose_pred, obj_pose_gth, self.plane_normal)
         self.logger.experiment.add_image('pose_estimation_{}'.format(phase), grid, self.global_step)
-
-
-    def _get_angle_from_axis_angle(self, orientation, plane_normal):
-        if orientation.shape[-1] == 4:
-            q_to_ax = QuaternionToAxis()
-            axis_angle = torch.from_numpy(q_to_ax._tr(orientation.detach().numpy()))
-        else:
-            axis_angle = orientation
-        projection = torch.einsum('bi,i->b', axis_angle, plane_normal)
-        normal_axis_angle = projection.unsqueeze(-1) * plane_normal.unsqueeze(0)
-        angle = torch.norm(normal_axis_angle, dim=-1) * torch.sign(projection)
-        return angle
-
-    def _get_pose_images(self, trans_pred, rot_angle_pred, trans_gth, rot_angle_gth):
-        images = []
-        for i in range(len(trans_pred)):
-            img = np.zeros([100, 100, 3], dtype=np.uint8)
-            img.fill(100)
-            pred_param = self._find_rect_param(trans_pred[i], rot_angle_pred[i], img)
-            color_p = (255, 0, 0)
-            self._draw_angled_rec(*pred_param, color_p, img)
-            gth_param = self._find_rect_param(trans_gth[i], rot_angle_gth[i], img)
-            color_gth = (0, 0, 255)
-            self._draw_angled_rec(*gth_param, color_gth, img)
-            img = torch.tensor(img)
-            img = img.permute(2, 0, 1)
-            images.append(img)
-        return images
-
-    def _find_rect_param(self, trans, rot, img):
-        height = 0.06 * 100 / 0.15
-        width = 0.015 * 100 / 0.15
-        center_x = img.shape[0] / 2 + trans[0] * 10 / 0.15
-        center_y = img.shape[1] / 2 + trans[1] * 10 / 0.15
-        return center_x, center_y, width, height, rot.item()
-
-    def _draw_angled_rec(self, x0, y0, width, height, angle, color, img):
-        b = np.cos(angle) * 0.5
-        a = np.sin(angle) * 0.5
-        pt0 = (int(x0 - a * height - b * width),
-            int(y0 + b * height - a * width))
-        pt1 = (int(x0 + a * height - b * width),
-            int(y0 - b * height - a * width))
-        pt2 = (int(2 * x0 - pt0[0]), int(2 * y0 - pt0[1]))
-        pt3 = (int(2 * x0 - pt1[0]), int(2 * y0 - pt1[1]))
-
-        cv2.line(img, pt0, pt1, color, 3)
-        cv2.line(img, pt1, pt2, color, 3)
-        cv2.line(img, pt2, pt3, color, 3)
-        cv2.line(img, pt3, pt0, color, 3)
-
-    def _get_image_grid(self, batched_img, cmap='jet'):
-        # reshape the batched_img to have the same imprints one above the other
-        batched_img = batched_img.detach().cpu()
-        batched_img_r = batched_img.reshape(*batched_img.shape[:1], -1, *batched_img.shape[3:]) # (batch_size, 2*W, H)
-        # Add padding
-        padding_pixels = 5
-        batched_img_padded = F.pad(input=batched_img_r,
-                                   pad=(padding_pixels, padding_pixels, padding_pixels, padding_pixels),
-                                   mode='constant',
-                                   value=0)
-        batched_img_cmap = self._cmap_tensor(batched_img_padded, cmap=cmap) # size (..., w,h, 3)
-        num_dims = len(batched_img_cmap.shape)
-        grid_input = batched_img_cmap.permute(*np.arange(num_dims-3), -1, -3, -2)
-        grid_img = torchvision.utils.make_grid(grid_input)
-        return grid_img
-
-    def _cmap_tensor(self, img_tensor, cmap='jet'):
-        cmap = cm.get_cmap(cmap)
-        mapped_img_ar = cmap(img_tensor/torch.max(img_tensor)) # (..,w,h,4)
-        mapped_img_ar = mapped_img_ar[..., :3] # (..,w,h,3) -- get rid of the alpha value
-        mapped_img = torch.tensor(mapped_img_ar).to(self.device)
-        return mapped_img
 
 
 class FakeICPApproximationModel(nn.Module):
