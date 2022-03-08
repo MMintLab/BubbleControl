@@ -178,12 +178,12 @@ class ICPApproximationModel(pl.LightningModule):
     def _log_imprint(self, batch, batch_idx, phase):
         if self.current_epoch == 0 and batch_idx == 0:
             imprint_t = batch['imprint'][:self.num_to_log]
-            self.logger.experiment.add_image('imprint_{}'.format(phase), get_batched_image_grid(imprint_t),
+            self.logger.experiment.add_image('imprint_{}'.format(phase), get_imprint_grid(imprint_t),
                                              self.global_step)
             if self.autoencoder_augmentation:
                 reconstructed_imprint_t = self.autoencoder.decode(self.autoencoder.encode(imprint_t))
                 self.logger.experiment.add_image('imprint_reconstructed_{}'.format(phase),
-                                                 self._get_image_grid(reconstructed_imprint_t), self.global_step)
+                                                 get_imprint_grid(reconstructed_imprint_t), self.global_step)
 
     def _log_object_pose_images(self, obj_pose_pred, obj_pose_gth, phase):
         grid = get_object_pose_images_grid(obj_pose_pred, obj_pose_gth, self.plane_normal)
