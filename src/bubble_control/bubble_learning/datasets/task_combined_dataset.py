@@ -70,6 +70,19 @@ class TaskCombinedDataset(CombinedDataset):
             clean_if_error=self.clean_if_error,
         )
         datasets.append(pivoting_dataset)
+        pivoting_dataset_wide_rot = BubblePivotingDownsampledDataset(
+            data_name=os.path.join(self.data_dir, 'bubble_pivoting_data_wide_rotations'),
+            downsample_factor_x=self.downsample_factor_x,
+            downsample_factor_y=self.downsample_factor_y,
+            downsample_reduction=self.downsample_reduction,
+            wrench_frame=self.wrench_frame,
+            dtype=self.dtype,
+            transformation=self.transformation,
+            load_cache=self.load_cache,
+            contribute_mode=self.contribute_mode,
+            clean_if_error=self.clean_if_error,
+        )
+        datasets.append(pivoting_dataset_wide_rot)
 
         # Make them combined datasets:
         combined_datasets = [BubbleImprintCombinedDatasetWrapper(dataset) for dataset in datasets]
