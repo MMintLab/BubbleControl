@@ -24,7 +24,7 @@ from bubble_control.bubble_learning.aux.visualization_utils.pose_visualization i
 class ICPApproximationModel(pl.LightningModule):
 
     def __init__(self, input_sizes, num_fcs=2, fc_h_dim=100,
-                 skip_layers=None, lr=1e-4, dataset_params=None, activation='relu', load_autoencoder_version=0, object_name='marker', num_to_log=40, autoencoder_augmentation=False):
+                 skip_layers=None, lr=1e-4, dataset_params=None, activation='relu', load_autoencoder_version=0, object_name='marker', num_to_log=40, autoencoder_augmentation=False, loss_name='pose_loss'):
         super().__init__()
         self.input_sizes = input_sizes
         self.num_fcs = num_fcs
@@ -36,6 +36,7 @@ class ICPApproximationModel(pl.LightningModule):
         self.object_name = object_name
         self.autoencoder_augmentation = autoencoder_augmentation
         self.object_model = self._get_object_model()
+        self.loss_name = loss_name
         self.mse_loss = nn.MSELoss()
         self.pose_loss = PoseLoss(self.object_model)
         self.plane_normal = nn.Parameter(torch.tensor([1, 0, 0], dtype=torch.float), requires_grad=False)
@@ -68,9 +69,9 @@ class ICPApproximationModel(pl.LightningModule):
         object_model_ar = np.asarray(model_pcs[self.object_name].points)
         # Transform object to be aligned with z axis in grasp frame
         tr_matrix = tr.quaternion_matrix(tr.quaternion_from_euler(0, -np.pi / 2, 0))
-        object_model_H = np.concatenate([object_model_ar, np.ones(*object_model_ar.shape[:-1],1)], axis=-1)
+        object_model_H = np.concatenate([object_model_ar, np.ones(object_model_ar.shape[:-1]+(1,))], axis=-1)
         object_model_tr = np.einsum('ij,kj->ki', tr_matrix, object_model_H)
-        object_model = object_model_tr[...,:3]
+        object_model = object_model_tr[..., :3]
         return object_model
 
     def forward(self, imprint):
@@ -151,15 +152,19 @@ class ICPApproximationModel(pl.LightningModule):
 
     def _compute_loss(self, obj_pose_pred, obj_pose_gth):
         # MSE Loss on position and orientation (encoded as aixis-angle 3 values)
-        axis_angle_pred = obj_pose_pred[..., 3:]
-        R_pred = batched_trs.axis_angle_to_matrix(axis_angle_pred)
-        t_pred = obj_pose_pred[..., :3]
-        axis_angle_gth = obj_pose_gth[..., 3:]
-        R_gth = batched_trs.axis_angle_to_matrix(axis_angle_gth)
-        t_gth = obj_pose_gth[..., :3]
-        pose_loss = self.pose_loss(R_1=R_pred, t_1=t_pred, R_2=R_gth, t_2=t_gth)
-        # pose_loss = self.mse_loss(obj_pose_pred, obj_pose_gth)
-        loss = pose_loss
+        if self.loss_name == 'pose_loss':
+            axis_angle_pred = obj_pose_pred[..., 3:]
+            R_pred = batched_trs.axis_angle_to_matrix(axis_angle_pred)
+            t_pred = obj_pose_pred[..., :3]
+            axis_angle_gth = obj_pose_gth[..., 3:]
+            R_gth = batched_trs.axis_angle_to_matrix(axis_angle_gth)
+            t_gth = obj_pose_gth[..., :3]
+            pose_loss = self.pose_loss(R_1=R_pred, t_1=t_pred, R_2=R_gth, t_2=t_gth)
+            loss = pose_loss
+        elif self.loss_name == 'mse':
+            loss = self.mse_loss(obj_pose_pred, obj_pose_gth)
+        else:
+            raise NotImplementedError('Loss named {} not implemented yet.'.format(self.loss_name))
         return loss
 
     # AUX FUCTIONS -----------------------------------------------------------------------------------------------------
