@@ -18,7 +18,7 @@ from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoE
 from bubble_control.bubble_learning.models.pointnet.pointnet_loading_utils import get_pretrained_pointnet2_object_embeding
 from bubble_control.bubble_learning.models.pointnet.pointnet_object_embedding import PointNetObjectEmbedding
 from bubble_control.bubble_learning.models.dynamics_model_base import DynamicsModelBase
-from bubble_control.bubble_learning.aux.visualization_utils.image_grid import get_batched_image_grid
+from bubble_control.bubble_learning.aux.visualization_utils.image_grid import get_batched_image_grid, get_imprint_grid
 
 
 class BubbleDynamicsModelBase(DynamicsModelBase):
@@ -95,12 +95,12 @@ class BubbleDynamicsModelBase(DynamicsModelBase):
         imprint_next = batch['final_imprint'][:self.num_imprints_to_log]
         imprint_indx = self.get_model_output_keys().index('init_imprint')
         imprint_next_rec = model_output[imprint_indx][:self.num_imprints_to_log]
-        predicted_grid = self._get_image_grid(imprint_next_rec * torch.max(imprint_next_rec) / torch.max(
+        predicted_grid = get_imprint_grid(imprint_next_rec * torch.max(imprint_next_rec) / torch.max(
             imprint_next))  # trasform so they are in the same range
-        gth_grid = self.get_batched_image_grid(imprint_next)
+        gth_grid = get_imprint_grid(imprint_next)
         if batch_idx == 0:
             if self.current_epoch == 0:
-                self.logger.experiment.add_image('init_imprint_{}'.format(phase), get_batched_image_grid(imprint_t),
+                self.logger.experiment.add_image('init_imprint_{}'.format(phase), get_imprint_grid(imprint_t),
                                                  self.global_step)
                 self.logger.experiment.add_image('next_imprint_gt_{}'.format(phase), gth_grid, self.global_step)
             self.logger.experiment.add_image('next_imprint_predicted_{}'.format(phase), predicted_grid,

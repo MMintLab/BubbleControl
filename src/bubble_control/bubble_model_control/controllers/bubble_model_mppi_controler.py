@@ -8,7 +8,6 @@ import pytorch3d.transforms as batched_trs
 import matplotlib
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
-import pdb
 from bubble_control.bubble_model_control.controllers.bubble_controller_base import BubbleModelController
 from bubble_control.bubble_model_control.aux.bubble_model_control_utils import batched_tensor_sample, get_transformation_matrix, tr_frame, convert_all_tfs_to_tensors
 from bubble_pivoting.pivoting_model_control.aux.pivoting_geometry import get_angle_difference, check_goal_position, get_tool_axis, get_tool_angle_gf
@@ -226,6 +225,7 @@ class BubbleModelMPPIController(BubbleModelController):
         state = self._unpack_state_tensor(state_t)
         action = self._unpack_action_tensor(action_t)
         model_input = self._extract_input_from_state(state)
+        pdb.set_trace()
         output = self.model(*model_input, action)
         if self.debug and action.shape[0] < 2:
             self.state_prev = state
@@ -294,8 +294,8 @@ class BubbleModelMPPIController(BubbleModelController):
         next_state_sample = self._pack_state_to_sample(next_state, self.sample)
         next_state_sample = self._action_correction(next_state_sample, action_t)
         estimated_pose = self.object_pose_estimator.estimate_pose(next_state_sample)
+        print('Predicted')
         tool_angle_gf = get_tool_angle_gf(estimated_pose, next_state_sample)
-        print('Predicted tool angle gf after action: ', tool_angle_gf)
         action_ind = (torch.norm(self.actions - action, dim=1) < 0.001).nonzero(as_tuple=True)[0]
         if action_ind.shape[0] >= 1:
             action_ind = action_ind[0].item()
@@ -305,6 +305,17 @@ class BubbleModelMPPIController(BubbleModelController):
     def visualize_prediction(self, obs_sample_next):
         # formatted_obs_sample = self.get_downsampled_obs(obs_sample_next)
         # state_next = self._unpack_state_sample(formatted_obs_sample)
+        obs_sample_next['all_tfs'] = self._convert_all_tfs_to_tensors(obs_sample_next['all_tfs'])
+        obs_sample_next['all_tfs']['med_base'] = torch.from_numpy(obs_sample_next['all_tfs']['med_base']).unsqueeze(0)
+        obs_sample_next['all_tfs']['grasp_frame'] = torch.from_numpy(obs_sample_next['all_tfs']['grasp_frame']).unsqueeze(0)
+        obs_sample_next['final_imprint'] = torch.from_numpy(obs_sample_next['init_imprint']).unsqueeze(0)
+        obs_sample_next['undef_depth_r'] = torch.from_numpy(obs_sample_next['undef_depth_r']).unsqueeze(0)
+        obs_sample_next['undef_depth_l'] = torch.from_numpy(obs_sample_next['undef_depth_l']).unsqueeze(0)
+        import pdb; pdb.set_trace()
+        estimated_pose = self.object_pose_estimator.estimate_pose(obs_sample_next)
+        print('Real')
+        tool_angle_gf = get_tool_angle_gf(estimated_pose, obs_sample_next)
+        print('Real estimated tool angle gf after action: ', tool_angle_gf)
         state_next = self._unpack_state_sample(obs_sample_next)
         fig, axes = plt.subplots(nrows=2, ncols=4)
         axes[0][0].imshow(self.state_prev[0][0,0], cmap='jet')
