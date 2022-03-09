@@ -71,7 +71,7 @@ class ICPApproximationModel(pl.LightningModule):
         tr_matrix = tr.quaternion_matrix(tr.quaternion_from_euler(0, -np.pi / 2, 0))
         object_model_H = np.concatenate([object_model_ar, np.ones(object_model_ar.shape[:-1]+(1,))], axis=-1)
         object_model_tr = np.einsum('ij,kj->ki', tr_matrix, object_model_H)
-        object_model = object_model_tr[...,:3]
+        object_model = object_model_tr[..., :3]
         return object_model
 
     def forward(self, imprint):
@@ -163,6 +163,8 @@ class ICPApproximationModel(pl.LightningModule):
             loss = pose_loss
         elif self.loss_name == 'mse':
             loss = self.mse_loss(obj_pose_pred, obj_pose_gth)
+        else:
+            raise NotImplementedError('Loss named {} not implemented yet.'.format(self.loss_name))
         return loss
 
     # AUX FUCTIONS -----------------------------------------------------------------------------------------------------
