@@ -157,7 +157,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
                                                  imprint_percentile=self.imprint_percentile)  # percentile
         elif ope_name == 'icp_approx':
             # ope = ICPApproximationModelOutputObjectPoseEstimation(model_name='icp_approximation_model', load_version=0, model_data_path=self.model_data_path) # without data augmentation
-            ope = ICPApproximationModelOutputObjectPoseEstimation(model_name='icp_approximation_model', load_version=3, model_data_path=self.model_data_path) # adding data augmentation for encoding-decoding images
+            ope = ICPApproximationModelOutputObjectPoseEstimation(model_name='icp_approximation_model', load_version=9, model_data_path=self.model_data_path) # adding data augmentation for encoding-decoding images
         else:
             raise NotImplementedError('Object pose estimation with name key {} NOT implemented yet. Available options: {}'.format(ope_name, ope_names))
         print('USING Object Pose Estimation {}'.format(ope.__class__.__name__))
