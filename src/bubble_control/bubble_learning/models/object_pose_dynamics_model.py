@@ -18,16 +18,17 @@ from bubble_control.bubble_learning.models.bubble_autoencoder import BubbleAutoE
 from bubble_control.bubble_learning.models.dynamics_model_base import DynamicsModelBase
 from bubble_control.bubble_learning.aux.orientation_trs import QuaternionToAxis
 from bubble_control.bubble_learning.aux.pose_loss import ModelPoseLoss
-from bubble_control.bubble_learning.aux.visualization_utils.pose_visualization import get_object_pose_images_grid
+from bubble_control.bubble_learning.aux.visualization_utils.pose_visualization import get_object_pose_images_grid, get_angle_from_axis_angle
 
 
 class ObjectPoseDynamicsModel(DynamicsModelBase):
 
-    def __init__(self, *args, num_to_log=40, input_batch_norm=True, **kwargs):
+    def __init__(self, *args, num_to_log=40, input_batch_norm=True, loss_name='pose_loss', **kwargs):
         self.num_to_log = num_to_log
         self.input_batch_norm = input_batch_norm
         super().__init__(*args, **kwargs)
         self.dyn_model = self._get_dyn_model()
+        self.loss_name = loss_name
         self.pose_loss = ModelPoseLoss()
         self.plane_normal = nn.Parameter(torch.tensor([1, 0, 0], dtype=torch.float), requires_grad=False)
         sizes = self._get_sizes()
@@ -92,16 +93,26 @@ class ObjectPoseDynamicsModel(DynamicsModelBase):
         return next_state_map
 
     def _compute_loss(self, obj_pose_pred, obj_pose_gth, object_model):
-        # MSE Loss on position and orientation (encoded as aixis-angle 3 values)
-        axis_angle_pred = obj_pose_pred[..., 3:]
-        R_pred = batched_trs.axis_angle_to_matrix(axis_angle_pred)
-        t_pred = obj_pose_pred[..., :3]
-        axis_angle_gth = obj_pose_gth[..., 3:]
-        R_gth = batched_trs.axis_angle_to_matrix(axis_angle_gth)
-        t_gth = obj_pose_gth[..., :3]
-        pose_loss = self.pose_loss(R_1=R_pred, t_1=t_pred, R_2=R_gth, t_2=t_gth, model_points=object_model)
-        # pose_loss = self.mse_loss(obj_pose_pred, obj_pose_gth)
-        loss = pose_loss
+        if self.loss_name == 'pose_loss':
+            # MSE Loss on position and orientation (encoded as aixis-angle 3 values)
+            axis_angle_pred = obj_pose_pred[..., 3:]
+            R_pred = batched_trs.axis_angle_to_matrix(axis_angle_pred)
+            t_pred = obj_pose_pred[..., :3]
+            axis_angle_gth = obj_pose_gth[..., 3:]
+            R_gth = batched_trs.axis_angle_to_matrix(axis_angle_gth)
+            t_gth = obj_pose_gth[..., :3]
+            # Transform object to be aligned with z axis in grasp frame
+            frame_axis_angle = torch.tensor([0, -torch.pi/2, 0]).unsqueeze(0)
+            frame_rotation = batched_trs.axis_angle_to_matrix(frame_axis_angle)
+            frame_translation = torch.zeros(1, 3)
+            object_model = self.pose_loss._transform_model_points(frame_rotation, frame_translation, object_model)
+            #Compute loss
+            loss = self.pose_loss(R_1=R_pred, t_1=t_pred, R_2=R_gth, t_2=t_gth, model_points=object_model)
+        elif self.loss_name == 'mse':
+            loss = self.mse_loss(obj_pose_pred, obj_pose_gth)
+        else:
+            raise NotImplementedError('Loss named {} not implemented yet.'.format(self.loss_name))
+
         return loss
 
     def _step(self, batch, batch_idx, phase='train'):
