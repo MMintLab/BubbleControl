@@ -277,8 +277,8 @@ class BubblePCReconsturctorDepth(BubblePCReconstructorROSBase):
     def get_imprint(self, view=False, separate=False):
         depth_r = self.right_parser.get_image_depth()
         depth_l = self.left_parser.get_image_depth()
-        imprint_r = get_imprint_pc(self.references['right'].squeeze(-1), depth_r.squeeze(-1), threshold=self.threshold, K=self.camera_info['right']['K'])
-        imprint_l = get_imprint_pc(self.references['left'].squeeze(-1), depth_l.squeeze(-1), threshold=self.threshold, K=self.camera_info['left']['K'])
+        imprint_r = get_imprint_pc(self.references['right'].squeeze(-1), depth_r.squeeze(-1), threshold=self.threshold, K=self.camera_info['right']['K'], percentile=self.percentile)
+        imprint_l = get_imprint_pc(self.references['left'].squeeze(-1), depth_l.squeeze(-1), threshold=self.threshold, K=self.camera_info['left']['K'], percentile=self.percentile)
         frame_r = self.right_parser.optical_frame['depth']
         frame_l = self.left_parser.optical_frame['depth']
 

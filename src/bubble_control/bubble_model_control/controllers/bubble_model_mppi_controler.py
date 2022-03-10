@@ -29,7 +29,7 @@ class BubbleModelMPPIController(BubbleModelController):
     Batched controller with a batched pose estimation
     """
     def __init__(self, model, env, object_pose_estimator, cost_function, action_model, grasp_pose_correction=None, 
-                 state_trs=None, num_samples=100, horizon=3, lambda_=0.01, noise_sigma=None, _noise_sigma_value=0.2, debug=False):
+                 state_trs=None, num_samples=100, horizon=2, lambda_=0.01, noise_sigma=None, _noise_sigma_value=0.2, debug=False):
         """
         :param model:
         :param env:
@@ -225,7 +225,6 @@ class BubbleModelMPPIController(BubbleModelController):
         state = self._unpack_state_tensor(state_t)
         action = self._unpack_action_tensor(action_t)
         model_input = self._extract_input_from_state(state)
-        pdb.set_trace()
         output = self.model(*model_input, action)
         if self.debug and action.shape[0] < 2:
             self.state_prev = state
@@ -283,8 +282,8 @@ class BubbleModelMPPIController(BubbleModelController):
         state = self._unpack_state_sample(state_sample)
         state_t = self._pack_state_to_tensor(state)
         action = self.controller.command(state_t)
-        if self.debug:
-            self._check_prediction(state_t, action)
+        # if self.debug:
+        self._check_prediction(state_t, action)
         return action
 
     def _check_prediction(self, state_t, action):
@@ -294,26 +293,17 @@ class BubbleModelMPPIController(BubbleModelController):
         next_state_sample = self._pack_state_to_sample(next_state, self.sample)
         next_state_sample = self._action_correction(next_state_sample, action_t)
         estimated_pose = self.object_pose_estimator.estimate_pose(next_state_sample)
-        print('Predicted')
         tool_angle_gf = get_tool_angle_gf(estimated_pose, next_state_sample)
-        action_ind = (torch.norm(self.actions - action, dim=1) < 0.001).nonzero(as_tuple=True)[0]
+        print('Predicted estimated tool angle gf after action: ', tool_angle_gf)
+        action_ind = (torch.norm(self.actions - action, dim=1) < 0.01).nonzero(as_tuple=True)[0]
         if action_ind.shape[0] >= 1:
             action_ind = action_ind[0].item()
         action_cost = self.costs[action_ind]
         print("Cost of action: ", action_cost)
 
     def visualize_prediction(self, obs_sample_next):
-        # formatted_obs_sample = self.get_downsampled_obs(obs_sample_next)
-        # state_next = self._unpack_state_sample(formatted_obs_sample)
-        obs_sample_next['all_tfs'] = self._convert_all_tfs_to_tensors(obs_sample_next['all_tfs'])
-        obs_sample_next['all_tfs']['med_base'] = torch.from_numpy(obs_sample_next['all_tfs']['med_base']).unsqueeze(0)
-        obs_sample_next['all_tfs']['grasp_frame'] = torch.from_numpy(obs_sample_next['all_tfs']['grasp_frame']).unsqueeze(0)
-        obs_sample_next['final_imprint'] = torch.from_numpy(obs_sample_next['init_imprint']).unsqueeze(0)
-        obs_sample_next['undef_depth_r'] = torch.from_numpy(obs_sample_next['undef_depth_r']).unsqueeze(0)
-        obs_sample_next['undef_depth_l'] = torch.from_numpy(obs_sample_next['undef_depth_l']).unsqueeze(0)
-        import pdb; pdb.set_trace()
+        obs_sample_next = self.format_sample_for_pose_estimation(obs_sample_next)
         estimated_pose = self.object_pose_estimator.estimate_pose(obs_sample_next)
-        print('Real')
         tool_angle_gf = get_tool_angle_gf(estimated_pose, obs_sample_next)
         print('Real estimated tool angle gf after action: ', tool_angle_gf)
         state_next = self._unpack_state_sample(obs_sample_next)
@@ -332,7 +322,16 @@ class BubbleModelMPPIController(BubbleModelController):
         axes[0][3].set_title('Gth next imprint')
         axes[0][1].set_title('Input imprint')
         plt.show()
-        
+    
+    def format_sample_for_pose_estimation(self, obs_sample):    
+        obs_sample['all_tfs'] = self._convert_all_tfs_to_tensors(obs_sample['all_tfs'])
+        obs_sample['all_tfs']['med_base'] = torch.from_numpy(obs_sample['all_tfs']['med_base']).unsqueeze(0)
+        obs_sample['all_tfs']['grasp_frame'] = torch.from_numpy(obs_sample['all_tfs']['grasp_frame']).unsqueeze(0)
+        obs_sample['final_imprint'] = torch.from_numpy(obs_sample['init_imprint']).unsqueeze(0)
+        obs_sample['undef_depth_r'] = torch.from_numpy(obs_sample['undef_depth_r']).unsqueeze(0)
+        obs_sample['undef_depth_l'] = torch.from_numpy(obs_sample['undef_depth_l']).unsqueeze(0)
+        return obs_sample        
+
     def _action_correction(self, state_samples, actions):
         # actions: tensor of shape (N, action_dim)
         state_samples_corrected = self.action_model(state_samples, actions)

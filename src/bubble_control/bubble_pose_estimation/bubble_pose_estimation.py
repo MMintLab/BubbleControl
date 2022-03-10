@@ -73,7 +73,7 @@ class BubblePoseEstimator(object):
             raise KeyError('No reconstructor found for key {} -- Possible keys: {}'.format(reconstruction_key, reconstructors.keys()))
         Reconstructor = reconstructors[reconstruction_key]
         reconstructor = Reconstructor(threshold=self.imprint_th, object_name=self.object_name, estimation_type=self.estimation_type,
-                              view=self.view, verbose=self.verbose, broadcast_imprint=self.broadcast_imprint)
+                              view=self.view, verbose=self.verbose, broadcast_imprint=self.broadcast_imprint, percentile=0.005)
         return reconstructor
 
     def calibrate(self):
