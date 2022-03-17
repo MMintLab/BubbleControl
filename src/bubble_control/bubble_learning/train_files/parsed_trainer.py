@@ -63,6 +63,9 @@ class ParsedTrainer(object):
 
     def _get_common_params(self):
         common_params = {
+            'num_data': None,
+            'num_train_data': None,
+            'num_val_data': None,
             'batch_size': None,
             'val_batch_size': None,
             'max_epochs': 500,
@@ -80,6 +83,9 @@ class ParsedTrainer(object):
 
     def _get_default_types(self, default_types=None):
         default_types_base = {
+            'num_data': int,
+            'num_train_data': int,
+            'num_val_data': int,
             'batch_size': int,
             'val_batch_size': int,
             'save_top_k': int,
@@ -193,8 +199,22 @@ class ParsedTrainer(object):
         return dataset
 
     def _get_train_val_data(self):
-        train_size = int(len(self.dataset) * self.args['train_fraction'])
-        val_size = len(self.dataset) - train_size
+        total_size = len(self.dataset)
+        desired_total_size = self.args['num_data']
+        if desired_total_size is not None:
+            if desired_total_size <= total_size:
+                total_size = desired_total_size
+            else:
+                raise AttributeError(' The num_data ({}) cannot be larger that the dataset size ({})'.format(desired_total_size, total_size))
+
+        if self.args['train_size'] is not None:
+            train_size = self.args['train_size']
+        else:
+            train_size = int(total_size * self.args['train_fraction'])
+        if self.args['val_size'] is not None:
+            val_size = self.args['val_size']
+        else:
+            val_size = total_size - train_size
         train_data, val_data = random_split(self.dataset, [train_size, val_size],
                                             generator=torch.Generator().manual_seed(self.args['seed']))
         return train_data, val_data

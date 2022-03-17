@@ -92,7 +92,25 @@ class TaskCombinedDataset(CombinedDataset):
 
 
 if __name__ == '__main__':
-    task_combined_dataset = TaskCombinedDataset('/home/mik/Datasets/bubble_datasets', only_keys=['imprint', 'object_pose', 'wrench', 'pos', 'ori'])
+    from collections import defaultdict
+    from bubble_control.bubble_learning.aux.visualization_utils.image_grid import save_grid, get_imprint_grid, get_batched_image_grid
+    from bubble_control.bubble_learning.aux.visualization_utils.pose_visualization import get_object_pose_images_grid
+
+    task_combined_dataset = TaskCombinedDataset('/home/mmint/bubble_datasets', only_keys=['imprint', 'object_pose', 'wrench', 'pos', 'ori'])
     d0 = task_combined_dataset[0]
     print(d0)
+    num_to_log = 120
+    batched_sample = defaultdict(list)
+    for i in range(num_to_log):
+        sample_i = task_combined_dataset[i]
+        for k, v in sample_i.items():
+            batched_sample[k].append(v)
+    # concatenate all
+    for k, v in batched_sample.items():
+        batched_sample[k] = torch.stack(v, dim=0)
+    imprint_grid = get_imprint_grid(batched_sample['imprint'])
+    save_grid(imprint_grid, path='/home/mmint/Desktop', filename='imprint_gird_test')
+    pose_grid = get_object_pose_images_grid(batched_sample['object_pose'], batched_sample['object_pose'], plane_normal=torch.tensor([1, 0, 0], dtype=torch.float32))
+    save_grid(pose_grid, path='/home/mmint/Desktop', filename='pose_gird_test')
+
 

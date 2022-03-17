@@ -123,7 +123,7 @@ class ImpedanceWrenchDataCollection(MedDataCollectionBase):
         self.med.home_robot()
 
     def _initialize_grasp(self):
-        self.med.set_joint_control(vel=0.1)
+        self.med.set_joint_position_control(vel=0.1)
         self.med.home_robot()
         self.med.set_robot_conf('grasp_conf')
         _ = input('Press enter to open the gripper and calibrate the bubbles')
@@ -147,7 +147,7 @@ class ImpedanceWrenchDataCollection(MedDataCollectionBase):
 
     def _init_drawing(self, pose_i):
         z_init = 0.15
-        self.med.set_joint_control(vel=0.1)
+        self.med.set_joint_position_control(vel=0.1)
         self.med.home_robot()
         self._initialize_grasp()
         init_pose = pose_i.copy()
