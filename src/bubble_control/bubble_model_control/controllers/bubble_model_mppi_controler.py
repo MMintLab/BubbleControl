@@ -282,8 +282,8 @@ class BubbleModelMPPIController(BubbleModelController):
         state = self._unpack_state_sample(state_sample)
         state_t = self._pack_state_to_tensor(state)
         action = self.controller.command(state_t)
-        # if self.debug:
-        self._check_prediction(state_t, action)
+        if self.debug:
+            self._check_prediction(state_t, action)
         return action
 
     def _check_prediction(self, state_t, action):
