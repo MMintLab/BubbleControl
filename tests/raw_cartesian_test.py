@@ -13,6 +13,7 @@ from victor_hardware_interface.victor_utils import get_cartesian_impedance_param
 from bubble_utils.bubble_med.aux.load_confs import load_robot_configurations
 from mmint_camera_utils.ros_utils.utils import matrix_to_pose, pose_to_matrix
 
+
 class CartesianMed(Med):
 
     def __init__(self, *args, **kwargs):

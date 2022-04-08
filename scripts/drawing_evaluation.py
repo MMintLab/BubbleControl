@@ -15,6 +15,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true', help='Whether or not to visualize model predictions')
     parser.add_argument('--object_name', type=str, default='marker', help='name of the object')
     parser.add_argument('--ope', type=str, default='icp', help='name of the object pose estimation algorithm')
+    parser.add_argument('--max_num_steps', type=int, default=40, help='maximum number of steps to perform')
     # TODO: Add more parameters if needed
 
     args = parser.parse_args()
@@ -25,8 +26,9 @@ if __name__ == '__main__':
     debug = args.debug
     model_name = args.model_name
     load_version = args.load_version
+    max_num_steps = args.max_num_steps
 
     rospy.init_node('test_evaluation_drawing')
 
-    dc = DrawingEvaluationDataCollection(data_path=save_path, scene_name=scene_name, model_name=model_name, load_version=load_version, debug=debug, object_name=args.object_name, ope=args.ope)
+    dc = DrawingEvaluationDataCollection(data_path=save_path, scene_name=scene_name, model_name=model_name, load_version=load_version, debug=debug, object_name=args.object_name, ope=args.ope, max_num_steps=max_num_steps)
     dc.collect_data(num_data=num_data)

@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import os
 from tqdm import tqdm
+import rospy
 
 from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
 from bubble_control.bubble_learning.models.bubble_dynamics_model import BubbleDynamicsModel
@@ -33,11 +34,12 @@ from arc_utilities.tf2wrapper import TF2Wrapper
 class DrawingEvaluationDataCollection(DataCollectorBase):
 
     def __init__(self, *args, model_name='random', load_version=0, scene_name='drawing_evaluation', imprint_selection='percentile',
-                                                     imprint_percentile=0.005,  object_name='marker', debug=False, ope='icp', **kwargs):
+                                                     imprint_percentile=0.005,  object_name='marker', debug=False, max_num_steps=40, ope='icp', **kwargs):
         self.scene_name = scene_name
         self.object_name = object_name
         self.num_samples = 100
         self.horizon = 2
+        self.max_num_steps = max_num_steps
         self.init_action = {
             'start_point': np.array([0.55, 0.2]),
             'direction': np.deg2rad(270),
@@ -92,7 +94,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             self._record_reference_state()
 
         # Draw
-        num_steps = 40
+        num_steps = self.max_num_steps
         num_steps_done = 0
         self.env.do_init_action(self.init_action)
         num_steps_done, obs_fcs, actions = self.draw_steps(num_steps=num_steps)
@@ -129,6 +131,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             'Score': score,
             'ObjectPoseEstimator': self.ope.__class__.__name__,
         }
+        
         return data_params
 
     def _init_collection_sample(self):
@@ -172,8 +175,8 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
                                            drawing_length_limits=(0.01, 0.02),
                                            wrap_data=True,
                                            marker_code=self.object_name,
-                                           # grasp_width_limits=(10, 35))
-                                           grasp_width_limits=(10, 45))
+                                           grasp_width_limits=(10, 35))
+                                           # grasp_width_limits=(10, 45))
         return env
 
     def _get_controller(self):
