@@ -6,6 +6,7 @@ import time
 from tqdm import tqdm
 import abc
 
+from tf import transformations as tr
 from arc_utilities.listener import Listener
 from sensor_msgs.msg import JointState
 from bubble_utils.bubble_data_collection.bubble_data_collection_base import BubbleDataCollectionBase
@@ -18,12 +19,14 @@ class GelsightComparisonDataCollectionBase(BubbleDataCollectionBase):
     """
     collect data using the robot in impedance mode and makeing contact into a surface while grasping a marker
     """
-    def __init__(self, *args, sensor_name='bubbles', manual_motion=False, **kwargs):
+    def __init__(self, *args, sensor_name='bubbles', manual_motion=False, force_threshold=10.0, delta_move=0.005, max_num_steps=100, **kwargs):
         self.manual_motion = manual_motion
-        self.force_threshold = 10.0
-        self.delta_move = 0.005
-        self.max_num_steps = 100
+        self.force_threshold = force_threshold
+        self.delta_move = delta_move
+        self.max_num_steps = max_num_steps
         self.sensor_name = sensor_name
+        self.num_start_steps = 10
+        self.num_calibration_steps = 15
         self.grasp_widths = {'bubbles': 20, 'gelsight': 25}
         if sensor_name == 'bubbles':
             right = True
@@ -125,6 +128,21 @@ class GelsightComparisonDataCollectionBase(BubbleDataCollectionBase):
         self.med.set_joint_position_control()
         self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', list(self.init_pose), frame_id='med_base')
 
+    def _calibration_steps(self, num_start_steps, num_calibration_steps):
+        calibration_wrenches = []
+        for indx in range(num_start_steps):
+            self._motion_step(indx)
+            rospy.sleep(1.0)
+        for indx in range(num_calibration_steps):
+            self._motion_step(num_start_steps + indx)
+            rospy.sleep(3.0)
+            calibration_wrench_i = self._get_wrench()
+            calibration_wrenches.append(calibration_wrench_i)
+
+        # obtain the calibration wrench
+        offset_wrench = np.mean(np.stack(calibration_wrenches, axis=0), axis=0)
+        return offset_wrench
+
     def _collect_data_sample(self, params=None):
         """
         Collect and save data to the designed path in self.data_path
@@ -141,24 +159,14 @@ class GelsightComparisonDataCollectionBase(BubbleDataCollectionBase):
         init_wrench = self._get_wrench()
 
         # calibration steps:
-        num_start_steps = 10
-        num_calibration_steps = 15
-        calibration_wrenches = []
-        for indx in range(num_start_steps):
-            self._motion_step(indx)
-            rospy.sleep(1.0)
-        for indx in range(num_calibration_steps):
-            self._motion_step(num_start_steps+indx)
-            rospy.sleep(3.0)
-            calibration_wrench_i = self._get_wrench()
-            calibration_wrenches.append(calibration_wrench_i)
 
-        # obtain the calibration wrench
-        offset_wrench = np.mean(np.stack(calibration_wrenches, axis=0), axis=0)
+
+        offset_wrench = self._calibration_steps(self.num_start_steps, self.num_calibration_steps)
+
         print('Offset wrench: ', offset_wrench)
 
         for indx in tqdm(range(self.max_num_steps)):
-            self._motion_step(indx+num_start_steps+num_calibration_steps)
+            self._motion_step(indx+self.num_start_steps+self.num_calibration_steps)
             rospy.sleep(3.0)
             # RECORD:
             fc_i = self.get_new_filecode()
@@ -224,14 +232,25 @@ class GelsightComparisonSidewaysDataCollection(GelsightComparisonTopDownDataColl
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    # def _init_data_collection_seq(self):
+    #     super()._init_data_collection_seq()
+    #     pre_contact_pose = self._get_init_pose() - np.array([0, 0.2, 0, 0, 0, 0, 0])
+    #     self.med.cartesian_impedance_raw_motion(pos=pre_contact_pose[:3], quat=pre_contact_pose[3:], frame_id='grasp_frame',
+    #                                             ref_frame='med_base')
     def _init_data_collection_seq(self):
-        super()._init_data_collection_seq()
-        pre_contact_pose = self._get_init_pose() - np.array([0, 0.2, 0, 0, 0, 0, 0])
-        self.med.cartesian_impedance_raw_motion(pos=pre_contact_pose[:3], quat=pre_contact_pose[3:], frame_id='grasp_frame',
-                                                ref_frame='med_base')
+        print('Recording started. Moving the robot to the grasp pose')
+        self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', list(self.init_pose), frame_id='med_base')
+        _ = input('Press enter to open the gripper')
+        self.med.open_gripper()
+        self._record_reference_state()
+        _ = input('Press to close the gripper')
+        self.med.gripper.move(width=self.grasp_widths[self.sensor_name], speed=50.0)
+        print('Strating to collect data')
+        # Set impedance mode
+        self._set_cartesian_impedance()
 
     def _get_init_pose(self):
-        init_pose = np.array([0.55, -0.3, 0.12, -np.cos(np.pi / 4), np.cos(np.pi / 4), 0, 0])
+        init_pose = np.array([0.55, -0.23, 0.15, -np.cos(np.pi / 4), np.cos(np.pi / 4), 0, 0])
         return init_pose
 
     def _set_cartesian_impedance(self):
@@ -245,10 +264,84 @@ class GelsightComparisonSidewaysDataCollection(GelsightComparisonTopDownDataColl
 
     def _check_wrench(self, wrench):
         wrench_value = np.abs(wrench[1])
-        print(wrench_value)
+        print('\n', wrench_value, '\n')
         is_wrench_limit_reached = wrench_value >= self.force_threshold
         return is_wrench_limit_reached
 
+
+class GelsightComparisonRotationDataCollection(GelsightComparisonTopDownDataCollection):
+    def __init__(self, *args, **kwargs):
+        self.contact_init_pose = None
+        super().__init__(*args, **kwargs)
+        self.num_start_steps = 10 # here, this is the number of steps until making contact
+        self.num_calibration_steps = 5 # here we first calibrate and then do the start steps
+
+    def _init_data_collection_seq(self):
+        print('Recording started. Moving the robot to the grasp pose')
+        self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', list(self.init_pose), frame_id='med_base')
+        _ = input('Press enter to open the gripper')
+        self.med.open_gripper()
+        self._record_reference_state()
+        _ = input('Press to close the gripper')
+        self.med.gripper.move(width=self.grasp_widths[self.sensor_name], speed=50.0)
+        print('Strating to collect data')
+        # Set impedance mode
+        self._set_cartesian_impedance()
+
+    def _get_init_pose(self):
+        init_pose = np.array([0.65, 0.1, 0.15, -np.cos(np.pi / 4), np.cos(np.pi / 4), 0, 0])
+        return init_pose
+
+    def _get_contact_init_pose(self):
+        contact_init_pose = np.array([0.58, 0.1, 0.15, -np.cos(np.pi / 4), np.cos(np.pi / 4), 0, 0])
+        return contact_init_pose
+
+    def _set_cartesian_impedance(self):
+        self.med.set_cartesian_impedance(velocity=1, x_stiffness=500, y_stiffness=5000, z_stiffnes=5000)
+
+    def _motion_step(self, indx):
+        pose_i = self.contact_init_pose.copy()
+        quat_i = pose_i[3:]
+        delta_quat_i = tr.quaternion_about_axis(angle=indx*self.delta_move, axis=np.array([0,1,0]))
+        quat_i = tr.quaternion_multiply(delta_quat_i, quat_i)
+        self.med.cartesian_impedance_raw_motion(pos=pose_i[:3], quat=quat_i, frame_id='grasp_frame',
+                                                ref_frame='med_base')
+
+    def _init_motion_step(self, indx):
+        pose_i = self.init_pose.copy()
+        pose_i[0] = pose_i[0] - (indx+1)*0.005
+        self.med.cartesian_impedance_raw_motion(pos=pose_i[:3], quat=pose_i[3:], frame_id='grasp_frame',
+                                                ref_frame='med_base')
+        return pose_i
+
+    def _calibration_steps(self, num_start_steps, num_calibration_steps):
+        calibration_wrenches = []
+        pose_i = self.init_pose
+        for i in range(num_calibration_steps):
+            pose_i = self._init_motion_step(i)
+            rospy.sleep(3.0)
+            calibration_wrench_i = self._get_wrench()  # wrench in the grasp frame!
+            calibration_wrenches.append(calibration_wrench_i)
+        offset_wrench = np.mean(np.stack(calibration_wrenches, axis=0), axis=0)
+        for i in range(num_start_steps):
+            pose_i = self._init_motion_step(i+num_calibration_steps)
+            rospy.sleep(3.0)
+            wrench_i = self._get_wrench() - offset_wrench # wrench in the grasp frame!
+            print('\n {}'.format(wrench_i))
+            if np.abs(wrench_i[1]) > 1.5:
+                break
+        self.contact_init_pose = pose_i.copy()
+        return offset_wrench
+
+    def _check_wrench(self, wrench):
+        wrench_value = np.abs(wrench[1])
+        print('\n', wrench_value, '\n')
+        is_wrench_limit_reached = wrench_value >= self.force_threshold
+        return is_wrench_limit_reached
+
+    def _get_wrench(self, *args, **kwargs):
+        wrench = super()._get_wrench(frame_id='grasp_frame')
+        return wrench
 
 
 
@@ -296,11 +389,25 @@ def top_down_data_collection(sensor_name):
     )
     dc.collect_data(num_data=5)
 
+
 def sideways_data_collection(sensor_name):
     dc = GelsightComparisonSidewaysDataCollection(
+        force_threshold=5.0,
         data_path='/home/mmint/Desktop/bubble_vs_gelsight_sideways_calibration_data',
         scene_name=sensor_name,
         sensor_name=sensor_name,
+        manual_motion=False,
+    )
+    dc.collect_data(num_data=5)
+
+
+def rotation_data_collection(sensor_name):
+    dc = GelsightComparisonRotationDataCollection(
+        force_threshold=5.0,
+        data_path='/home/mmint/Desktop/bubble_vs_gelsight_rotation_calibration_data',
+        scene_name=sensor_name,
+        sensor_name=sensor_name,
+        delta_move=np.deg2rad(5.0),
         manual_motion=False,
     )
     dc.collect_data(num_data=5)
@@ -310,8 +417,9 @@ def sideways_data_collection(sensor_name):
 if __name__ == '__main__':
 
     sensor_name = 'bubbles'
-    top_down_data_collection(sensor_name)
+    # top_down_data_collection(sensor_name)
     # sideways_data_collection(sensor_name)
+    rotation_data_collection(sensor_name)
     # simple_3_image_recording()
 
 
