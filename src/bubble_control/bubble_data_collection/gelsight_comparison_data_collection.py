@@ -13,6 +13,7 @@ from bubble_utils.bubble_data_collection.bubble_data_collection_base import Bubb
 from bubble_utils.bubble_data_collection.bubble_data_collection_base import MedDataCollectionBase
 from mmint_camera_utils.point_cloud_parsers import RealSensePointCloudParser
 from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
+from victor_hardware_interface_msgs.msg import MotionCommand, MotionStatus, ControlMode
 
 
 class GelsightComparisonDataCollectionBase(BubbleDataCollectionBase):
@@ -159,8 +160,6 @@ class GelsightComparisonDataCollectionBase(BubbleDataCollectionBase):
         init_wrench = self._get_wrench()
 
         # calibration steps:
-
-
         offset_wrench = self._calibration_steps(self.num_start_steps, self.num_calibration_steps)
 
         print('Offset wrench: ', offset_wrench)
@@ -273,7 +272,7 @@ class GelsightComparisonRotationDataCollection(GelsightComparisonTopDownDataColl
     def __init__(self, *args, **kwargs):
         self.contact_init_pose = None
         super().__init__(*args, **kwargs)
-        self.num_start_steps = 10 # here, this is the number of steps until making contact
+        self.num_start_steps = 8 # here, this is the number of steps until making contact
         self.num_calibration_steps = 5 # here we first calibrate and then do the start steps
 
     def _init_data_collection_seq(self):
@@ -297,21 +296,36 @@ class GelsightComparisonRotationDataCollection(GelsightComparisonTopDownDataColl
         return contact_init_pose
 
     def _set_cartesian_impedance(self):
-        self.med.set_cartesian_impedance(velocity=1, x_stiffness=500, y_stiffness=5000, z_stiffnes=5000)
+        # Cartesian impedance is no good for rotations, therefore we try with joint impedance:
+        self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, vel=0.1)
+        # self.med.set_cartesian_impedance(velocity=1, x_stiffness=500, y_stiffness=5000, z_stiffnes=5000)
 
     def _motion_step(self, indx):
+        print('motion_step')
         pose_i = self.contact_init_pose.copy()
+        # pose_i = self._get_contact_init_pose()
         quat_i = pose_i[3:]
-        delta_quat_i = tr.quaternion_about_axis(angle=indx*self.delta_move, axis=np.array([0,1,0]))
-        quat_i = tr.quaternion_multiply(delta_quat_i, quat_i)
-        self.med.cartesian_impedance_raw_motion(pos=pose_i[:3], quat=quat_i, frame_id='grasp_frame',
-                                                ref_frame='med_base')
+        step_angle = self.delta_move*(indx+1-self.num_start_steps-self.num_calibration_steps)
+        delta_quat_i = tr.quaternion_about_axis(angle=step_angle, axis=np.array([0,1,0]))
+        pose_i[3:] = tr.quaternion_multiply(delta_quat_i, quat_i)
+        # self.med.cartesian_impedance_raw_motion(pos=pose_i[:3], quat=quat_i, frame_id='grasp_frame', ref_frame='med_base')
+        # import pdb; pdb.set_trace()
+        # self.med.get_current_pose()
+        # self.med.set_execute(False)
+        plan_and_execution_result = self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(pose_i), frame_id='med_base')
+        # import pdb; pdb.set_trace()
+        # self.med.rotation_along_axis_point_angle(axis=np.array([0, 1, 0]), angle=step_angle)
+        # self.med.set_execute(True)
+        # import pdb; pdb.set_trace()
+        # x = 0
+        pass
 
     def _init_motion_step(self, indx):
         pose_i = self.init_pose.copy()
         pose_i[0] = pose_i[0] - (indx+1)*0.005
-        self.med.cartesian_impedance_raw_motion(pos=pose_i[:3], quat=pose_i[3:], frame_id='grasp_frame',
-                                                ref_frame='med_base')
+        # self.med.cartesian_impedance_raw_motion(pos=pose_i[:3], quat=pose_i[3:], frame_id='grasp_frame', ref_frame='med_base')
+        self.med.plan_to_pose(self.med.arm_group, 'grasp_frame', target_pose=list(pose_i), frame_id='med_base')
+
         return pose_i
 
     def _calibration_steps(self, num_start_steps, num_calibration_steps):
@@ -407,8 +421,9 @@ def rotation_data_collection(sensor_name):
         data_path='/home/mmint/Desktop/bubble_vs_gelsight_rotation_calibration_data',
         scene_name=sensor_name,
         sensor_name=sensor_name,
-        delta_move=np.deg2rad(5.0),
+        delta_move=np.deg2rad(3.0),
         manual_motion=False,
+        max_num_steps=10,
     )
     dc.collect_data(num_data=5)
 

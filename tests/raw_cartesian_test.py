@@ -4,6 +4,7 @@ import sys
 import numpy as np
 from mmint_camera_utils.camera_calibration import CameraApriltagCalibration
 from arm_robots.med import Med
+from bubble_utils.bubble_med.bubble_med import BubbleMed
 from victor_hardware_interface import victor_utils
 from arc_utilities.listener import Listener
 import tf.transformations as tr
@@ -14,7 +15,7 @@ from bubble_utils.bubble_med.aux.load_confs import load_robot_configurations
 from mmint_camera_utils.ros_utils.utils import matrix_to_pose, pose_to_matrix
 
 
-class CartesianMed(Med):
+class CartesianMed(BubbleMed):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -22,6 +23,7 @@ class CartesianMed(Med):
         self.home_joints = self._get_home_joints()
         self.command_frame = 'med_base'
         self.cartesian_impedance_frame = 'med_kuka_link_ee'
+        # self.cartesian_impedance_frame = 'grasp_frame'
 
     def _get_home_joints(self):
         home_joints = self.robot_confs['home_conf']# Override the method if needed
@@ -43,6 +45,10 @@ class CartesianMed(Med):
         cartesian_impedance_params.cartesian_impedance_params.cartesian_stiffness.z = z_stiffnes  # by default is 5000
         cartesian_impedance_params.cartesian_impedance_params.cartesian_stiffness.x = x_stiffness
         cartesian_impedance_params.cartesian_impedance_params.cartesian_stiffness.y = y_stiffness
+        cartesian_impedance_params.cartesian_impedance_params.cartesian_damping.a = 0.5
+        cartesian_impedance_params.cartesian_impedance_params.cartesian_damping.b = 0.5
+        cartesian_impedance_params.cartesian_impedance_params.cartesian_damping.c = 0.5
+        # import pdb; pdb.set_trace()
         send_new_control_mode(arm='med', msg=cartesian_impedance_params)
 
     def set_joint_position_control(self, vel=0.1, **kwargs):
@@ -87,8 +93,10 @@ class CartesianMed(Med):
 
 
 def raw_cartesian_test():
+    # frame_ee = 'grasp_frame'
+    frame_ee = 'med_kuka_link_ee'
     rospy.init_node('bubble_med')
-    med = CartesianMed()
+    med = CartesianMed(display_goals=False)
     med.connect()
     med.set_joint_position_control()
     med.home_robot()
@@ -97,18 +105,45 @@ def raw_cartesian_test():
     target_pose = np.concatenate([target_pos, target_quat])
     med.plan_to_pose(med.arm_group, ee_link_name='grasp_frame', target_pose=list(target_pose), frame_id='med_base')
     med.set_cartesian_impedance(1, x_stiffness=5000, y_stiffness=5000, z_stiffnes=100)
-    delta_pos = np.array([0.05, 0, 0])
-    delta_quat = tr.quaternion_about_axis(angle=np.pi/8, axis=np.array([1,0,0]))
+    _ = input('press enter to continue')
+    X_tr = med.tf_wrapper.get_transform(parent='med_base', child=frame_ee)
+    # import pdb; pdb.set_trace()
+    target_pos = X_tr[:3,3]
+    target_quat = tr.quaternion_from_matrix(X_tr)
+    delta_pos = np.array([0.001, 0.00, 0.])
+    delta_quat = tr.quaternion_about_axis(angle=np.pi/45, axis=np.array([1,0,0]))
+
+    for i in range(10):
+        target_pos = target_pos + delta_pos
+        target_quat = tr.quaternion_multiply(delta_quat, target_quat)
+        # target_quat_i = tr.quaternion_multiply(target_quat, delta_quat)
+        target_pose_i = np.concatenate([target_pos, target_quat])
+        med.raw_cartesian_command(target_pose_i, ref_frame='med_base', frame_id=frame_ee)
+        _ = input('press enter to continue')
+
+
+def raw_cartesian_impedance_grasp_frame_test():
+    rospy.init_node('bubble_med')
+    med = CartesianMed(display_goals=False)
+    med.cartesian_impedance_frame = 'grasp_frame'
+    med.connect()
+    med.set_joint_position_control()
+    med.home_robot()
+    target_pos = np.array([0.6, 0, 0.2])
+    target_quat = np.array([-np.cos(np.pi / 4), np.cos(np.pi / 4), 0, 0])
+    target_pose = np.concatenate([target_pos, target_quat])
+    med.plan_to_pose(med.arm_group, ee_link_name='grasp_frame', target_pose=list(target_pose), frame_id='med_base')
+    med.set_cartesian_impedance(1, x_stiffness=100, y_stiffness=5000, z_stiffnes=100)
+    _ = input('press enter to continue')
+    delta_pos = np.array([0., 0, 0])
+    delta_quat = tr.quaternion_about_axis(angle=np.pi / 16, axis=np.array([1, 0, 0]))
     target_pos_i = target_pos + delta_pos
     target_quat_i = tr.quaternion_multiply(delta_quat, target_quat)
-    # target_quat_i = tr.quaternion_multiply(target_quat, delta_quat)
     target_pose_i = np.concatenate([target_pos_i, target_quat_i])
     med.raw_cartesian_command(target_pose_i, ref_frame='med_base', frame_id='grasp_frame')
     _ = input('press enter to continue')
-    target_pos_i = target_pos_i + delta_pos
-    target_quat_i = tr.quaternion_multiply(delta_quat, target_quat_i)
-    target_pose_i = np.concatenate([target_pos_i, target_quat_i])
-    med.raw_cartesian_command(target_pose_i, ref_frame='med_base', frame_id='grasp_frame')
+
 
 if __name__ == '__main__':
     raw_cartesian_test()
+    # raw_cartesian_impedance_grasp_frame_test()
