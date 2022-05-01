@@ -206,16 +206,18 @@ class ParsedTrainer(object):
                 total_size = desired_total_size
             else:
                 raise AttributeError(' The num_data ({}) cannot be larger that the dataset size ({})'.format(desired_total_size, total_size))
-
-        if self.args['train_size'] is not None:
+        else:
+            desired_total_size = total_size
+        if 'train_size' in self.args.keys() and self.args['train_size'] is not None:
             train_size = self.args['train_size']
         else:
             train_size = int(total_size * self.args['train_fraction'])
-        if self.args['val_size'] is not None:
+        if 'val_size' in self.args.keys() and self.args['val_size'] is not None:
             val_size = self.args['val_size']
         else:
-            val_size = total_size - train_size
-        train_data, val_data = random_split(self.dataset, [train_size, val_size],
+            val_size = desired_total_size - train_size
+        excluded_size = len(self.dataset) - train_size - val_size
+        train_data, val_data, _ = random_split(self.dataset, [train_size, val_size, excluded_size],
                                             generator=torch.Generator().manual_seed(self.args['seed']))
         return train_data, val_data
 

@@ -28,6 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('--view', action='store_true')
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--imprint_br', action='store_true')
+    parser.add_argument('--percentile', type=float, default=None, help='Percentile used for imprint filtering')
 
     args = parser.parse_args()
 
@@ -45,6 +46,7 @@ if __name__ == '__main__':
                               icp_th=icp_th,
                               rate=args.rate,
                               view=args.view,
+                              percentile=args.percentile,
                               verbose=args.verbose,
                               broadcast_imprint=args.imprint_br,
                               estimation_type=args.estimation_type,

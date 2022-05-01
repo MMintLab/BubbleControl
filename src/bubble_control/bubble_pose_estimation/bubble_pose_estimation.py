@@ -37,11 +37,12 @@ class BubblePoseEstimator(object):
     BubblePoseEstimation > BubblePCReconstructor > PoseEstimators
     """
 
-    def __init__(self, imprint_th=0.005, icp_th=0.01, rate=5.0, view=False, verbose=False, broadcast_imprint=False, object_name='allen', estimation_type='icp3d', reconstruction='depth', gripper_width=None):
+    def __init__(self, imprint_th=0.005, icp_th=0.01, rate=5.0, percentile=None, view=False, verbose=False, broadcast_imprint=False, object_name='allen', estimation_type='icp3d', reconstruction='depth', gripper_width=None):
         self.object_name = object_name
         self.imprint_th = imprint_th
         self.icp_th = icp_th
         self.rate = rate
+        self.percentile = percentile
         self.view = view
         self.verbose = verbose
         self.broadcast_imprint = broadcast_imprint
@@ -73,7 +74,7 @@ class BubblePoseEstimator(object):
             raise KeyError('No reconstructor found for key {} -- Possible keys: {}'.format(reconstruction_key, reconstructors.keys()))
         Reconstructor = reconstructors[reconstruction_key]
         reconstructor = Reconstructor(threshold=self.imprint_th, object_name=self.object_name, estimation_type=self.estimation_type,
-                              view=self.view, verbose=self.verbose, broadcast_imprint=self.broadcast_imprint)
+                              view=self.view, verbose=self.verbose, broadcast_imprint=self.broadcast_imprint, percentile=self.percentile)
         return reconstructor
 
     def calibrate(self):
