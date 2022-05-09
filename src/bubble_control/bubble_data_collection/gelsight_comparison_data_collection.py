@@ -249,7 +249,12 @@ class GelsightComparisonSidewaysDataCollection(GelsightComparisonTopDownDataColl
         self._set_cartesian_impedance()
 
     def _get_init_pose(self):
-        init_pose = np.array([0.55, -0.23, 0.15, -np.cos(np.pi / 4), np.cos(np.pi / 4), 0, 0])
+        if self.sensor_name == 'bubbles':
+            init_pose = np.array([0.55, -0.23, 0.15, -np.cos(np.pi / 4), np.cos(np.pi / 4), 0, 0])
+        elif self.sensor_name == 'gelsight':
+            init_pose = np.array([0.55, -0.23, 0.1, -np.cos(np.pi / 4), np.cos(np.pi / 4), 0, 0])
+        else:
+            raise NotImplementedError
         return init_pose
 
     def _set_cartesian_impedance(self):
@@ -431,10 +436,11 @@ def rotation_data_collection(sensor_name):
 # DEBUG:
 if __name__ == '__main__':
 
-    sensor_name = 'bubbles'
+    # sensor_name = 'bubbles'
+    sensor_name = 'gelsight'
     # top_down_data_collection(sensor_name)
-    # sideways_data_collection(sensor_name)
-    rotation_data_collection(sensor_name)
+    sideways_data_collection(sensor_name)
+    # rotation_data_collection(sensor_name)
     # simple_3_image_recording()
 
 

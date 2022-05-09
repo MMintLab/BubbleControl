@@ -93,6 +93,10 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
             # record the reference
             self._record_reference_state()
 
+        # visualize expected drawing
+        expected_drawing_cooridnates = self._get_expected_drawing()
+        self.evaluator.publish_drawing_coordinates(expected_drawing_cooridnates, frame='med_base')
+
         # Draw
         num_steps = self.max_num_steps
         num_steps_done = 0
@@ -108,7 +112,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         self.env.med.set_control_mode(ControlMode.JOINT_POSITION, vel=0.1)
         self.env.med.home_robot()
         self.env.med.set_robot_conf('zero_conf')
-        expected_drawing_cooridnates = self._get_expected_drawing()
+
         score, actual_drawing, expected_drawing = self.evaluator.evaluate(expected_drawing_cooridnates,
                                                                           frame='med_base',
                                                                           save_path=os.path.join(self.data_path, 'evaluation_files', '{:06d}'.format(fc)))

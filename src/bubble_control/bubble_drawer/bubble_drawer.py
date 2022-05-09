@@ -184,7 +184,6 @@ class BubbleDrawer(BubbleMed):
             self.plan_to_pose(self.arm_group, target_pose_dict['frame'], target_pose=list(target_pose_dict['pose']),
                                   frame_id=self.drawing_frame)
         else:
-            #
             self.plan_to_pose(self.arm_group, 'grasp_frame', target_pose=list(pre_pose), frame_id=self.drawing_frame)
         # self.med.set_control_mode(ControlMode.JOINT_IMPEDANCE, stiffness=Stiffness.STIFF, vel=0.075)  # Low val for safety
         rospy.sleep(.5)
