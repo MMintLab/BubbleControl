@@ -9,6 +9,8 @@ from mmint_camera_utils.camera_utils import project_points_pinhole
 from matplotlib import pyplot as plt
 from scipy.spatial import KDTree
 
+from mmint_camera_utils.ros_utils.marker_publisher import MarkerPublisher
+from geometry_msgs.msg import Point
 
 def transform_points(points, X):
     points_original_shape = points.shape
@@ -42,14 +44,17 @@ def invert_img(img):
 
 class DrawingEvaluator(object):
 
-    def __init__(self, camera_indx=1, board_size=(0.56, 0.86), tag_size=0.09, scaling_factor=1000):
+    def __init__(self, camera_indx=1, board_size=(0.56, 0.86), tag_size=0.09, scaling_factor=1000, drawing_topic='expected_drawing', visualize_expected_drawing=False):
         self.tag_names = ['tag_5', 'tag_6', 'tag_7']
         self.camera_indx = camera_indx
         self.board_x_size = board_size[0]
         self.board_y_size = board_size[1]
         self.tag_size = tag_size
         self.scaling_factor = scaling_factor # pixels per meter for unwarped image
+        self.drawing_topic = drawing_topic
+        self.visualize_expected_drawing = visualize_expected_drawing
         self.tf_listener = TF2Wrapper()
+        self.marker_publisher = MarkerPublisher(self.drawing_topic)
         self.camera_parser = RealSensePointCloudParser(camera_indx=camera_indx, verbose=False)
         self.camera_info_depth = self.camera_parser.get_camera_info_depth()
         self.camera_info_color = self.camera_parser.get_camera_info_color()
@@ -127,6 +132,21 @@ class DrawingEvaluator(object):
         min_dists, min_indxs = tree.query(desired_drawing_pixels)
         score = np.mean(min_dists)
         return score
+
+    def publish_drawing_coordinates(self, drawing_coordinates, frame='med_base'):
+        drawing_points = []
+        for i, coord_i in enumerate(drawing_coordinates):
+            point_i = Point()
+            point_i.x = coord_i[0]
+            point_i.y = coord_i[1]
+            point_i.z = coord_i[2]
+            drawing_points.append(point_i)
+        self.marker_publisher.marker_type = self.marker_publisher.Marker.LINE_STRIP
+        self.marker_publisher.marker_points = drawing_points
+        self.marker_publisher.frame_id = frame
+        self.marker_publisher.scale = [0.01, 0.01, 0.01]
+        self.marker_publisher.data = np.zeros(7)
+
 
     def evaluate(self, expected_drawing_cooridnates, frame='med_base', save_path=None):
         """
