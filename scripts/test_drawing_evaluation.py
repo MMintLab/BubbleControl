@@ -1,14 +1,12 @@
 #! /usr/bin/env python
-import tf
-import tf.transformations as tr
 import rospy
 import numpy as np
 import cv2
 import os
 
 from arc_utilities.tf2wrapper import TF2Wrapper
-from mmint_camera_utils.point_cloud_parsers import RealSensePointCloudParser
-from mmint_camera_utils.camera_utils import project_points_pinhole
+from mmint_camera_utils.camera_utils.camera_parsers import RealSenseCameraParser
+from mmint_camera_utils.camera_utils.camera_utils import project_points_pinhole
 from matplotlib import pyplot as plt
 from scipy.spatial import KDTree
 
@@ -53,7 +51,7 @@ if __name__ == '__main__':
     projected_img_size = (1000*np.array([board_x_size, board_y_size])).astype(np.int32) # u,v (x,y)
 
     tf_listener = TF2Wrapper()
-    rsp = RealSensePointCloudParser(camera_indx=camera_indx,verbose=False)
+    rsp = RealSenseCameraParser(camera_indx=camera_indx, verbose=False)
     camera_info_depth = rsp.get_camera_info_depth()
     camera_info_color = rsp.get_camera_info_color()
     camera_frame = 'camera_1_link'
@@ -217,16 +215,5 @@ if __name__ == '__main__':
     score = np.mean(min_dists)
     print('SCORE:', score)
     _ = input('Press enter')
-
-
-
-
-
-
-
-
-
-
-
 
     print('DONE')

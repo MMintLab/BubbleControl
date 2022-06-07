@@ -1,11 +1,10 @@
 import numpy as np
 import abc
-from mmint_camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud
+from mmint_camera_utils.camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud
 import open3d as o3d
 import copy
 import tf.transformations as tr
 from scipy.spatial import KDTree
-from tqdm import tqdm
 from mmint_utils.terminal_colors import term_colors
 
 

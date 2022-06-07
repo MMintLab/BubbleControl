@@ -3,16 +3,14 @@ import torch
 import pytorch3d.transforms as batched_trs
 import einops
 from abc import abstractmethod
-import tf.transformations as tr
 
 from bubble_control.bubble_learning.aux.img_trs.block_upsampling_tr import BlockUpSamplingTr
 from bubble_control.aux.load_confs import load_bubble_reconstruction_params, load_object_models
-from bubble_control.bubble_pose_estimation.bubble_pc_reconstruction import BubblePCReconstructorOfflineDepth
 from bubble_utils.bubble_tools.bubble_img_tools import unprocess_bubble_img
 
 from bubble_control.bubble_pose_estimation.batched_pytorch_icp import icp_2d_masked, pc_batched_tr
-from mmint_camera_utils.camera_utils import project_depth_image
-from mmint_camera_utils.point_cloud_utils import project_pc, get_projection_tr
+from mmint_camera_utils.camera_utils.camera_utils import project_depth_image
+from mmint_camera_utils.camera_utils.point_cloud_utils import project_pc, get_projection_tr
 from bubble_utils.bubble_tools.bubble_pc_tools import get_imprint_mask
 from bubble_control.bubble_learning.aux.load_model import load_model_version
 from bubble_control.bubble_learning.models.icp_approximation_model import ICPApproximationModel, FakeICPApproximationModel

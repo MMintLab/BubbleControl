@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 import rospy
 
-from bubble_utils.src.bubble_utils.bubble_data_collection.bubble_data_collection_base import BubbleDataCollectionBase
+from bubble_utils.bubble_data_collection.bubble_data_collection_base import BubbleDataCollectionBase
 
 
 # TEST THE CODE: ------------------------------------------------------------------------------------------------------

@@ -1,15 +1,10 @@
 #! /usr/bin/env python
 import rospy
-import sys
 import numpy as np
-from mmint_camera_utils.camera_calibration import CameraApriltagCalibration
-from arm_robots.med import Med
 from bubble_utils.bubble_med.bubble_med import BubbleMed
-from victor_hardware_interface import victor_utils
-from arc_utilities.listener import Listener
 import tf.transformations as tr
-from geometry_msgs.msg import PoseStamped, Quaternion, Pose
-from victor_hardware_interface_msgs.msg import MotionCommand, MotionStatus, ControlModeParameters, ControlMode
+from geometry_msgs.msg import PoseStamped
+from victor_hardware_interface_msgs.msg import MotionCommand, ControlMode
 from victor_hardware_interface.victor_utils import get_cartesian_impedance_params, send_new_control_mode
 from bubble_utils.bubble_med.aux.load_confs import load_robot_configurations
 from mmint_camera_utils.ros_utils.utils import matrix_to_pose, pose_to_matrix

@@ -1,25 +1,19 @@
 from gym import Env
-import os
-import threading
 import rospy
-import tf
 import tf2_ros as tf2
-import pandas as pd
-from collections import defaultdict
 from abc import abstractmethod
 
-from arm_robots.med import Med
 from arc_utilities.listener import Listener
 from arc_utilities.tf2wrapper import TF2Wrapper
 
-from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
-from mmint_camera_utils.tf_recording import save_tfs, get_tfs
-from mmint_camera_utils.recorders.data_recording_wrappers import TFSelfSavedWrapper
-from mmint_camera_utils.recorders.data_recording_wrappers import DictSelfSavedWrapper
+
+from mmint_camera_utils.tf_utils.tf_utils import get_tfs
+from mmint_camera_utils.recording_utils.data_recording_wrappers import TFSelfSavedWrapper
+from mmint_camera_utils.recording_utils.data_recording_wrappers import DictSelfSavedWrapper
 from geometry_msgs.msg import WrenchStamped
-from bubble_utils.bubble_data_collection.data_collector_base import DataCollectorBase
 from bubble_utils.bubble_data_collection.wrench_recorder import WrenchRecorder
 from bubble_utils.bubble_med.bubble_med import BubbleMed
+from bubble_utils.bubble_parsers.bubble_parser import BubbleParser
 
 
 class BaseEnv(Env):
@@ -222,20 +216,20 @@ class BubbleBaseEnv(MedBaseEnv):
      - Tf listener
      - PicoFlexxParsers for each bubble
     """
-    def __init__(self, *args , right=True, left=True, **kwargs):
+    def __init__(self, *args , right=True, left=True, record_shear=False, **kwargs):
         self.right = right
         self.left = left
         super().__init__(*args, **kwargs)
         if self.right:
             self.camera_name_right = 'pico_flexx_right'
-            self.camera_parser_right = PicoFlexxPointCloudParser(camera_name=self.camera_name_right,
+            self.camera_parser_right = BubbleParser(camera_name=self.camera_name_right,
                                                                  scene_name=self.scene_name, save_path=self.save_path,
-                                                                 verbose=False, wrap_data=self.wrap_data)
+                                                                 verbose=False, wrap_data=self.wrap_data, record_shear=record_shear)
         if self.left:
             self.camera_name_left = 'pico_flexx_left'
-            self.camera_parser_left = PicoFlexxPointCloudParser(camera_name=self.camera_name_left,
+            self.camera_parser_left = BubbleParser(camera_name=self.camera_name_left,
                                                                 scene_name=self.scene_name, save_path=self.save_path,
-                                                                verbose=False, wrap_data=self.wrap_data)
+                                                                verbose=False, wrap_data=self.wrap_data, record_shear=record_shear)
 
     @classmethod
     def get_name(cls):

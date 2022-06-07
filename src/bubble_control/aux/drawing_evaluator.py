@@ -4,8 +4,8 @@ import cv2
 import os
 
 from arc_utilities.tf2wrapper import TF2Wrapper
-from mmint_camera_utils.point_cloud_parsers import RealSensePointCloudParser
-from mmint_camera_utils.camera_utils import project_points_pinhole
+from mmint_camera_utils.camera_utils.camera_parsers import RealSenseCameraParser
+from mmint_camera_utils.camera_utils.camera_utils import project_points_pinhole
 from matplotlib import pyplot as plt
 from scipy.spatial import KDTree
 
@@ -55,7 +55,7 @@ class DrawingEvaluator(object):
         self.visualize_expected_drawing = visualize_expected_drawing
         self.tf_listener = TF2Wrapper()
         self.marker_publisher = MarkerPublisher(self.drawing_topic)
-        self.camera_parser = RealSensePointCloudParser(camera_indx=camera_indx, verbose=False)
+        self.camera_parser = RealSenseCameraParser(camera_indx=camera_indx, verbose=False)
         self.camera_info_depth = self.camera_parser.get_camera_info_depth()
         self.camera_info_color = self.camera_parser.get_camera_info_color()
         self.camera_frame = 'camera_{}_link'.format(self.camera_indx)
