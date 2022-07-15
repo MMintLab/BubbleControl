@@ -4,7 +4,7 @@ import os
 import numpy as np
 import pandas as pd
 import bubble_utils
-from mmint_camera_utils.point_cloud_utils import pack_o3d_pcd, unpack_o3d_pcd
+from mmint_camera_utils.camera_utils.point_cloud_utils import pack_o3d_pcd, unpack_o3d_pcd
 
 package_path = project_path = os.path.join(os.path.dirname(os.path.abspath(__file__)).split('/bubble_control')[0], 'bubble_control')
 
