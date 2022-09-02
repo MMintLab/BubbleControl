@@ -14,7 +14,7 @@ from sensor_msgs.msg import PointCloud2
 from geometry_msgs.msg import TransformStamped
 
 from mmint_camera_utils.camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud, tr_pointcloud
-from mmint_camera_utils.camera_utils.camera_parsers import PicoFlexxPointCloudParser
+from bubble_utils.bubble_parsers.bubble_parser import BubbleParser
 from bubble_utils.bubble_tools.bubble_pc_tools import get_imprint_pc
 from bubble_control.bubble_pose_estimation.pose_estimators import ICP3DPoseEstimator, ICP2DPoseEstimator
 from mmint_camera_utils.ros_utils.publisher_wrapper import PublisherWrapper
@@ -154,8 +154,8 @@ class BubblePCReconstructorROSBase(BubblePCReconstructorBase):
     def __init__(self, *args, broadcast_imprint=False, verbose=False, **kwargs):
         self.broadcast_imprint = broadcast_imprint
         self.verbose = verbose
-        self.left_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_left', verbose=self.verbose)
-        self.right_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_right', verbose=self.verbose)
+        self.left_parser = BubbleParser(camera_name='pico_flexx_left', verbose=self.verbose)
+        self.right_parser = BubbleParser(camera_name='pico_flexx_right', verbose=self.verbose)
         self.imprint_broadcaster = rospy.Publisher('imprint_pc', PointCloud2)
         super().__init__(*args, verbose=verbose, **kwargs)
 
