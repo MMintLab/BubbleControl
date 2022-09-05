@@ -105,16 +105,17 @@ class MedBaseEnv(BaseEnv):
      - Wrench listener
      - Tf listener
     """
-    def __init__(self, wrench_topic='/med/wrench', save_path=None, scene_name='default_scene', wrap_data=False, verbose=False):
+    def __init__(self, wrench_topic='/med/wrench', save_path=None, scene_name='default_scene', wrap_data=False, verbose=False, buffered=False):
         self.wrench_topic = wrench_topic
         self.save_path = self._get_save_path(save_path)
         self.scene_name = scene_name
         self.wrap_data = wrap_data
         self.verbose = verbose
+        self.buffered = buffered
         self._init_ros_node()
         self.tf_buffer = tf2.Buffer()
-        self.tf_listener = tf2.TransformListener(buffer=self.tf_buffer)
-        self.tf2_listener = TF2Wrapper()
+        self.tf_listener = tf2.TransformListener(buffer=self.tf_buffer, queue_size=1000, buff_size=500000)
+        self.tf2_listener = TF2Wrapper(buffer=self.tf_buffer, listener=self.tf_listener)
         self.wrench_listener = Listener(self.wrench_topic, WrenchStamped, wait_for_data=True)
         self.med = self._get_med()
         self.wrench_recorder = WrenchRecorder(self.wrench_topic, scene_name=self.scene_name, save_path=self.save_path, wrap_data=self.wrap_data)
@@ -224,12 +225,12 @@ class BubbleBaseEnv(MedBaseEnv):
             self.camera_name_right = 'pico_flexx_right'
             self.camera_parser_right = BubbleParser(camera_name=self.camera_name_right,
                                                                  scene_name=self.scene_name, save_path=self.save_path,
-                                                                 verbose=False, wrap_data=self.wrap_data, record_shear=record_shear)
+                                                                 verbose=False, wrap_data=self.wrap_data, record_shear=record_shear, buffered=self.buffered)
         if self.left:
             self.camera_name_left = 'pico_flexx_left'
             self.camera_parser_left = BubbleParser(camera_name=self.camera_name_left,
                                                                 scene_name=self.scene_name, save_path=self.save_path,
-                                                                verbose=False, wrap_data=self.wrap_data, record_shear=record_shear)
+                                                                verbose=False, wrap_data=self.wrap_data, record_shear=record_shear, buffered=self.buffered)
 
     @classmethod
     def get_name(cls):
