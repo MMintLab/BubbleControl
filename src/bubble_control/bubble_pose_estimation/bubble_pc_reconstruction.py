@@ -156,7 +156,7 @@ class BubblePCReconstructorROSBase(BubblePCReconstructorBase):
         self.verbose = verbose
         self.left_parser = BubbleParser(camera_name='pico_flexx_left', verbose=self.verbose)
         self.right_parser = BubbleParser(camera_name='pico_flexx_right', verbose=self.verbose)
-        self.imprint_broadcaster = rospy.Publisher('imprint_pc', PointCloud2)
+        self.imprint_broadcaster = rospy.Publisher('imprint_pc', PointCloud2, queue_size=100)
         super().__init__(*args, verbose=verbose, **kwargs)
 
     def _broadcast_imprint(self, imprint):
@@ -277,12 +277,20 @@ class BubblePCReconsturctorDepth(BubblePCReconstructorROSBase):
         # pc_l_contact_indxs = get_far_points_indxs(self.reference_pcs['left'], pc_l, d_threshold=self.threshold)
         imprint_r = self.right_parser.transform_pc(filtered_imprint_r, origin_frame=frame_r, target_frame=self.reconstruction_frame)
         imprint_l = self.left_parser.transform_pc(filtered_imprint_l, origin_frame=frame_l, target_frame=self.reconstruction_frame)
-        
+
+        if imprint_r is None:
+            print('No imprint detected in R, maybe we have a problem with the tfs')
+            imprint_r = np.empty((0, 6))
+        if imprint_l is None:
+            print('No imprint detected in L, maybe we have a problem with the tfs')
+            imprint_l = np.empty((0, 6))
+
         # if view:
         #     pc_r_tr[pc_r_contact_indxs, 3:6] = np.array([0, 1, 0])  # green
         #     pc_l_tr[pc_l_contact_indxs, 3:6] = np.array([0, 1, 0])  # green
         #     print('visualizing the bubbles with the imprint on green')
         #     view_pointcloud([pc_r_tr, pc_l_tr], frame=True)
+
         if view:
             print('visualizing the imprint on green')
             # view

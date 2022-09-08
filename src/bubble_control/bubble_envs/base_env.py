@@ -6,7 +6,6 @@ from abc import abstractmethod
 from arc_utilities.listener import Listener
 from arc_utilities.tf2wrapper import TF2Wrapper
 
-
 from mmint_camera_utils.tf_utils.tf_utils import get_tfs
 from mmint_camera_utils.recording_utils.data_recording_wrappers import TFSelfSavedWrapper
 from mmint_camera_utils.recording_utils.data_recording_wrappers import DictSelfSavedWrapper
@@ -28,13 +27,11 @@ class BaseEnv(Env):
      - render():
      - close():
     For more information about the Env class, check: https://github.com/openai/gym/blob/master/gym/core.py
-
     """
     def __init__(self):
         self.action_space = self._get_action_space()
         self.observation_space = self._get_observation_space()
         self.num_steps = 0
-
 
     @classmethod
     def get_name(cls):
@@ -176,7 +173,7 @@ class MedBaseEnv(BaseEnv):
                 plan_found = True
 
         if not execution_success:
-            # It seams tha execution always fails (??)
+            # It seems tha execution always fails (??)
             print('-' * 20 + '    Execution Failed    ' + '-' * 20)
 
         return plan_success, execution_success
@@ -197,7 +194,7 @@ class MedBaseEnv(BaseEnv):
     def _get_tfs(self):
         tf_frames = self._get_tf_frames()
         parent_names = 'med_base'
-        tfs = get_tfs(tf_frames, parent_names, verbose=self.verbose, tf_listener=self.tf_listener) # df of the frames
+        tfs = get_tfs(tf_frames, parent_names, verbose=self.verbose, buffer=self.tf_buffer) # df of the frames
         if self.wrap_data:
             tfs = TFSelfSavedWrapper(tfs, data_params={'save_path': self.save_path, 'scene_name': self.scene_name})
         return tfs
