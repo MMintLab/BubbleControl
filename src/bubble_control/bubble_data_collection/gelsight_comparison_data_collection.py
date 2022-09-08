@@ -10,10 +10,9 @@ from tf import transformations as tr
 from arc_utilities.listener import Listener
 from sensor_msgs.msg import JointState
 from bubble_utils.bubble_data_collection.bubble_data_collection_base import BubbleDataCollectionBase
-from bubble_utils.bubble_data_collection.bubble_data_collection_base import MedDataCollectionBase
-from mmint_camera_utils.point_cloud_parsers import RealSensePointCloudParser
-from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
-from victor_hardware_interface_msgs.msg import MotionCommand, MotionStatus, ControlMode
+from mmint_camera_utils.camera_utils.camera_parsers import RealSenseCameraParser
+from mmint_camera_utils.camera_utils.camera_parsers import PicoFlexxCameraParser
+from victor_hardware_interface_msgs.msg import ControlMode
 
 
 class GelsightComparisonDataCollectionBase(BubbleDataCollectionBase):
@@ -38,7 +37,7 @@ class GelsightComparisonDataCollectionBase(BubbleDataCollectionBase):
         self.reference_fc = None
         super().__init__(*args, right=right, left=left, **kwargs)
         self.init_pose = self._get_init_pose()
-        self.realsense_parser = RealSensePointCloudParser(camera_indx=1, scene_name=self.scene_name, save_path=self.save_path, verbose=False)
+        self.realsense_parser = RealSenseCameraParser(camera_indx=1, scene_name=self.scene_name, save_path=self.save_path, verbose=False)
 
         self.joint_listener = Listener('/med/joint_states', JointState, wait_for_data=True)
         self.joint_sequence = None
@@ -372,11 +371,11 @@ def simple_3_image_recording():
     data_path = '/home/mmint/Desktop/bubble_vs_gelsight_top_down_calibration_data'
     save_path = data_path
     camera_name_right = 'pico_flexx_right'
-    camera_parser_right = PicoFlexxPointCloudParser(camera_name=camera_name_right,
+    camera_parser_right = PicoFlexxCameraParser(camera_name=camera_name_right,
                                                          scene_name=scene_name, save_path=save_path,
                                                          verbose=False)
     camera_name_left = 'pico_flexx_left'
-    camera_parser_left = PicoFlexxPointCloudParser(camera_name=camera_name_left,
+    camera_parser_left = PicoFlexxCameraParser(camera_name=camera_name_left,
                                                         scene_name=scene_name, save_path=save_path,
                                                         verbose=False)
     med = BubbleMed()

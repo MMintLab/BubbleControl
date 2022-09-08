@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import os
 from tqdm import tqdm
-import rospy
 
 from bubble_control.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
 from bubble_control.bubble_learning.models.bubble_dynamics_model import BubbleDynamicsModel
@@ -26,9 +25,8 @@ from bubble_control.bubble_model_control.aux.bubble_model_control_utils import b
 
 from bubble_utils.bubble_data_collection.data_collector_base import DataCollectorBase
 
-from mmint_camera_utils.recorders.recording_utils import record_image_color
-from mmint_camera_utils.recorders.data_recording_wrappers import ActionSelfSavedWrapper
-from arc_utilities.tf2wrapper import TF2Wrapper
+from mmint_camera_utils.recording_utils.recording_utils import record_image_color
+from mmint_camera_utils.recording_utils.data_recording_wrappers import ActionSelfSavedWrapper
 
 
 class DrawingEvaluationDataCollection(DataCollectorBase):
@@ -215,8 +213,10 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
 
     def _get_expected_drawing(self):
         num_points = 1000
-        edc_x = self.init_action['start_point'][0] * np.ones((num_points,))
-        edc_y = np.linspace(self.init_action['start_point'][1] - 0.55, self.init_action['start_point'][1], num=num_points)
+        # edc_x = (self.init_action['start_point'][0])* np.ones((num_points,))
+        edc_x = (self.init_action['start_point'][0] - 0.018)* np.ones((num_points,))
+        # edc_y = np.linspace(self.init_action['start_point'][1] - 0.55, self.init_action['start_point'][1], num=num_points)
+        edc_y = np.linspace(self.init_action['start_point'][1] - 0.5, self.init_action['start_point'][1], num=num_points)
         edc_z = 0.01*np.ones((num_points,))
         expected_drawing_cooridnates = np.stack([edc_x, edc_y, edc_z], axis=-1)
         return expected_drawing_cooridnates
@@ -247,7 +247,8 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
                 action = self.controller.control(obs_sample) # it is already an action dictionary
                 # This is a test to see how random grasp width effect the performace.
                 if self.model_name == 'fixed_model':
-                    action['grasp_width'] = random_action['grasp_width']
+                    action['grasp_width'] = random_action['grasp_width'] # random grasp_width
+                    pass
             else:
                 action = random_action
             # print('Action:', action)

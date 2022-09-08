@@ -1,25 +1,18 @@
 from gym import Env
-import os
-import threading
 import rospy
-import tf
 import tf2_ros as tf2
-import pandas as pd
-from collections import defaultdict
 from abc import abstractmethod
 
-from arm_robots.med import Med
 from arc_utilities.listener import Listener
 from arc_utilities.tf2wrapper import TF2Wrapper
 
-from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
-from mmint_camera_utils.tf_recording import save_tfs, get_tfs
-from mmint_camera_utils.recorders.data_recording_wrappers import TFSelfSavedWrapper
-from mmint_camera_utils.recorders.data_recording_wrappers import DictSelfSavedWrapper
+from mmint_camera_utils.tf_utils.tf_utils import get_tfs
+from mmint_camera_utils.recording_utils.data_recording_wrappers import TFSelfSavedWrapper
+from mmint_camera_utils.recording_utils.data_recording_wrappers import DictSelfSavedWrapper
 from geometry_msgs.msg import WrenchStamped
-from bubble_utils.bubble_data_collection.data_collector_base import DataCollectorBase
 from bubble_utils.bubble_data_collection.wrench_recorder import WrenchRecorder
 from bubble_utils.bubble_med.bubble_med import BubbleMed
+from bubble_utils.bubble_parsers.bubble_parser import BubbleParser
 
 
 class BaseEnv(Env):
@@ -34,13 +27,11 @@ class BaseEnv(Env):
      - render():
      - close():
     For more information about the Env class, check: https://github.com/openai/gym/blob/master/gym/core.py
-
     """
     def __init__(self):
         self.action_space = self._get_action_space()
         self.observation_space = self._get_observation_space()
         self.num_steps = 0
-
 
     @classmethod
     def get_name(cls):
@@ -111,16 +102,17 @@ class MedBaseEnv(BaseEnv):
      - Wrench listener
      - Tf listener
     """
-    def __init__(self, wrench_topic='/med/wrench', save_path=None, scene_name='default_scene', wrap_data=False, verbose=False):
+    def __init__(self, wrench_topic='/med/wrench', save_path=None, scene_name='default_scene', wrap_data=False, verbose=False, buffered=False):
         self.wrench_topic = wrench_topic
         self.save_path = self._get_save_path(save_path)
         self.scene_name = scene_name
         self.wrap_data = wrap_data
         self.verbose = verbose
+        self.buffered = buffered
         self._init_ros_node()
         self.tf_buffer = tf2.Buffer()
-        self.tf_listener = tf2.TransformListener(buffer=self.tf_buffer)
-        self.tf2_listener = TF2Wrapper()
+        self.tf_listener = tf2.TransformListener(buffer=self.tf_buffer, queue_size=1000, buff_size=500000)
+        self.tf2_listener = TF2Wrapper(buffer=self.tf_buffer, listener=self.tf_listener)
         self.wrench_listener = Listener(self.wrench_topic, WrenchStamped, wait_for_data=True)
         self.med = self._get_med()
         self.wrench_recorder = WrenchRecorder(self.wrench_topic, scene_name=self.scene_name, save_path=self.save_path, wrap_data=self.wrap_data)
@@ -181,7 +173,7 @@ class MedBaseEnv(BaseEnv):
                 plan_found = True
 
         if not execution_success:
-            # It seams tha execution always fails (??)
+            # It seems tha execution always fails (??)
             print('-' * 20 + '    Execution Failed    ' + '-' * 20)
 
         return plan_success, execution_success
@@ -202,7 +194,7 @@ class MedBaseEnv(BaseEnv):
     def _get_tfs(self):
         tf_frames = self._get_tf_frames()
         parent_names = 'med_base'
-        tfs = get_tfs(tf_frames, parent_names, verbose=self.verbose, tf_listener=self.tf_listener) # df of the frames
+        tfs = get_tfs(tf_frames, parent_names, verbose=self.verbose, buffer=self.tf_buffer) # df of the frames
         if self.wrap_data:
             tfs = TFSelfSavedWrapper(tfs, data_params={'save_path': self.save_path, 'scene_name': self.scene_name})
         return tfs
@@ -222,20 +214,20 @@ class BubbleBaseEnv(MedBaseEnv):
      - Tf listener
      - PicoFlexxParsers for each bubble
     """
-    def __init__(self, *args , right=True, left=True, **kwargs):
+    def __init__(self, *args , right=True, left=True, record_shear=False, **kwargs):
         self.right = right
         self.left = left
         super().__init__(*args, **kwargs)
         if self.right:
             self.camera_name_right = 'pico_flexx_right'
-            self.camera_parser_right = PicoFlexxPointCloudParser(camera_name=self.camera_name_right,
+            self.camera_parser_right = BubbleParser(camera_name=self.camera_name_right,
                                                                  scene_name=self.scene_name, save_path=self.save_path,
-                                                                 verbose=False, wrap_data=self.wrap_data)
+                                                                 verbose=False, wrap_data=self.wrap_data, record_shear=record_shear, buffered=self.buffered)
         if self.left:
             self.camera_name_left = 'pico_flexx_left'
-            self.camera_parser_left = PicoFlexxPointCloudParser(camera_name=self.camera_name_left,
+            self.camera_parser_left = BubbleParser(camera_name=self.camera_name_left,
                                                                 scene_name=self.scene_name, save_path=self.save_path,
-                                                                verbose=False, wrap_data=self.wrap_data)
+                                                                verbose=False, wrap_data=self.wrap_data, record_shear=record_shear, buffered=self.buffered)
 
     @classmethod
     def get_name(cls):

@@ -1,31 +1,20 @@
 #!/usr/bin/env python3
 
-import sys
-import os
 import rospy
 import numpy as np
-import ros_numpy as rn
-import cv2
-import ctypes
-import struct
-from PIL import Image as imm
-import open3d as o3d
 from scipy.spatial import KDTree
-import copy
 import tf.transformations as tr
 import tf2_ros as tf2
 from functools import reduce
-from sklearn.cluster import DBSCAN
 import abc
 
 import sensor_msgs.point_cloud2 as pc2
-from std_msgs.msg import String, Header, Bool
-from sensor_msgs.msg import Image, CompressedImage, CameraInfo, PointCloud2, PointField
-from geometry_msgs.msg import TransformStamped, Pose
-from visualization_msgs.msg import Marker, MarkerArray
+from std_msgs.msg import Header, Bool
+from sensor_msgs.msg import PointCloud2
+from geometry_msgs.msg import TransformStamped
 
-from mmint_camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud, tr_pointcloud
-from mmint_camera_utils.point_cloud_parsers import PicoFlexxPointCloudParser
+from mmint_camera_utils.camera_utils.point_cloud_utils import pack_o3d_pcd, view_pointcloud, tr_pointcloud
+from bubble_utils.bubble_parsers.bubble_parser import BubbleParser
 from bubble_utils.bubble_tools.bubble_pc_tools import get_imprint_pc
 from bubble_control.bubble_pose_estimation.pose_estimators import ICP3DPoseEstimator, ICP2DPoseEstimator
 from mmint_camera_utils.ros_utils.publisher_wrapper import PublisherWrapper
@@ -165,9 +154,9 @@ class BubblePCReconstructorROSBase(BubblePCReconstructorBase):
     def __init__(self, *args, broadcast_imprint=False, verbose=False, **kwargs):
         self.broadcast_imprint = broadcast_imprint
         self.verbose = verbose
-        self.left_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_left', verbose=self.verbose)
-        self.right_parser = PicoFlexxPointCloudParser(camera_name='pico_flexx_right', verbose=self.verbose)
-        self.imprint_broadcaster = rospy.Publisher('imprint_pc', PointCloud2)
+        self.left_parser = BubbleParser(camera_name='pico_flexx_left', verbose=self.verbose)
+        self.right_parser = BubbleParser(camera_name='pico_flexx_right', verbose=self.verbose)
+        self.imprint_broadcaster = rospy.Publisher('imprint_pc', PointCloud2, queue_size=100)
         super().__init__(*args, verbose=verbose, **kwargs)
 
     def _broadcast_imprint(self, imprint):
@@ -288,12 +277,20 @@ class BubblePCReconsturctorDepth(BubblePCReconstructorROSBase):
         # pc_l_contact_indxs = get_far_points_indxs(self.reference_pcs['left'], pc_l, d_threshold=self.threshold)
         imprint_r = self.right_parser.transform_pc(filtered_imprint_r, origin_frame=frame_r, target_frame=self.reconstruction_frame)
         imprint_l = self.left_parser.transform_pc(filtered_imprint_l, origin_frame=frame_l, target_frame=self.reconstruction_frame)
-        
+
+        if imprint_r is None:
+            print('No imprint detected in R, maybe we have a problem with the tfs')
+            imprint_r = np.empty((0, 6))
+        if imprint_l is None:
+            print('No imprint detected in L, maybe we have a problem with the tfs')
+            imprint_l = np.empty((0, 6))
+
         # if view:
         #     pc_r_tr[pc_r_contact_indxs, 3:6] = np.array([0, 1, 0])  # green
         #     pc_l_tr[pc_l_contact_indxs, 3:6] = np.array([0, 1, 0])  # green
         #     print('visualizing the bubbles with the imprint on green')
         #     view_pointcloud([pc_r_tr, pc_l_tr], frame=True)
+
         if view:
             print('visualizing the imprint on green')
             # view

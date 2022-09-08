@@ -2,20 +2,10 @@
 import copy
 
 import rospy
-import sys
 import numpy as np
-from mmint_camera_utils.camera_calibration import CameraApriltagCalibration
 from arm_robots.med import Med
-from victor_hardware_interface import victor_utils
-from arc_utilities.listener import Listener
-import tf.transformations as tr
 
-from victor_hardware_interface.victor_utils import get_cartesian_impedance_params, send_new_control_mode
-from bubble_utils.bubble_med.aux.load_confs import load_robot_configurations
-from mmint_camera_utils.ros_utils.utils import matrix_to_pose, pose_to_matrix
-
-from geometry_msgs.msg import PoseStamped, Quaternion, Pose
-from victor_hardware_interface_msgs.msg import MotionStatus, MotionCommand, JointValueQuantity, CartesianValueQuantity, ControlMode
+from victor_hardware_interface_msgs.msg import MotionCommand
 
 
 def create_motion_command_from_joint_values(joints_poses, joint_vels):
