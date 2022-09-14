@@ -217,6 +217,7 @@ class BubbleBaseEnv(MedBaseEnv):
     def __init__(self, *args , right=True, left=True, record_shear=False, **kwargs):
         self.right = right
         self.left = left
+        self.record_shear = record_shear
         super().__init__(*args, **kwargs)
         if self.right:
             self.camera_name_right = 'pico_flexx_right'
@@ -262,4 +263,7 @@ class BubbleBaseEnv(MedBaseEnv):
         obs['color_img'] = camera_parser.get_image_color()
         obs['depth_img'] = camera_parser.get_image_depth()
         obs['point_cloud'] = camera_parser.get_point_cloud()
+        if self.record_shear and isinstance(camera_parser, BubbleParser):
+            obs['shear_deformation'] = camera_parser.get_shear_deformation()
+            obs['shear_img'] = camera_parser.get_shear_image()
         return obs
