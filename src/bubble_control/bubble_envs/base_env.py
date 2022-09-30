@@ -115,7 +115,7 @@ class MedBaseEnv(BaseEnv):
         self.tf2_listener = TF2Wrapper(buffer=self.tf_buffer, listener=self.tf_listener)
         self.wrench_listener = Listener(self.wrench_topic, WrenchStamped, wait_for_data=True)
         self.med = self._get_med()
-        self.wrench_recorder = WrenchRecorder(self.wrench_topic, scene_name=self.scene_name, save_path=self.save_path, wrap_data=self.wrap_data)
+        self.wrench_recorder = WrenchRecorder(self.wrench_topic, scene_name=self.scene_name, save_path=self.save_path, wrap_data=self.wrap_data, wrench_name='med_wrenches')
         super().__init__()
 
     @classmethod
