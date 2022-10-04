@@ -7,7 +7,9 @@ from mmint_camera_utils.aux.wrapping_utils import AttributeWrapper, ClassWrapper
 
 
 def imprint_downsampled_dataset(cls):
-    class Wrapper(AttributeWrapper):
+    """ This does not really work -- TODO: Fix this class """
+    # class Wrapper(AttributeWrapper):
+    class Wrapper(ClassWrapper):
         def __init__(self, *args, downsample_factor_x=5, downsample_factor_y=5, downsample_reduction='mean', **kwargs):
             self.downsample_factor_x = downsample_factor_x
             self.downsample_factor_y = downsample_factor_y
@@ -27,7 +29,8 @@ def imprint_downsampled_dataset(cls):
                                                                                                     'transformation'])))
             else:
                 kwargs['transformation'] = [self.block_mean_downsampling_tr]
-            super().__init__(cls.__init__(*args, **kwargs))
+            wrapped_obj = cls(*args, **kwargs)
+            super().__init__(wrapped_obj)
 
         @classmethod
         def get_name(self):

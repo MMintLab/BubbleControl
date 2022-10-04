@@ -22,14 +22,14 @@ class BubbleSimpleDataset(BubbleDatasetBase):
         time = dl_line['Time']
 
         # Load the state:
-        depth_r = self._load_depth_img(fc=fc, scene_name=scene_name, camera_name='right')
-        depth_l = self._load_depth_img(fc=fc, scene_name=scene_name, camera_name='left')
-        color_r = self._load_color_img(fc=fc, scene_name=scene_name, camera_name='right')
-        color_l = self._load_color_img(fc=fc, scene_name=scene_name, camera_name='left')
+        depth_r = self._load_bubble_depth_img(fc=fc, scene_name=scene_name, camera_name='right')
+        depth_l = self._load_bubble_depth_img(fc=fc, scene_name=scene_name, camera_name='left')
+        color_r = self._load_bubble_color_img(fc=fc, scene_name=scene_name, camera_name='right')
+        color_l = self._load_bubble_color_img(fc=fc, scene_name=scene_name, camera_name='left')
 
         # camera info
-        camera_info_r = self._load_camera_info_depth(scene_name=scene_name, camera_name='right')
-        camera_info_l = self._load_camera_info_depth(scene_name=scene_name, camera_name='left')
+        camera_info_r = self._load_bubble_camera_info_depth(scene_name=scene_name, camera_name='right')
+        camera_info_l = self._load_bubble_camera_info_depth(scene_name=scene_name, camera_name='left')
 
         sample_simple = {
             'time': time,

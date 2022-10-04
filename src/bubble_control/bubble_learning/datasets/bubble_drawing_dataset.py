@@ -54,12 +54,12 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         final_pos = final_tf[..., :3]
         final_quat = final_tf[..., 3:]
 
-        undef_depth_r = self._load_depth_img(fc=undef_fc, scene_name=scene_name, camera_name='right')
-        undef_depth_l = self._load_depth_img(fc=undef_fc, scene_name=scene_name, camera_name='left')
-        init_def_depth_r = self._load_depth_img(fc=init_fc, scene_name=scene_name, camera_name='right')
-        init_def_depth_l = self._load_depth_img(fc=init_fc, scene_name=scene_name, camera_name='left')
-        final_def_depth_r = self._load_depth_img(fc=final_fc, scene_name=scene_name, camera_name='right')
-        final_def_depth_l = self._load_depth_img(fc=final_fc, scene_name=scene_name, camera_name='left')
+        undef_depth_r = self._load_bubble_depth_img(fc=undef_fc, scene_name=scene_name, camera_name='right')
+        undef_depth_l = self._load_bubble_depth_img(fc=undef_fc, scene_name=scene_name, camera_name='left')
+        init_def_depth_r = self._load_bubble_depth_img(fc=init_fc, scene_name=scene_name, camera_name='right')
+        init_def_depth_l = self._load_bubble_depth_img(fc=init_fc, scene_name=scene_name, camera_name='left')
+        final_def_depth_r = self._load_bubble_depth_img(fc=final_fc, scene_name=scene_name, camera_name='right')
+        final_def_depth_l = self._load_bubble_depth_img(fc=final_fc, scene_name=scene_name, camera_name='left')
 
         # load tf from cameras to grasp frame (should
         all_tfs = self._load_tfs(init_fc, scene_name)
@@ -69,8 +69,8 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         action = self._get_action(action_fc)
 
         # camera info
-        camera_info_r = self._load_camera_info_depth(scene_name=scene_name, camera_name='right', fc=undef_fc)
-        camera_info_l = self._load_camera_info_depth(scene_name=scene_name, camera_name='left', fc=undef_fc)
+        camera_info_r = self._load_bubble_camera_info_depth(scene_name=scene_name, camera_name='right', fc=undef_fc)
+        camera_info_l = self._load_bubble_camera_info_depth(scene_name=scene_name, camera_name='left', fc=undef_fc)
 
         object_code = self._get_object_code(fc)
         object_model = self._get_object_model(object_code)
