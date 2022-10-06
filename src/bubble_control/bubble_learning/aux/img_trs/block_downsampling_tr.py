@@ -67,7 +67,10 @@ class BlockMeanDownSamplingTr(BlockDownSamplingBaseTr):
         super().__init__(*args, **kwargs)
 
     def _reduction(self, x_rrr):
-        x_down = np.mean(x_rrr, axis=-1)
+        if torch.is_tensor(x_rrr):
+            x_down = torch.mean(x_rrr, dim=-1)
+        else:
+            x_down = np.mean(x_rrr, axis=-1)
         return x_down
 
 
@@ -77,7 +80,10 @@ class BlockMaxDownSamplingTr(BlockDownSamplingBaseTr):
         super().__init__(*args, **kwargs)
 
     def _reduction(self, x_rrr):
-        x_down = np.max(x_rrr, axis=-1)
+        if torch.is_tensor(x_rrr):
+            x_down = torch.max(x_rrr, dim=-1)
+        else:
+            x_down = np.max(x_rrr, axis=-1)
         return x_down
 
 
@@ -89,13 +95,15 @@ class BlockDownSamplingTr(BlockDownSamplingBaseTr):
 
     def _reduction(self, x_rrr):
         implemented_reductions = ['mean', 'max', 'min']
-        if self.reduction == 'mean':
-            x_down = np.mean(x_rrr, axis=-1)
-        elif self.reduction == 'max':
-            x_down = np.max(x_rrr, axis=-1)
-        elif self.reduction == 'min':
-            x_down = np.min(x_rrr, axis=-1)
+        numpy_operations = dict(zip(implemented_reductions, [np.mean, np.max, np.min]))
+        torch_operations = dict(zip(implemented_reductions, [torch.mean, torch.max, torch.min]))
+        if not self.reduction in implemented_reductions:
+            raise NotImplemented(f'Reduction {self.reduction} not yet implemented. Only {implemented_reductions} available')
+        if type(x_rrr) in [np.ndarray]:
+            x_down = numpy_operations[self.reduction](x_rrr, axis=-1)
+        elif torch.is_tensor(x_rrr):
+            x_down = torch_operations[self.reduction](x_rrr, dim=-1)
         else:
-            raise NotImplemented('Reduction {} not yet implemented. Only {} available'.format(implemented_reductions))
+            raise NotImplemented(f'Type of transformed input {type(x_rrr)} not supported yet.')
         return x_down
 
