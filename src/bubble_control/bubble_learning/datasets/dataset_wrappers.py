@@ -47,14 +47,14 @@ class BubbleImprintCombinedDatasetWrapper(BubbleDatasetBase):
         self.dataset = dataset
         super().__init__(data_name=dataset.data_path)
 
-    def _get_filecodes(self):
+    def _get_sample_codes(self):
         filecodes = np.arange(2*len(self.dataset))
         return filecodes
 
-    def _get_sample(self, fc):
-        true_fc = fc // 2
+    def _get_sample(self, sample_code):
+        true_fc = sample_code // 2
         sample = self.dataset[true_fc]
-        if fc % 2 == 0:
+        if sample_code % 2 == 0:
             # sample is the initial
             key = 'init'
         else:

@@ -29,9 +29,9 @@ class BubbleDrawingDataset(BubbleDatasetBase):
     def get_name(self):
         return 'bubble_drawing_dataset'
 
-    def _get_sample(self, fc):
+    def _get_sample(self, sample_code):
         # fc: index of the line in the datalegend (self.dl) of the sample
-        dl_line = self.dl.iloc[fc]
+        dl_line = self.dl.iloc[sample_code]
         scene_name = dl_line['Scene']
         undef_fc = int(dl_line['UndeformedFC'])
         init_fc = int(dl_line['InitialStateFC'])
@@ -65,14 +65,14 @@ class BubbleDrawingDataset(BubbleDatasetBase):
         all_tfs = self._load_tfs(init_fc, scene_name)
 
         # Action:
-        action_fc = fc
+        action_fc = sample_code
         action = self._get_action(action_fc)
 
         # camera info
         camera_info_r = self._load_bubble_camera_info_depth(scene_name=scene_name, camera_name='right', fc=undef_fc)
         camera_info_l = self._load_bubble_camera_info_depth(scene_name=scene_name, camera_name='left', fc=undef_fc)
 
-        object_code = self._get_object_code(fc)
+        object_code = self._get_object_code(sample_code)
         object_model = self._get_object_model(object_code)
         init_object_pose = self._estimate_object_pose(init_def_depth_r, init_def_depth_l, undef_depth_r, undef_depth_l, camera_info_r, camera_info_l, all_tfs)
         final_object_pose = self._estimate_object_pose(final_def_depth_r, final_def_depth_l, undef_depth_r, undef_depth_l, camera_info_r, camera_info_l, all_tfs)

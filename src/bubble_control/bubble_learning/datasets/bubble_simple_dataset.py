@@ -14,9 +14,9 @@ class BubbleSimpleDataset(BubbleDatasetBase):
     def get_name(self):
         return 'bubble_simple_dataset'
 
-    def _get_sample(self, fc):
+    def _get_sample(self, sample_code):
         # fc: index of the line in the datalegend (self.dl) of the sample
-        dl_line = self.dl.iloc[fc]
+        dl_line = self.dl.iloc[sample_code]
         scene_name = dl_line['Scene']
         fc = dl_line['FC']
         time = dl_line['Time']

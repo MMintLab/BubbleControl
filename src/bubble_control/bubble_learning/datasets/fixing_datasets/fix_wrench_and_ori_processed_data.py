@@ -15,9 +15,9 @@ def fix_wrench(dataset, wrench_frame=None, init_indx=0, last_indx=0, indxs=None)
     if indxs is None:
         indxs = np.arange(start=init_indx, stop=(last_indx - 1) % len(dataset) + 1)
     for indx in tqdm(indxs):
-        fc = dataset.fcs[indx]
+        sample_code = dataset.sample_codes[indx]
         sample_i = dataset[indx]
-        dl_line = dataset.dl.iloc[fc]
+        dl_line = dataset.dl.iloc[sample_code]
         scene_name = dl_line['Scene']
         init_fc = dl_line['InitialStateFC']
         final_fc = dl_line['FinalStateFC']
