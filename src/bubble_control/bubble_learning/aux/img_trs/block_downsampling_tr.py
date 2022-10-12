@@ -5,11 +5,12 @@ import abc
 
 
 class BlockDownSamplingBaseTr(abc.ABC):
-    def __init__(self, factor_x, factor_y, keys_to_tr=None):
+    def __init__(self, factor_x, factor_y, keys_to_tr=None, invertible=True):
         super().__init__()
         self.factor_x = factor_x
         self.factor_y = factor_y
         self.keys_to_tr = keys_to_tr
+        self.invertible = invertible # whether or not to keep the original undownsampled version
 
     def __call__(self, sample):
         if self.keys_to_tr is None:
@@ -18,13 +19,15 @@ class BlockDownSamplingBaseTr(abc.ABC):
             for k in old_keys:
                 v = sample[k]
                 if 'imprint' in k:
-                    sample['{}_undownsampled'.format(k)] = v  # store the unsampled one
+                    if self.invertible:
+                        sample['{}_undownsampled'.format(k)] = v  # store the unsampled one
                     sample[k] = self._tr(v)
         else:
             for key in self.keys_to_tr:
                 if key in sample:
                     v = sample[key]
-                    sample['{}_undownsampled'.format(key)] = v  # store the unsample one
+                    if self.invertible:
+                        sample['{}_undownsampled'.format(key)] = v  # store the unsample one
                     sample[key] = self._tr(sample[key])
         return sample
 
