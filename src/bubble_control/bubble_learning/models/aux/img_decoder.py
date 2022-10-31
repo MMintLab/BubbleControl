@@ -76,7 +76,6 @@ class ImageDecoder(nn.Module):
             in_size_i = np.floor(_size_up / stride + 1).astype(np.int64)
             expected_out_size = (in_size_i - 1)*stride - 2*padding + dilation*(ks - 1) + 1
             out_padding = sizes[-1] - expected_out_size
-            # import pdb; pdb.set_trace()
             conv_i = nn.ConvTranspose2d(in_channels=h_dim, out_channels=out_dim, kernel_size=ks, padding=padding, dilation=dilation, stride=stride, output_padding=out_padding)
             conv_modules.append(conv_i)
             sizes.append(in_size_i)
