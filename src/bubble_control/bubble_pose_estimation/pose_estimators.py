@@ -21,40 +21,52 @@ class PCPoseEstimatorBase(abc.ABC):
 
 
 class ICPPoseEstimator(PCPoseEstimatorBase):
-    def __init__(self, obj_model, view=False, verbose=False):
+    def __init__(self, obj_model, view=False, verbose=False, is_model_target=False):
         super().__init__()
         self.object_model = obj_model
+        self.is_model_target = is_model_target
         self.last_tr = None
         self.threshold = None
         self.view = view
         self.verbose = verbose
 
     def estimate_pose(self, target_pc, init_tr=None):
-        target_pc = self._filter_input_pc(target_pc)
+        # target_pc = self._filter_input_pc(target_pc)
         target_pcd = pack_o3d_pcd(target_pc)
         if init_tr is None:
             init_tr = self._get_init_tr(target_pcd)
         if self.view:
             # Visualize the initial transofrm:
             print('visualizing ICP initial configuration')
-            model_tr_pcd = copy.deepcopy(self.object_model)
-            model_tr_pcd.transform(init_tr)
-            view_pointcloud([target_pcd, model_tr_pcd], frame=True)
+            self._view_pointcloud(self.object_model, target_pcd, init_tr)
 
         # Estimate the transformation
         if self.threshold is None:
             self.threshold = 0.015
-        icp_tr = self._icp(source_pcd=self.object_model, target_pcd=target_pcd, threshold=self.threshold, init_tr=init_tr)
+        if self.is_model_target:
+            icp_tr = self._icp(source_pcd=target_pcd, target_pcd=self.object_model, threshold=self.threshold, init_tr=init_tr)
+        else:
+            icp_tr = self._icp(source_pcd=self.object_model, target_pcd=target_pcd, threshold=self.threshold, init_tr=init_tr)
 
         if self.view:
             # Visualize the estimated transofrm:
             print('visualizing the ICP infered transformation')
-            model_tr_pcd = copy.deepcopy(self.object_model)
-            model_tr_pcd.transform(icp_tr)
-            view_pointcloud([target_pcd, model_tr_pcd], frame=True)
+            self._view_pointcloud(self.object_model, target_pcd, icp_tr)
 
         self.last_tr = icp_tr
+        if self.is_model_target:
+            icp_tr = np.linalg.inv(icp_tr)  # We always return the object pose with respect to the target
         return icp_tr
+
+    def _view_pointcloud(self, model_pcd, target_pcd, icp_tr):
+        if self.is_model_target:
+            target_tr_pcd = copy.deepcopy(target_pcd)
+            target_tr_pcd.transform(icp_tr)
+            view_pointcloud([target_tr_pcd, model_pcd], frame=True)
+        else:
+            model_tr_pcd = copy.deepcopy(model_pcd)
+            model_tr_pcd.transform(icp_tr)
+            view_pointcloud([target_pcd, model_tr_pcd], frame=True)
 
     def _filter_input_pc(self, input_pc):
         return input_pc
