@@ -87,7 +87,7 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         """
 
         self._init_collection_sample()
-        if self.bubble_ref_obs is not self.env.bubble_ref_obs:
+        if self.bubble_ref_obs is not self.env.ref_obs:
             # record the reference
             self._record_reference_state()
 
@@ -266,10 +266,10 @@ class DrawingEvaluationDataCollection(DataCollectorBase):
         return step_i+1, obs_fcs, actions
 
     def _record_reference_state(self):
-        self.bubble_ref_obs = self.env.bubble_ref_obs
+        self.bubble_ref_obs = self.env.ref_obs
         self.reference_fc = self.get_new_filecode()
-        self.env.bubble_ref_obs.modify_data_params(self.data_save_params)
-        self.env.bubble_ref_obs.save_fc(self.reference_fc)
+        self.env.ref_obs.modify_data_params(self.data_save_params)
+        self.env.ref_obs.save_fc(self.reference_fc)
 
     def format_raw_observation(self, obs_sample_raw=None):
         if obs_sample_raw is None:

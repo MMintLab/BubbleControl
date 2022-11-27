@@ -13,7 +13,7 @@ import argparse
 
 from bubble_control.bubble_data_collection.bubble_draw_data_collection import BubbleDrawingDataCollection
 from bubble_control.bubble_envs.bubble_drawing_env import BubbleCartesianDrawingEnv, BubbleOneDirectionDrawingEnv, BubbleLineDrawingEnv
-from bubble_utils.bubble_data_collection.env_data_collection import EnvDataCollector, BubbleEnvDataCollector
+from bubble_utils.bubble_data_collection.env_data_collection import EnvDataCollector, ReferencedEnvDataCollector
 from bubble_control.bubble_model_control.aux.bubble_dynamics_fixed_model import BubbleDynamicsFixedModel
 from bubble_control.bubble_model_control.aux.format_observation import format_observation_sample
 from bubble_control.bubble_model_control.cost_functions import vertical_tool_cost_function
@@ -52,7 +52,7 @@ def collect_data_drawing_env_test(save_path, scene_name, num_data=10, prob_axis=
                              wrap_data=True,
                                        marker_code=object_name,
                            )
-    dc = BubbleEnvDataCollector(env, data_path=save_path, scene_name=scene_name)
+    dc = ReferencedEnvDataCollector(env, data_path=save_path, scene_name=scene_name)
     dc.collect_data(num_data=num_data)
 
 
@@ -87,7 +87,7 @@ def collect_data_drawing_env_jacobian_controller(save_path, scene_name, num_data
 
 
     controlled_env = ControlledEnvWrapper(env=env, controller=controller, random_action_prob=random_action_prob, controlled_action_keys=['rotation', 'length'])
-    dc = BubbleEnvDataCollector(controlled_env, data_path=save_path, scene_name=scene_name)
+    dc = ReferencedEnvDataCollector(controlled_env, data_path=save_path, scene_name=scene_name)
     dc.collect_data(num_data=num_data)
 
 
