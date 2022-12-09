@@ -13,7 +13,7 @@ from geometry_msgs.msg import TransformStamped, Pose
 from moveit_msgs.msg import AttachedCollisionObject, PlanningScene, CollisionObject
 from shape_msgs.msg import SolidPrimitive
 
-package_path = os.path.join(os.path.dirname(os.path.abspath(__file__)).split('/bubble_control')[0], 'bubble_control')
+package_path = os.path.join(os.path.dirname(os.path.abspath(__file__)).split('/bubble_drawing')[0], 'bubble_drawing')
 
 
 def broadcast_calibration_tool():

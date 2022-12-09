@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 import numpy as np
 
-from bubble_control.bubble_drawer.bubble_drawer import BubbleDrawer
+from bubble_drawing.bubble_drawer.bubble_drawer import BubbleDrawer
 
 # TEST THE CODE: ------------------------------------------------------------------------------------------------------
 

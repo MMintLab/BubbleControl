@@ -14,7 +14,7 @@ from arc_utilities.tf2wrapper import TF2Wrapper
 from victor_hardware_interface_msgs.msg import ControlMode
 from mmint_camera_utils.recorders.wrench_recorder import WrenchRecorder
 from bubble_utils.bubble_med.bubble_med import BubbleMed
-from bubble_control.bubble_contact_point_estimation.contact_point_marker_publisher import ContactPointMarkerPublisher
+from bubble_drawing.bubble_contact_point_estimation.contact_point_marker_publisher import ContactPointMarkerPublisher
 
 
 class ToolContactPointEstimator(object):

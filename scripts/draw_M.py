@@ -7,12 +7,12 @@ import numpy as np
 import tf.transformations as tr
 
 
-from bubble_control.bubble_drawer.bubble_drawer import BubbleDrawer
+from bubble_drawing.bubble_drawer.bubble_drawer import BubbleDrawer
 
 
 def draw_M(reactive=False, force_threshold=5.):
     bd = BubbleDrawer(reactive=reactive, force_threshold=force_threshold)
-    m_points = np.load('/home/mmint/InstalledProjects/robot_stack/src/bubble_control/config/M.npy')
+    m_points = np.load('/home/mmint/InstalledProjects/robot_stack/src/bubble_drawing/config/M.npy')
     m_points[:, 1] = m_points[:, 1]*(-1)
     # scale points:
     scale = 0.25

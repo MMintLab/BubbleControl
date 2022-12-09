@@ -8,7 +8,7 @@ import tf.transformations as tr
 
 from geometry_msgs.msg import Pose, Point, Quaternion
 
-from bubble_control.bubble_drawer.bubble_drawer import BubbleDrawer
+from bubble_drawing.bubble_drawer.bubble_drawer import BubbleDrawer
 from victor_hardware_interface_msgs.msg import ControlMode
 
 

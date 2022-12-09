@@ -9,7 +9,7 @@ import rospy
 import tf
 import tf.transformations as tr
 
-from bubble_control.bubble_data_collection.med_wrench_data_collection import MedWrenchDataCollection
+from bubble_drawing.bubble_data_collection.med_wrench_data_collection import MedWrenchDataCollection
 
 # TEST THE CODE: ------------------------------------------------------------------------------------------------------
 
