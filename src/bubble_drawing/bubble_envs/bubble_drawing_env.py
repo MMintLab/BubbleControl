@@ -5,7 +5,7 @@ import rospy
 from collections import OrderedDict
 import gym
 import copy
-import tf.transformations as tr
+import mmint_tools.mmint_tf_tools.transformations as tr
 
 from geometry_msgs.msg import Quaternion
 

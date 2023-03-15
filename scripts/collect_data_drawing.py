@@ -8,7 +8,7 @@ import copy
 import rospy
 import torch
 import tf
-import tf.transformations as tr
+import mmint_tools.mmint_tf_tools.transformations as tr
 import argparse
 
 from bubble_drawing.bubble_data_collection.bubble_draw_data_collection import BubbleDrawingDataCollection

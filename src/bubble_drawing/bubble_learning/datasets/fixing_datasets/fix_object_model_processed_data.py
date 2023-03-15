@@ -1,14 +1,12 @@
 import torch
 import os
 import numpy as np
-import tqdm
-from bubble_utils.bubble_datasets.transform_processed_dataset import transform_processed_dataset
+from bubble_tools.bubble_datasets import transform_processed_dataset
 from bubble_drawing.aux.load_confs import load_object_models as load_object_models_drawing
 from bubble_pivoting.aux.load_confs import load_object_models as load_object_models_pivoting
 from bubble_drawing.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
-from bubble_pivoting.datasets.bubble_pivoting_dataset import BubblePivotingDataset, BubblePivotingDownsampledDataset
-from bubble_utils.bubble_datasets.data_transformations import TensorTypeTr
-from bubble_drawing.bubble_learning.aux.orientation_trs import QuaternionToAxis
+from bubble_pivoting.datasets.bubble_pivoting_dataset import BubblePivotingDownsampledDataset
+from bubble_tools.bubble_datasets import TensorTypeTr
 
 
 class ReplaceObjectTr(object):

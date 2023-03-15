@@ -3,7 +3,7 @@ import numpy as np
 from collections import OrderedDict
 import gym
 import copy
-import tf.transformations as tr
+import mmint_tools.mmint_tf_tools.transformations as tr
 from bubble_pivoting.pivoting_model_control.aux.pivoting_geometry import get_angle_difference, get_tool_axis
 
 

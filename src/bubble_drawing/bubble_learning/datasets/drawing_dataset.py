@@ -1,8 +1,7 @@
 import os
 
-from bubble_utils.bubble_datasets.combined_dataset import CombinedDataset
+from bubble_tools.bubble_datasets import CombinedDataset
 from bubble_drawing.bubble_learning.datasets.bubble_drawing_dataset import BubbleDrawingDataset
-from bubble_drawing.bubble_learning.datasets.dataset_wrappers import BubbleImprintCombinedDatasetWrapper
 
 
 class DrawingDataset(CombinedDataset):

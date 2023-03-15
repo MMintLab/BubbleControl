@@ -2,7 +2,7 @@ import abc
 import torch
 import numpy as np
 import copy
-import tf.transformations as tr
+import mmint_tools.mmint_tf_tools.transformations as tr
 from pytorch_mppi import mppi
 import pytorch3d.transforms as batched_trs
 import matplotlib

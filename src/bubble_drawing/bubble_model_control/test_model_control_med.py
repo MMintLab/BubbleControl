@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import rospy
-import tf.transformations as tr
+import mmint_tools.mmint_tf_tools.transformations as tr
 
 from bubble_drawing.bubble_learning.aux.img_trs.block_downsampling_tr import BlockDownSamplingTr
 from bubble_drawing.bubble_learning.models.old.bubble_dynamics_pretrained_ae_model import BubbleDynamicsPretrainedAEModel

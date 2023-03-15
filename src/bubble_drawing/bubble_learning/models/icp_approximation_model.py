@@ -8,7 +8,7 @@ import pytorch_lightning as pl
 import abc
 import torchvision
 import pytorch3d.transforms as batched_trs
-import tf.transformations as tr
+import mmint_tools.mmint_tf_tools.transformations as tr
 from matplotlib import cm
 
 
